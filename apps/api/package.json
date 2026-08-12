@@ -1,0 +1,26 @@
+{
+  "name": "@watchlytics/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "generate": "drizzle-kit generate",
+    "migrate": "node --env-file=.env src/db/migrate.ts",
+    "seed": "node --env-file=.env src/seed.ts",
+    "dev": "node --env-file=.env --watch src/server.ts",
+    "test": "node --env-file=.env --test src/server.test.ts"
+  },
+  "dependencies": {
+    "@watchlytics/contract": "*",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.11.3",
+    "postgres": "^3.4.7",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "drizzle-kit": "^0.31.5",
+    "typescript": "^5.9.3"
+  }
+}

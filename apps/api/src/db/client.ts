@@ -1,0 +1,10 @@
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema.ts";
+
+const url = process.env["DATABASE_URL"];
+if (!url) throw new Error("DATABASE_URL não definida (veja .env.example)");
+
+/** Cliente cru do postgres.js. `sql` fica reservado para o template tag do drizzle. */
+export const pg = postgres(url);
+export const db = drizzle(pg, { schema });
