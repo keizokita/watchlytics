@@ -1,0 +1,77 @@
+name: check & deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: dev
+          POSTGRES_PASSWORD: dev
+          POSTGRES_DB: watchlytics
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgres://dev:dev@localhost:5432/watchlytics
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @watchlytics/contract
+      - run: npm run check
+      - name: migrate + seed
+        run: |
+          node apps/api/src/db/migrate.ts
+          node apps/api/src/seed.ts
+      - name: seed é idempotente
+        run: node apps/api/src/seed.ts | grep -q "inseridos: 0"
+      - run: node --test apps/api/src/server.test.ts
+      - run: npm run build -w @watchlytics/web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+
+  deploy-api:
+    needs: check
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency: deploy-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # Contexto na raiz: o Dockerfile copia packages/ e seed/.
+      - run: flyctl deploy --remote-only --config apps/api/fly.toml --dockerfile apps/api/Dockerfile
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-web:
+    needs: check
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency: deploy-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+      # workingDirectory em apps/web: o wrangler só enxerga functions/ no cwd,
+      # e é de lá que sai o proxy de /v1 para o Fly.
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: pages deploy dist --project-name=watchlytics

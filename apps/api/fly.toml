@@ -1,0 +1,32 @@
+app = "watchlytics-api"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Roda antes de trocar as máquinas: se a migration falhar, o deploy aborta.
+# O seed está aqui porque o catálogo é uma fixture e é idempotente por PK.
+# REMOVER o seed quando houver fornecedor de catálogo real.
+[deploy]
+  release_command = "sh -c 'node apps/api/src/db/migrate.ts && node apps/api/src/seed.ts'"
+
+[env]
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    path = "/health"
+    method = "GET"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
