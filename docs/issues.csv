@@ -1,0 +1,38 @@
+ID,Title,Track,Depends On,Status,Definition of Done,Labels
+S1,Setup pnpm workspace + tsconfig base + lint,S — Skeleton,,Ready,"`pnpm -r build` passa em api, web e contract",skeleton;infra
+S2,Create packages/contract with Zod schemas,S — Skeleton,S1,Ready,"Os mesmos tipos importam em apps/api e apps/web sem duplicação",skeleton;contract
+S3,Single migration with full schema + pgvector,S — Skeleton,S1,Ready,"`drizzle-kit migrate` sobe o banco do zero sem erro",skeleton;db
+S4,Seed: 19 genres + titles.json fixture (~100),S — Skeleton,S3,Ready,"`pnpm seed` roda duas vezes sem duplicar registros",skeleton;db
+S5,GET /v1/feed returning 20 titles (no filter/auth),S — Skeleton,S2;S4,Ready,"curl devolve JSON que valida contra o schema do contrato",skeleton;api
+S6,Single page rendering one card with gradient placeholder,S — Skeleton,S2;S5,Ready,"Card vindo do Postgres renderizado na tela",skeleton;web
+S7,Deploy skeleton to Neon + Fly + Cloudflare Pages,S — Skeleton,S5;S6,Ready,"URL pública mostra o card. CI roda migration",skeleton;infra;deploy
+A1,Feed filters: type, genre, year, language,A — Feed,S7,Backlog,"Contrato e query aceitam os quatro filtros combinados",feed;api
+A2,Exclude already-swiped + recycle dislikes after 180d,A — Feed,A1,Backlog,"Título curtido nunca reaparece; descartado volta após a janela. Teste automatizado",feed;api;test
+A3,Cursor pagination in batches of 20,A — Feed,A1,Backlog,"Duas páginas consecutivas sem sobreposição de itens",feed;api
+A4,Genre boost from taste_vector + multiplicative noise,A — Feed,A2,Backlog,"Dois usuários com gostos opostos recebem ordens diferentes",feed;api;reco
+A5,Empty-queue degradation in 3 steps,A — Feed,A2,Backlog,"Nunca aparece deck vazio sem mensagem explicando o que foi relaxado",feed;api;ux
+A6,Create indexes from PLAN §4 + EXPLAIN sanity check,A — Feed,A2,Backlog,"Feed usa index scan; nenhum seq scan em swipes",feed;db;perf
+B1,Card stack: 3 cards in DOM with translate3d,B — Swipe,S6,Backlog,"Apenas 3 cards no DOM, verificado no inspector",swipe;web
+B2,Pointer Events gesture with distance OR velocity threshold,B — Swipe,B1,Backlog,"Flick curto e rápido dispara o swipe",swipe;web
+B3,Buttons + arrow keys + prefers-reduced-motion + aria-live,B — Swipe,B2,Backlog,"Fluxo completo utilizável sem tocar na tela",swipe;web;a11y
+B4,Preload next 5 card images,B — Swipe,B1,Backlog,"Sem flash ao trocar de card",swipe;web;perf
+B5,Optimistic mutation + batched POST /v1/swipes,B — Swipe,B2;S2,Backlog,"Card sai da tela antes da resposta do servidor",swipe;web;api
+B6,Offline buffer in localStorage with flush (5 items / 3s),B — Swipe,B5,Backlog,"Modo avião: 10 swipes, volta a rede, os 10 chegam sem duplicar. Teste automatizado",swipe;web;offline;test
+B7,Undo last swipe,B — Swipe,B5,Backlog,"Desfaz sem deixar swipe órfão no servidor",swipe;web;api
+C1,DEV_USER_ID env bypass injecting fixed user,C — Identity,S5,Ready,"Trilhas A/B/D destravam sem OAuth configurado. REMOVER no merge de C2",identity;api;tech-debt
+C2,Google OAuth PKCE with code exchange on the backend,C — Identity,S7,Backlog,"Login real ponta a ponta. Código nunca trocado no browser",identity;api;web
+C3,JWT 15min + rotating opaque refresh token in sessions,C — Identity,C2,Backlog,"Refresh token reutilizado é rejeitado e revoga a sessão. Teste automatizado",identity;api;security;test
+C4,Auth middleware + rate limiting,C — Identity,C3,Backlog,"401 correto em rota protegida; limite por IP e por conta",identity;api;security
+C5,Versioned consent capture on first login,C — Identity,C2,Backlog,"Linha em consents com versão e timestamp",identity;api;legal
+C6,DELETE /v1/me and POST /v1/me/export,C — Identity,C3,Backlog,"Exclusão em cascata verificada no banco; export abre como JSON válido",identity;api;legal
+D1,PUT /v1/library/:id with status and rating,D — Library,A2;B5,Backlog,"LIKE vira entrada; interested → watched grava watched_at",library;api
+D2,Library screens: interested / watched / discarded,D — Library,D1,Backlog,"Aba descartados lê de swipes, não de library_entries",library;web
+D3,Profile stats with 10-title aggregation floor,D — Library,D1,Backlog,"Abaixo de 10 assistidos a página pública não exibe agregados",library;api;web;privacy
+D4,Onboarding: genres → 20-swipe stratified deck → taste_vector,D — Library,D1;B3,Backlog,"Contador de progresso visível; feed sai calibrado ao final",library;web;api;onboarding
+D5,Public profile + GET /u/:handle with OG tags,D — Library,D3,Backlog,"Link colado em WhatsApp/Slack renderiza preview",library;api;web
+E1,Unique handle + user search (min 3 chars, never by email),E — Social,C2,Backlog,"Busca não confirma existência de conta para termo parcial",social;api
+E2,Friend request and accept,E — Social,E1,Backlog,"Par normalizado user_a < user_b; impossível criar linha invertida. Teste automatizado",social;api;test
+E3,Real-time match on like (same transaction),E — Social,E2;D1,Backlog,"Dois amigos curtem o mesmo título → linha em matches imediatamente",social;api
+E4,Retroactive match on friendship accept + aggregated notification,E — Social,E3,Backlog,"37 títulos em comum geram 1 notificação, não 37. Teste automatizado",social;api;test
+E5,Common titles tab with match strength,E — Social,E3,Backlog,"Match forte notifica; fraco apenas aparece na aba",social;web;api
+E6,Notifications + 60s polling + badge,E — Social,E4,Backlog,"Badge zera ao abrir a aba de notificações",social;web;api
