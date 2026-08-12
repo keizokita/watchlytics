@@ -1,0 +1,23 @@
+{
+  "name": "watchlytics",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=23"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "check": "npm run check --workspaces --if-present",
+    "db:up": "podman start watchlytics-db || podman run -d --name watchlytics-db -e POSTGRES_PASSWORD=dev -e POSTGRES_USER=dev -e POSTGRES_DB=watchlytics -p 5433:5432 docker.io/pgvector/pgvector:pg17",
+    "db:down": "podman rm -f watchlytics-db",
+    "migrate": "npm run migrate -w @watchlytics/api",
+    "seed": "npm run seed -w @watchlytics/api",
+    "dev:api": "npm run dev -w @watchlytics/api",
+    "dev:web": "npm run dev -w @watchlytics/web",
+    "test": "npm run test --workspaces --if-present"
+  }
+}
