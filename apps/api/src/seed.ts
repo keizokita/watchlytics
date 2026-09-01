@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { GENRES, genreId, titleType } from "@watchlytics/contract";
 import { db, pg } from "./db/client.ts";
-import { genres, titleExternalIds, titles } from "./db/schema.ts";
+import { genres, titleExternalIds, titles, users } from "./db/schema.ts";
 
 /**
  * A fixture entra pela MESMA porta que um fornecedor real usaria:
@@ -43,6 +43,15 @@ await db
   .insert(genres)
   .values(GENRES.map((g) => ({ id: g.id, name: g.name })))
   .onConflictDoUpdate({ target: genres.id, set: { name: sql`excluded.name` } });
+
+// Usuário do shim C1. Produção não define DEV_USER_ID, então não cria nada.
+const devUserId = process.env["DEV_USER_ID"];
+if (devUserId) {
+  await db
+    .insert(users)
+    .values({ id: devUserId, handle: "dev", displayName: "Dev" })
+    .onConflictDoNothing();
+}
 
 const seeded = new Set(
   (
