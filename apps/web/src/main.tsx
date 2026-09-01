@@ -1,97 +1,89 @@
-import { StrictMode, useEffect, useState } from "react";
+import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import {
-  GENRE_NAME_BY_ID,
-  feedResponse,
-  type Title,
-} from "@watchlytics/contract";
+import { feedResponse, type Title } from "@watchlytics/contract";
+import { Deck } from "./Deck.tsx";
+import { t } from "./strings.ts";
 
-/**
- * Pôster determinístico a partir do id, enquanto não há fornecedor de catálogo.
- *
- * ponytail: gradiente valida o gesto, não o apelo visual do card. A fase 1 não
- * fecha sem ter visto a mecânica com imagem de verdade.
- */
-function gradient(id: string) {
-  const h = [...id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
-  return `linear-gradient(160deg, hsl(${h} 52% 30%), hsl(${(h + 45) % 360} 58% 12%))`;
-}
+/** Busca mais cards quando restam estes: o swipe não pode esperar rede. */
+const REFILL_AT = 5;
 
-function Card({ t }: { t: Title }) {
-  const genres = t.genreIds
-    .map((id) => GENRE_NAME_BY_ID.get(id))
-    .filter(Boolean)
-    .join(" · ");
-
-  return (
-    <article
-      style={{
-        width: "min(22rem, 100%)",
-        aspectRatio: "2 / 3",
-        borderRadius: 20,
-        padding: "1.25rem",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "flex-end",
-        background: t.posterUrl
-          ? `center / cover url(${t.posterUrl})`
-          : gradient(t.id),
-        boxShadow: "0 12px 40px rgb(0 0 0 / 0.5)",
-        userSelect: "none",
-      }}
-    >
-      <div
-        style={{
-          fontSize: "0.75rem",
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          color: "var(--muted)",
-        }}
-      >
-        {t.type === "movie" ? "Movie" : "Series"} · {t.releaseYear} ·{" "}
-        {t.voteAverage.toFixed(1)}
-      </div>
-      <h1 style={{ margin: "0.35rem 0", fontSize: "1.6rem", lineHeight: 1.15 }}>
-        {t.title}
-      </h1>
-      {t.originalTitle && t.originalTitle !== t.title && (
-        <div style={{ color: "var(--muted)", fontSize: "0.9rem" }}>
-          {t.originalTitle}
-        </div>
-      )}
-      <div
-        style={{ margin: "0.5rem 0", fontSize: "0.8rem", color: "var(--muted)" }}
-      >
-        {genres}
-      </div>
-      <p style={{ margin: 0, fontSize: "0.95rem" }}>{t.overview}</p>
-    </article>
-  );
+async function fetchFeed(): Promise<Title[]> {
+  const res = await fetch("/v1/feed");
+  if (!res.ok) throw new Error(`feed respondeu ${res.status}`);
+  return feedResponse.parse(await res.json()).items;
 }
 
 function App() {
-  const [state, setState] = useState<
-    { s: "loading" } | { s: "error"; m: string } | { s: "ok"; items: Title[] }
-  >({ s: "loading" });
+  const [queue, setQueue] = useState<Title[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [exhausted, setExhausted] = useState(false);
+  const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    fetch("/v1/feed")
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`feed respondeu ${r.status}`);
-        return feedResponse.parse(await r.json());
-      })
-      .then((f) => setState({ s: "ok", items: f.items }))
-      .catch((e: unknown) =>
-        setState({ s: "error", m: e instanceof Error ? e.message : String(e) }),
-      );
+  /**
+   * Já decididos nesta sessão. O servidor filtra pelo que está gravado, mas um
+   * refill disparado antes do POST chegar traria o título de volta.
+   */
+  const decided = useRef(new Set<string>());
+  const loading = useRef(false);
+
+  const refill = useCallback(async () => {
+    if (loading.current) return;
+    loading.current = true;
+    try {
+      const fresh = (await fetchFeed()).filter((i) => !decided.current.has(i.id));
+      setQueue((q) => {
+        const have = new Set(q.map((i) => i.id));
+        const added = fresh.filter((i) => !have.has(i.id));
+        setExhausted(added.length === 0 && q.length === 0);
+        return [...q, ...added];
+      });
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      loading.current = false;
+      setReady(true);
+    }
   }, []);
 
-  if (state.s === "loading") return <p>carregando…</p>;
-  if (state.s === "error")
-    return <p style={{ color: "#ff8080" }}>erro: {state.m}</p>;
-  if (!state.items.length) return <p>catálogo vazio — rodou o seed?</p>;
+  useEffect(() => {
+    void refill();
+  }, [refill]);
 
-  return <Card t={state.items[0]!} />;
+  const onDecide = useCallback(
+    (title: Title, direction: 1 | -1) => {
+      decided.current.add(title.id);
+      setQueue((q) => {
+        const rest = q.filter((i) => i.id !== title.id);
+        if (rest.length <= REFILL_AT) void refill();
+        return rest;
+      });
+
+      // Fire-and-forget: o card já saiu da tela. Lote de um até B6 trazer o
+      // buffer offline — o endpoint aceita array desde A0.
+      void fetch("/v1/swipes", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify([
+          { titleId: title.id, direction, clientTs: new Date().toISOString() },
+        ]),
+      }).catch((e: unknown) => console.error("swipe não gravado", e));
+    },
+    [refill],
+  );
+
+  if (error) return <p className="notice error">{t.error(error)}</p>;
+  if (!ready) return <p className="notice">{t.loading}</p>;
+  if (queue.length === 0) {
+    return (
+      <div className="notice">
+        <p>{exhausted ? t.exhausted : t.emptyCatalog}</p>
+        {exhausted && <p className="notice-hint">{t.exhaustedHint}</p>}
+      </div>
+    );
+  }
+
+  return <Deck items={queue} onDecide={onDecide} />;
 }
 
 createRoot(document.getElementById("root")!).render(

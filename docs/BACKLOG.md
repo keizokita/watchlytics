@@ -75,15 +75,15 @@ B trabalha contra mock do contrato e não espera A.
 
 ### B — Deck e swipe · frontend · depende de S2 (contrato), **não** de A
 
-| id | Tarefa | Pronto quando |
-|---|---|---|
-| B1 | Pilha de 3 cards, `translate3d` | Só 3 cards no DOM, verificado no inspector |
-| B2 | Gesto Pointer Events, disparo por distância **ou** velocidade | Flick curto e rápido conta |
-| B3 | Botões + setas do teclado + `prefers-reduced-motion` + `aria-live` | Fluxo completo sem tocar na tela |
-| B4 | Pré-carregamento das 5 próximas imagens | Sem flash ao trocar de card |
-| B5 | Mutação otimista + `POST /v1/swipes` em lote | Card sai da tela antes da resposta |
-| B6 | Buffer offline em `localStorage`, flush a cada 5 ou 3s | Modo avião: 10 swipes, volta a rede, os 10 chegam |
-| B7 | Undo de 1 | Desfaz sem duplicar swipe no servidor |
+| id | Tarefa | Pronto quando | |
+|---|---|---|---|
+| B1 | Pilha de 3 cards, `translate3d` | Só 3 cards no DOM, verificado no inspector | ✅ |
+| B2 | Gesto Pointer Events, disparo por distância **ou** velocidade | Flick curto e rápido conta | ✅ |
+| B3 | Botões + setas do teclado + `prefers-reduced-motion` + `aria-live` | Fluxo completo sem tocar na tela | ✅ |
+| B4 | Pré-carregamento das 5 próximas imagens | Sem flash ao trocar de card | ⏸ sem imagem enquanto não há fornecedor |
+| B5 | Mutação otimista + `POST /v1/swipes` em lote | Card sai da tela antes da resposta | 🟡 envio fire-and-forget feito; lote real vem com B6 |
+| B6 | Buffer offline em `localStorage`, flush a cada 5 ou 3s | Modo avião: 10 swipes, volta a rede, os 10 chegam | |
+| B7 | Undo de 1 | Desfaz sem duplicar swipe no servidor | |
 
 ### C — Identidade · fullstack · independente de A, B e D
 
@@ -100,13 +100,13 @@ B trabalha contra mock do contrato e não espera A.
 
 ### D — Catálogo pessoal e perfil · fullstack · depende de A + B
 
-| id | Tarefa | Pronto quando |
-|---|---|---|
-| D1 | `PUT /v1/library/:id` — status e rating | LIKE vira entrada; `interested → watched` grava `watched_at` |
-| D2 | Telas: interessado / assistido / descartados | Descartados lê de `swipes`, não de `library_entries` |
-| D3 | Stats + piso de 10 assistidos | Abaixo de 10 a página pública não mostra agregados |
-| D4 | Onboarding: gêneros → deck estratificado de 20 → `taste_vector` | Contador visível; feed sai calibrado |
-| D5 | Perfil público + rota `GET /u/:handle` com OG tags | Link em WhatsApp/Slack renderiza preview |
+| id | Tarefa | Pronto quando | |
+|---|---|---|---|
+| D1 | `PUT /v1/library/:id` — status e rating | LIKE vira entrada; `interested → watched` grava `watched_at` | |
+| D2 | Telas: interessado / assistido / descartados | Descartados lê de `swipes`, não de `library_entries` | |
+| D3 | Stats + piso de 10 assistidos | Abaixo de 10 a página pública não mostra agregados | |
+| D4 | Onboarding: gêneros → deck estratificado de 20 → `taste_vector` | Contador visível; feed sai calibrado | |
+| D5 | Perfil público + rota `GET /u/:handle` com OG tags | Link em WhatsApp/Slack renderiza preview | |
 
 > **D4 colide com a fixture.** 20 swipes obrigatórios sobre ~100 títulos queimam
 > 20% do catálogo na porta de entrada. Aceitável para construir e demonstrar,
@@ -114,14 +114,14 @@ B trabalha contra mock do contrato e não espera A.
 
 ### E — Social e match · fullstack · depende de D (status) + C (usuários reais)
 
-| id | Tarefa | Pronto quando |
-|---|---|---|
-| E1 | Handle único + busca (≥3 chars, nunca por email) | Busca não confirma existência de conta |
-| E2 | Pedido e aceite de amizade | Par normalizado `user_a < user_b`, sem linha invertida |
-| E3 | Match no like, na mesma transação | Dois amigos curtem o mesmo título → linha em `matches` |
-| E4 | Match retroativo no aceite, notificação **agregada** | 37 comuns geram 1 notificação, não 37 |
-| E5 | Aba "títulos em comum" com força do match | Forte notifica, fraco só aparece |
-| E6 | Notificações + polling 60s + badge | Badge zera ao abrir |
+| id | Tarefa | Pronto quando | |
+|---|---|---|---|
+| E1 | Handle único + busca (≥3 chars, nunca por email) | Busca não confirma existência de conta | |
+| E2 | Pedido e aceite de amizade | Par normalizado `user_a < user_b`, sem linha invertida | |
+| E3 | Match no like, na mesma transação | Dois amigos curtem o mesmo título → linha em `matches` | |
+| E4 | Match retroativo no aceite, notificação **agregada** | 37 comuns geram 1 notificação, não 37 | |
+| E5 | Aba "títulos em comum" com força do match | Forte notifica, fraco só aparece | |
+| E6 | Notificações + polling 60s + badge | Badge zera ao abrir | |
 
 ---
 

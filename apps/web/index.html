@@ -10,19 +10,112 @@
         --bg: #0e0f13;
         --fg: #f2f3f7;
         --muted: #9aa0ad;
+        --like: #35c98b;
+        --pass: #e0525f;
       }
       * { box-sizing: border-box; }
+
       body {
         margin: 0;
         min-height: 100dvh;
         display: grid;
         place-items: center;
-        padding: 1.5rem;
+        padding: 1.25rem;
         background: var(--bg);
         color: var(--fg);
         font: 16px/1.5 system-ui, sans-serif;
-        /* o deck não rola: o gesto de swipe é horizontal */
         overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
+
+      .deck-wrap { display: grid; gap: 1.25rem; justify-items: center; }
+
+      .deck {
+        position: relative;
+        width: min(22rem, 88vw);
+        aspect-ratio: 2 / 3;
+        /* os cards de trás são absolutos e transbordam ~52px: sem esta folga
+           eles ficam por baixo dos botões */
+        margin-bottom: 2.25rem;
+      }
+
+      .deck-card {
+        position: absolute;
+        inset: 0;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 12px 40px rgb(0 0 0 / 0.5);
+        will-change: transform;
+        /* deixa a página rolar na vertical, mas o swipe horizontal é nosso */
+        touch-action: pan-y;
+      }
+
+      .card {
+        height: 100%;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        background: linear-gradient(transparent 45%, rgb(0 0 0 / 0.55));
+      }
+      .card-meta {
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .card-title { margin: 0.35rem 0; font-size: 1.6rem; line-height: 1.15; }
+      .card-original { color: var(--muted); font-size: 0.9rem; }
+      .card-genres { margin: 0.5rem 0; font-size: 0.8rem; color: var(--muted); }
+      .card-overview { margin: 0; font-size: 0.95rem; }
+
+      .badge {
+        position: absolute;
+        top: 1.25rem;
+        padding: 0.35rem 0.9rem;
+        border: 3px solid currentColor;
+        border-radius: 10px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        z-index: 2;
+        pointer-events: none;
+      }
+      .badge-like { left: 1.25rem; color: var(--like); transform: rotate(-12deg); }
+      .badge-pass { right: 1.25rem; color: var(--pass); transform: rotate(12deg); }
+
+      .actions { display: flex; gap: 1rem; }
+      .actions button {
+        min-width: 7rem;
+        padding: 0.7rem 1.2rem;
+        border-radius: 999px;
+        border: 1px solid rgb(255 255 255 / 0.18);
+        background: rgb(255 255 255 / 0.06);
+        color: var(--fg);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .actions button:first-child:hover { border-color: var(--pass); color: var(--pass); }
+      .actions button:last-child:hover { border-color: var(--like); color: var(--like); }
+      .actions button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+
+      .notice { text-align: center; color: var(--muted); max-width: 22rem; }
+      .notice.error { color: var(--pass); }
+      .notice-hint { font-size: 0.9rem; }
+
+      .sr-only {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .deck-card { transition: none !important; }
       }
     </style>
   </head>
