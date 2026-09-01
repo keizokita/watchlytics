@@ -67,5 +67,12 @@ export type SwipeInput = z.infer<typeof swipeInput>;
 /** Em lote de propósito: o buffer offline manda vários de uma vez. */
 export const swipeBatch = z.array(swipeInput).min(1).max(50);
 
+export const swipeBatchResponse = z.object({
+  accepted: z.number().int(),
+  /** Títulos que não existem mais no catálogo. O cliente pode descartá-los. */
+  skipped: z.number().int(),
+});
+export type SwipeBatchResponse = z.infer<typeof swipeBatchResponse>;
+
 export const libraryStatus = z.enum(["interested", "watched"]);
 export type LibraryStatus = z.infer<typeof libraryStatus>;
