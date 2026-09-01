@@ -67,6 +67,7 @@ B trabalha contra mock do contrato e não espera A.
 |---|---|---|---|
 | A0 | `POST /v1/swipes` em lote e idempotente | Reenviar o mesmo lote não duplica nem falha. Teste automatizado | ✅ |
 | A1 | Filtros: tipo, gênero, ano, idioma | Contrato e query aceitam os quatro | |
+| A7 | `DELETE /v1/swipes/:titleId` | Idempotente: 204 tendo apagado linha ou não | ✅ |
 | A2 | Exclusão de já-avaliado + reciclagem de dislike (180d) | Título curtido nunca reaparece; descartado volta após a janela | ✅ |
 | A3 | Paginação por cursor, lotes de 20 | Duas páginas seguidas sem sobreposição | |
 | A4 | Boost por gênero (`taste_vector`) + ruído | Dois usuários com gostos opostos veem ordens diferentes | |
@@ -81,9 +82,9 @@ B trabalha contra mock do contrato e não espera A.
 | B2 | Gesto Pointer Events, disparo por distância **ou** velocidade | Flick curto e rápido conta | ✅ |
 | B3 | Botões + setas do teclado + `prefers-reduced-motion` + `aria-live` | Fluxo completo sem tocar na tela | ✅ |
 | B4 | Pré-carregamento das 5 próximas imagens | Sem flash ao trocar de card | ⏸ sem imagem enquanto não há fornecedor |
-| B5 | Mutação otimista + `POST /v1/swipes` em lote | Card sai da tela antes da resposta | 🟡 envio fire-and-forget feito; lote real vem com B6 |
-| B6 | Buffer offline em `localStorage`, flush a cada 5 ou 3s | Modo avião: 10 swipes, volta a rede, os 10 chegam | |
-| B7 | Undo de 1 | Desfaz sem duplicar swipe no servidor | |
+| B5 | Mutação otimista + `POST /v1/swipes` em lote | Card sai da tela antes da resposta | ✅ |
+| B6 | Buffer offline em `localStorage`, flush a cada 5 ou 3s | Modo avião: 10 swipes, volta a rede, os 10 chegam | ✅ |
+| B7 | Undo de 1 | Desfaz sem duplicar swipe no servidor | ✅ |
 
 ### C — Identidade · fullstack · independente de A, B e D
 

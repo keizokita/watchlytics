@@ -1,5 +1,6 @@
 import { and, desc, eq, gt, inArray, notExists, or, sql } from "drizzle-orm";
 import Fastify from "fastify";
+import { z } from "zod";
 import { swipeBatch, type Title } from "@watchlytics/contract";
 import { requireUserId } from "./auth.ts";
 import { db, pg } from "./db/client.ts";
@@ -134,6 +135,30 @@ export function buildServer() {
 
     return { accepted: rows.length, skipped: ids.length - rows.length };
   });
+
+  /**
+   * B7 — undo. Idempotente de propósito: 204 tendo apagado linha ou não.
+   * O cliente pode chamar depois de já ter removido o swipe da fila local.
+   */
+  app.delete<{ Params: { titleId: string } }>(
+    "/v1/swipes/:titleId",
+    async (req, reply) => {
+      const userId = requireUserId();
+      const titleId = req.params.titleId;
+
+      if (!z.uuid().safeParse(titleId).success) {
+        reply.code(400);
+        return { error: "titleId inválido" };
+      }
+
+      await db
+        .delete(swipes)
+        .where(and(eq(swipes.userId, userId), eq(swipes.titleId, titleId)));
+
+      reply.code(204);
+      return null;
+    },
+  );
 
   return app;
 }

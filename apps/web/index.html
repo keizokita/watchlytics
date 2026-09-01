@@ -85,9 +85,9 @@
       .badge-like { left: 1.25rem; color: var(--like); transform: rotate(-12deg); }
       .badge-pass { right: 1.25rem; color: var(--pass); transform: rotate(12deg); }
 
-      .actions { display: flex; gap: 1rem; }
+      .actions { display: flex; gap: 0.75rem; align-items: center; }
       .actions button {
-        min-width: 7rem;
+        min-width: 6rem;
         padding: 0.7rem 1.2rem;
         border-radius: 999px;
         border: 1px solid rgb(255 255 255 / 0.18);
@@ -100,6 +100,26 @@
       .actions button:first-child:hover { border-color: var(--pass); color: var(--pass); }
       .actions button:last-child:hover { border-color: var(--like); color: var(--like); }
       .actions button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+      .actions .undo {
+        min-width: 0;
+        padding: 0.7rem 1rem;
+        color: var(--muted);
+        background: none;
+        border-color: transparent;
+      }
+      .actions .undo:disabled { opacity: 0.35; cursor: default; }
+      .actions .undo:not(:disabled):hover { color: var(--fg); }
+
+      .notice .link {
+        margin-top: 0.75rem;
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+        border: 1px solid rgb(255 255 255 / 0.18);
+        background: none;
+        color: var(--fg);
+        font: inherit;
+        cursor: pointer;
+      }
 
       .notice { text-align: center; color: var(--muted); max-width: 22rem; }
       .notice.error { color: var(--pass); }

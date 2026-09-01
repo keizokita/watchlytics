@@ -117,6 +117,34 @@ test("like sai do feed para sempre; dislike volta depois de 180 dias", async () 
   assert.ok(aged.includes(disliked), "dislike antigo volta ao feed");
 });
 
+test("undo apaga o swipe e o título volta ao feed", async () => {
+  await db.delete(swipes).where(eq(swipes.userId, USER));
+  const [liked] = await twoFeedIds();
+  await post([
+    { titleId: liked, direction: 1, clientTs: new Date().toISOString() },
+  ]);
+  assert.ok(!(await feedIds()).includes(liked), "saiu do feed");
+
+  const del = await app.inject({
+    method: "DELETE",
+    url: `/v1/swipes/${liked}`,
+  });
+  assert.equal(del.statusCode, 204);
+  assert.ok((await feedIds()).includes(liked), "voltou ao feed");
+
+  // idempotente: o cliente pode chamar sem saber se o swipe chegou a existir
+  const again = await app.inject({
+    method: "DELETE",
+    url: `/v1/swipes/${liked}`,
+  });
+  assert.equal(again.statusCode, 204);
+});
+
+test("undo com id inválido responde 400", async () => {
+  const res = await app.inject({ method: "DELETE", url: "/v1/swipes/abc" });
+  assert.equal(res.statusCode, 400);
+});
+
 test("corpo inválido responde 400, não 500", async () => {
   const res = await app.inject({
     method: "POST",

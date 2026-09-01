@@ -19,9 +19,13 @@ type Direction = 1 | -1;
 export function Deck({
   items,
   onDecide,
+  onUndo,
+  canUndo,
 }: {
   items: Title[];
   onDecide: (title: Title, direction: Direction) => void;
+  onUndo: () => void;
+  canUndo: boolean;
 }) {
   const [drag, setDrag] = useState({ dx: 0, dy: 0, active: false });
   const [flying, setFlying] = useState<Direction | null>(null);
@@ -59,10 +63,14 @@ export function Deck({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") commit(-1);
       else if (e.key === "ArrowRight") commit(1);
+      else if (e.key === "Backspace" && canUndo) {
+        e.preventDefault();
+        onUndo();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [commit]);
+  }, [commit, canUndo, onUndo]);
 
   if (!top) return null;
 
@@ -173,6 +181,15 @@ export function Deck({
       <div className="actions">
         <button type="button" onClick={() => commit(-1)} aria-label={t.passHint}>
           {t.pass}
+        </button>
+        <button
+          type="button"
+          className="undo"
+          onClick={onUndo}
+          disabled={!canUndo}
+          aria-label={t.undoHint}
+        >
+          {t.undo}
         </button>
         <button type="button" onClick={() => commit(1)} aria-label={t.likeHint}>
           {t.like}

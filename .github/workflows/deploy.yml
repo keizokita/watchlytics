@@ -21,6 +21,8 @@ jobs:
           --health-timeout 5s --health-retries 5
     env:
       DATABASE_URL: postgres://dev:dev@localhost:5432/watchlytics
+      # C1 — só no CI e em dev. Produção nunca define, e responde 401.
+      DEV_USER_ID: 00000000-0000-4000-8000-000000000001
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,9 +36,11 @@ jobs:
         run: |
           node apps/api/src/db/migrate.ts
           node apps/api/src/seed.ts
+      # bloco literal: o `: ` dentro das aspas faria o YAML ler como mapa
       - name: seed é idempotente
-        run: node apps/api/src/seed.ts | grep -q "inseridos: 0"
-      - run: node --test apps/api/src/server.test.ts
+        run: |
+          node apps/api/src/seed.ts | grep -q "inseridos: 0"
+      - run: npm test
       - run: npm run build -w @watchlytics/web
       - uses: actions/upload-artifact@v4
         with:

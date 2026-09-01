@@ -7,8 +7,10 @@
 export const t = {
   pass: "Pass",
   like: "Like",
+  undo: "Undo",
   passHint: "Not interested (arrow left)",
   likeHint: "Interested (arrow right)",
+  undoHint: "Undo last swipe (backspace)",
   loading: "loading…",
   emptyCatalog: "Catalog is empty — did the seed run?",
   exhausted: "That's everything for now.",
