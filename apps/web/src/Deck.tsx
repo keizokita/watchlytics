@@ -10,6 +10,11 @@ const COMMIT_VELOCITY = 0.5;
 /** Deslocamento mínimo para não confundir tremor de toque com gesto. */
 const MIN_INTENT_PX = 20;
 const FLY_MS = 260;
+/**
+ * Teto do acompanhamento vertical. O card seguir o dedo na vertical é enfeite;
+ * sem limite ele empurra a altura do documento e faz aparecer barra de rolagem.
+ */
+const MAX_DRIFT_Y = 40;
 
 /** Só 3 no DOM: os de baixo existem para dar profundidade, nada mais. */
 const VISIBLE = 3;
@@ -112,9 +117,12 @@ export function Deck({
   };
 
   const ms = reduced.current ? 0 : FLY_MS;
-  const x = flying ? flying * window.innerWidth * 1.4 : drag.dx;
-  const y = flying ? drag.dy : drag.dy * 0.35;
   const clamp = (n: number) => Math.max(0, Math.min(1, n));
+  const x = flying ? flying * window.innerWidth * 1.4 : drag.dx;
+  const y = Math.max(
+    -MAX_DRIFT_Y,
+    Math.min(MAX_DRIFT_Y, drag.dy * (flying ? 1 : 0.35)),
+  );
 
   return (
     <div className="deck-wrap">
@@ -142,10 +150,11 @@ export function Deck({
                     : gradient(item.id),
                   transform: isTop
                     ? `translate3d(${x}px, ${y}px, 0) rotate(${x / 22}deg)`
-                    : // o deslocamento tem que superar o que o scale encolhe,
-                      // senão o card de trás fica invisível e some a pista de
-                      // que há mais deck embaixo
-                      `translate3d(0, ${i * 26}px, 0) scale(${1 - i * 0.05})`,
+                    : // Para CIMA, não para baixo: o deslocamento precisa
+                      // superar o que o scale encolhe (senão o card de trás
+                      // some), e por cima o que aparece é gradiente limpo —
+                      // por baixo apareceria o rodapé de texto do outro card.
+                      `translate3d(0, ${-i * 24}px, 0) scale(${1 - i * 0.05})`,
                   transition:
                     isTop && drag.active
                       ? "none"

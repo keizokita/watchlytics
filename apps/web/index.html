@@ -15,8 +15,21 @@
       }
       * { box-sizing: border-box; }
 
+      /* O card voa para ±1.4x a largura da tela e, mesmo sendo absoluto,
+         continua contando para a área de rolagem do documento — era daí que
+         vinham as duas barras.
+
+         `clip` só no eixo X: mata a barra horizontal por definição, sem criar
+         contêiner de rolagem. O eixo Y fica rolável de propósito, senão em
+         tela baixa os botões ficam inalcançáveis — e eles são o caminho
+         não-gestual exigido pela acessibilidade. O movimento vertical do card
+         é limitado no Deck para não gerar barra sozinho. */
+      html, body { overflow-x: clip; }
+
       body {
         margin: 0;
+        /* dvh, não %: porcentagem não resolve contra a altura `auto` do html,
+           e sem altura definida o grid não centraliza nada */
         min-height: 100dvh;
         display: grid;
         place-items: center;
@@ -33,11 +46,13 @@
 
       .deck {
         position: relative;
-        width: min(22rem, 88vw);
+        /* O terceiro termo é o que impede o `overflow: clip` de cortar algo:
+           limita a largura pelo que sobra de altura (botões, folgas e o topo
+           do stack ≈ 9rem), então em tela baixa o deck encolhe em vez de
+           vazar. O `max` põe um piso — abaixo disso o card seria ilegível de
+           qualquer jeito. */
+        width: min(22rem, 88vw, max(11rem, calc((100dvh - 9rem) * 2 / 3)));
         aspect-ratio: 2 / 3;
-        /* os cards de trás são absolutos e transbordam ~52px: sem esta folga
-           eles ficam por baixo dos botões */
-        margin-bottom: 2.25rem;
       }
 
       .deck-card {
@@ -47,28 +62,49 @@
         overflow: hidden;
         box-shadow: 0 12px 40px rgb(0 0 0 / 0.5);
         will-change: transform;
-        /* deixa a página rolar na vertical, mas o swipe horizontal é nosso */
-        touch-action: pan-y;
+        /* a página não rola mais, então o gesto é inteiramente nosso — evita o
+           navegador roubar um arrasto diagonal para scroll ou pull-to-refresh */
+        touch-action: none;
+        /* o texto escala com o card, não com a viewport: quando o deck encolhe
+           em tela baixa, a tipografia acompanha em vez de transbordar */
+        container-type: inline-size;
       }
 
       .card {
         height: 100%;
-        padding: 1.25rem;
+        padding: clamp(0.7rem, 5.5cqi, 1.25rem);
         display: flex;
         flex-direction: column;
         justify-content: flex-end;
+        overflow: hidden;
         background: linear-gradient(transparent 45%, rgb(0 0 0 / 0.55));
       }
       .card-meta {
-        font-size: 0.75rem;
+        font-size: clamp(0.6rem, 3.4cqi, 0.75rem);
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--muted);
       }
-      .card-title { margin: 0.35rem 0; font-size: 1.6rem; line-height: 1.15; }
-      .card-original { color: var(--muted); font-size: 0.9rem; }
-      .card-genres { margin: 0.5rem 0; font-size: 0.8rem; color: var(--muted); }
-      .card-overview { margin: 0; font-size: 0.95rem; }
+      .card-title {
+        margin: 0.35rem 0;
+        font-size: clamp(1rem, 7.3cqi, 1.6rem);
+        line-height: 1.15;
+      }
+      .card-original {
+        color: var(--muted);
+        font-size: clamp(0.7rem, 4cqi, 0.9rem);
+      }
+      .card-genres {
+        margin: 0.5rem 0;
+        font-size: clamp(0.65rem, 3.6cqi, 0.8rem);
+        color: var(--muted);
+      }
+      .card-overview {
+        margin: 0;
+        font-size: clamp(0.72rem, 4.3cqi, 0.95rem);
+        /* último recurso: em card muito baixo, corta a sinopse em vez de vazar */
+        overflow: hidden;
+      }
 
       .badge {
         position: absolute;
