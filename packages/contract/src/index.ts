@@ -43,6 +43,8 @@ export const feedQuery = z.object({
   yearTo: z.coerce.number().int().optional(),
   languages: z.array(z.string().length(2)).optional(),
   cursor: z.string().optional(),
+  /** Degrau 2 da fila vazia: o usuário aceitou rever o que já descartou. */
+  recycle: z.stringbool().optional(),
 });
 export type FeedQuery = z.infer<typeof feedQuery>;
 
@@ -205,3 +207,23 @@ export type SessionUser = z.infer<typeof sessionUser>;
 
 export const authResponse = authTokens.extend({ user: sessionUser });
 export type AuthResponse = z.infer<typeof authResponse>;
+
+  /** Degrau 2 da fila vazia: o usuário aceitou rever o que já descartou. */
+/**
+ * Vocabulário do `relaxed` — os degraus de degradação do PLAN §5.2.
+ *
+ * Os quatro primeiros são o degrau 1 (filtro afrouxado, na ordem da escada);
+ * `dislikes` é o degrau 2 aceito, `recycle-offer` é o degrau 2 oferecido e
+ * `exhausted` é o degrau 3. Existe para o cliente ter uma frase por caso —
+ * deck vazio sem explicação é o que o degrau proíbe.
+ */
+export const feedRelaxation = z.enum([
+  "year",
+  "genre",
+  "type",
+  "language",
+  "dislikes",
+  "recycle-offer",
+  "exhausted",
+]);
+export type FeedRelaxation = z.infer<typeof feedRelaxation>;

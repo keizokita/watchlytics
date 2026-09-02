@@ -18,10 +18,28 @@ const USER = process.env["DEV_USER_ID"];
 if (!USER) throw new Error("DEV_USER_ID não definida (veja .env.example)");
 
 const app = buildServer();
+
+/**
+ * TODOS os títulos que o feed ainda mostraria, não só o primeiro lote.
+ *
+ * Desde A4 a ordem tem ruído: um título que volta ao feed pode voltar em
+ * qualquer página. Perguntar só a primeira transformaria "voltou ao feed" em
+ * moeda ao ar.
+ */
 const feedIds = async () => {
-  const res = await app.inject({ method: "GET", url: "/v1/feed" });
-  assert.equal(res.statusCode, 200);
-  return (res.json() as { items: { id: string }[] }).items.map((i) => i.id);
+  const all: string[] = [];
+  let url = "/v1/feed";
+  for (;;) {
+    const res = await app.inject({ method: "GET", url });
+    assert.equal(res.statusCode, 200);
+    const body = res.json() as {
+      items: { id: string }[];
+      nextCursor: string | null;
+    };
+    all.push(...body.items.map((i) => i.id));
+    if (!body.nextCursor) return all;
+    url = `/v1/feed?cursor=${encodeURIComponent(body.nextCursor)}`;
+  }
 };
 const post = (payload: SwipeInput[]) =>
   app.inject({ method: "POST", url: "/v1/swipes", payload });

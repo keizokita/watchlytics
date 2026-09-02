@@ -24,8 +24,8 @@ test("GET /v1/feed devolve um lote válido pelo contrato", async (t) => {
   const body = feedResponse.parse(res.json());
   assert.equal(body.items.length, 20, "lote de 20");
 
-  const scores = body.items.map((i) => i.score);
-  assert.deepEqual(scores, [...scores].sort((a, b) => b - a), "score desc");
+  // A ordem deixou de ser score DESC em A4 — entrou o boost por gênero e o
+  // ruído multiplicativo. Quem guarda a ordenação agora é routes/feed.test.ts.
 
   // Sem fornecedor de catálogo, todo card cai no gradiente.
   assert.ok(

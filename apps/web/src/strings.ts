@@ -51,4 +51,28 @@ export const t = {
   signedInAs: (handle: string) => `Signed in as @${handle}`,
   authNotConfigured: "Sign-in is not configured on this build.",
   authStateMismatch: "Sign-in did not come back from where it started.",
+
+  // A1 — filtros
+  filters: "Filters",
+  filterType: "Filter by type",
+  filterGenre: "Filter by genre",
+  filterLanguage: "Filter by language",
+  filterYearFrom: "Released from year",
+  filterYearTo: "Released up to year",
+  anyType: "Any type",
+  anyGenre: "Any genre",
+  anyLanguage: "Any language",
+  yearFrom: "From",
+  yearTo: "To",
+  // A5 — o aviso é obrigatório: deck vazio sem explicação parece bug
+  relaxedNames: {
+    year: "year",
+    type: "type",
+    language: "language",
+  } as Record<string, string>,
+  relaxedBanner: (names: string[]) =>
+    `Nothing matched — ignoring your ${new Intl.ListFormat("en").format(names)} filter${names.length > 1 ? "s" : ""}.`,
+  recycleOffer: "Nothing new matches. Want to see titles you passed on before?",
+  recycleAction: "Show passed titles",
+  recycled: "Showing titles you passed on before.",
 } as const;
