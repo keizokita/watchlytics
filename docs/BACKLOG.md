@@ -66,13 +66,13 @@ B trabalha contra mock do contrato e não espera A.
 | id | Tarefa | Pronto quando | |
 |---|---|---|---|
 | A0 | `POST /v1/swipes` em lote e idempotente | Reenviar o mesmo lote não duplica nem falha. Teste automatizado | ✅ |
-| A1 | Filtros: tipo, gênero, ano, idioma | Contrato e query aceitam os quatro | |
+| A1 | Filtros: tipo, gênero, ano, idioma | Contrato e query aceitam os quatro | ✅ backend; UI pendente |
 | A7 | `DELETE /v1/swipes/:titleId` | Idempotente: 204 tendo apagado linha ou não | ✅ |
 | A2 | Exclusão de já-avaliado + reciclagem de dislike (180d) | Título curtido nunca reaparece; descartado volta após a janela | ✅ |
-| A3 | Paginação por cursor, lotes de 20 | Duas páginas seguidas sem sobreposição | |
-| A4 | Boost por gênero (`taste_vector`) + ruído | Dois usuários com gostos opostos veem ordens diferentes | |
-| A5 | Degradação em 3 degraus da fila vazia | Nunca aparece deck vazio sem mensagem | |
-| A6 | Índices do §4 + `EXPLAIN` de sanidade | Feed usa index scan, não seq scan em `swipes` | |
+| A3 | Paginação por cursor, lotes de 20 | Duas páginas seguidas sem sobreposição | ✅ |
+| A4 | Boost por gênero (`taste_vector`) + ruído | Dois usuários com gostos opostos veem ordens diferentes | ✅ |
+| A5 | Degradação em 3 degraus da fila vazia | Nunca aparece deck vazio sem mensagem | ✅ |
+| A6 | Índices do §4 + `EXPLAIN` de sanidade | Feed usa index scan, não seq scan em `swipes` | ✅ |
 
 ### B — Deck e swipe · frontend · depende de S2 (contrato), **não** de A
 
@@ -91,9 +91,9 @@ B trabalha contra mock do contrato e não espera A.
 | id | Tarefa | Pronto quando | |
 |---|---|---|---|
 | C1 | `DEV_USER_ID` no `.env` injetando usuário fixo | A/B/D destravam sem OAuth | ✅ |
-| C2 | Google OAuth PKCE, troca do código **no backend** | Login real ponta a ponta | |
-| C3 | JWT 15min + refresh opaco rotacionado em `sessions` | Refresh usado duas vezes é rejeitado | |
-| C4 | Middleware de auth + rate limit | 401 correto, limite por IP e por conta | |
+| C2 | Google OAuth PKCE, troca do código **no backend** | Login real ponta a ponta | ✅ |
+| C3 | JWT 15min + refresh opaco rotacionado em `sessions` | Refresh usado duas vezes é rejeitado | ✅ |
+| C4 | Middleware de auth + rate limit | 401 correto, limite por IP e por conta | ✅ |
 | C5 | Consentimento versionado no primeiro login | Linha em `consents` com versão | |
 | C6 | `DELETE /v1/me` e `POST /v1/me/export` | Exclusão em cascata verificada; export abre como JSON | |
 
@@ -103,9 +103,9 @@ B trabalha contra mock do contrato e não espera A.
 
 | id | Tarefa | Pronto quando | |
 |---|---|---|---|
-| D1 | `PUT /v1/library/:id` — status e rating | LIKE vira entrada; `interested → watched` grava `watched_at` | |
-| D2 | Telas: interessado / assistido / descartados | Descartados lê de `swipes`, não de `library_entries` | |
-| D3 | Stats + piso de 10 assistidos | Abaixo de 10 a página pública não mostra agregados | |
+| D1 | `PUT /v1/library/:id` — status e rating | LIKE vira entrada; `interested → watched` grava `watched_at` | ✅ |
+| D2 | Telas: interessado / assistido / descartados | Descartados lê de `swipes`, não de `library_entries` | ✅ |
+| D3 | Stats + piso de 10 assistidos | Abaixo de 10 a página pública não mostra agregados | ✅ |
 | D4 | Onboarding: gêneros → deck estratificado de 20 → `taste_vector` | Contador visível; feed sai calibrado | |
 | D5 | Perfil público + rota `GET /u/:handle` com OG tags | Link em WhatsApp/Slack renderiza preview | |
 
