@@ -6,10 +6,10 @@
   "scripts": {
     "check": "tsc --noEmit",
     "generate": "drizzle-kit generate",
-    "migrate": "node --env-file=.env src/db/migrate.ts",
-    "seed": "node --env-file=.env src/seed.ts",
-    "dev": "node --env-file=.env --watch src/server.ts",
-    "test": "node --env-file=.env --test \"src/**/*.test.ts\""
+    "migrate": "node --env-file-if-exists=.env src/db/migrate.ts",
+    "seed": "node --env-file-if-exists=.env src/seed.ts",
+    "dev": "node --env-file-if-exists=.env --watch src/server.ts",
+    "test": "node --env-file-if-exists=.env --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@watchlytics/contract": "*",

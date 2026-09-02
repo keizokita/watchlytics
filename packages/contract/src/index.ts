@@ -142,3 +142,66 @@ export const profileStats = z.object({
     .nullable(),
 });
 export type ProfileStats = z.infer<typeof profileStats>;
+
+
+// ─── identidade (C2/C3) ─────────────────────────────────────────────────────
+
+/** Apple entra aqui na fase 4 — a rota já é /v1/auth/oauth/:provider. */
+export const oauthProvider = z.enum(["google"]);
+export type OauthProvider = z.infer<typeof oauthProvider>;
+
+/**
+ * Para onde vai o refresh token.
+ *
+ * `cookie` — web: httpOnly, fora do alcance de XSS, nunca aparece no corpo.
+ * `body`   — nativo: devolvido no JSON e guardado em SecureStore.
+ *
+ * Mesmo endpoint, transporte diferente. É isso que faz a fase 4 ser só UI.
+ */
+export const authTransport = z.enum(["cookie", "body"]);
+export type AuthTransport = z.infer<typeof authTransport>;
+
+export const oauthExchange = z.object({
+  code: z.string().min(1).max(2048),
+  /** RFC 7636 §4.1: 43–128 caracteres do alfabeto unreserved. */
+  codeVerifier: z
+    .string()
+    .min(43)
+    .max(128)
+    .regex(/^[A-Za-z0-9\-._~]+$/, "code_verifier fora do alfabeto do RFC 7636"),
+  /**
+   * Precisa ser byte a byte o mesmo usado na autorização — o provedor recusa
+   * a troca se divergir. O servidor ainda confere contra a própria allowlist.
+   */
+  redirectUri: z.url(),
+  transport: authTransport.default("cookie"),
+});
+export type OauthExchange = z.infer<typeof oauthExchange>;
+
+export const refreshRequest = z.object({
+  /** Ausente no transporte cookie: aí o refresh vem do header Cookie. */
+  refresh: z.string().min(1).max(512).optional(),
+  transport: authTransport.default("cookie"),
+});
+export type RefreshRequest = z.infer<typeof refreshRequest>;
+
+export const authTokens = z.object({
+  access: z.string(),
+  /** Segundos de vida do access. O cliente renova ANTES, não depois do 401. */
+  expiresIn: z.number().int().positive(),
+  /** Só no transporte body. No cookie este campo não existe, de propósito. */
+  refresh: z.string().optional(),
+});
+export type AuthTokens = z.infer<typeof authTokens>;
+
+/** O mínimo para a UI se identificar. Stats e catálogo têm rotas próprias. */
+export const sessionUser = z.object({
+  id: z.uuid(),
+  handle: z.string(),
+  displayName: z.string(),
+  avatarUrl: z.url().nullable(),
+});
+export type SessionUser = z.infer<typeof sessionUser>;
+
+export const authResponse = authTokens.extend({ user: sessionUser });
+export type AuthResponse = z.infer<typeof authResponse>;

@@ -45,4 +45,10 @@ export const t = {
   /** Piso de agregação: a tela explica por que ainda não há número. */
   statsLocked: (missing: number, floor: number) =>
     `${missing} more watched to unlock your stats — averages over fewer than ${floor} titles would just spell out your library.`,
+
+  signIn: "Sign in with Google",
+  signOut: "Sign out",
+  signedInAs: (handle: string) => `Signed in as @${handle}`,
+  authNotConfigured: "Sign-in is not configured on this build.",
+  authStateMismatch: "Sign-in did not come back from where it started.",
 } as const;

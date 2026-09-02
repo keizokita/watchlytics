@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import { pg } from "./db/client.ts";
+import { registerAuth } from "./routes/auth.ts";
 import { feedRoutes } from "./routes/feed.ts";
 import { libraryRoutes } from "./routes/library.ts";
 import { swipeRoutes } from "./routes/swipes.ts";
@@ -14,6 +15,7 @@ export function buildServer() {
 
   app.get("/health", async () => ({ ok: true }));
 
+  registerAuth(app);
   feedRoutes(app);
   swipeRoutes(app);
   libraryRoutes(app);

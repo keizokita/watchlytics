@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { feedResponse, type Title } from "@watchlytics/contract";
 import { Deck } from "./Deck.tsx";
 import { Library } from "./Library.tsx";
+import { Login } from "./Login.tsx";
 import { drop, enqueue, startFlushing } from "./swipeQueue.ts";
 import { t } from "./strings.ts";
 
@@ -158,6 +159,7 @@ function Root() {
         <a href="#/library" aria-current={inLibrary ? "page" : undefined}>
           {t.navLibrary}
         </a>
+        <Login />
       </nav>
       {inLibrary ? <Library /> : <App />}
     </div>
