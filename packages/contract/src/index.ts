@@ -76,3 +76,69 @@ export type SwipeBatchResponse = z.infer<typeof swipeBatchResponse>;
 
 export const libraryStatus = z.enum(["interested", "watched"]);
 export type LibraryStatus = z.infer<typeof libraryStatus>;
+
+export const rating = z.number().int().min(1).max(5);
+
+/**
+ * D1 — corpo de `PUT /v1/library/:titleId`.
+ *
+ * PUT é substituição, não patch: `rating` ausente grava NULL. Um PATCH que
+ * distinguisse "não mandei" de "apague a nota" exigiria três estados no
+ * cliente para uma tela que tem dois botões.
+ */
+export const libraryInput = z.object({
+  status: libraryStatus,
+  rating: rating.nullable().optional(),
+});
+export type LibraryInput = z.infer<typeof libraryInput>;
+
+export const libraryEntry = z.object({
+  title,
+  status: libraryStatus,
+  rating: rating.nullable(),
+  addedAt: z.iso.datetime(),
+  /** Carimbado na transição interested → watched, nunca antes. */
+  watchedAt: z.iso.datetime().nullable(),
+});
+export type LibraryEntry = z.infer<typeof libraryEntry>;
+
+export const libraryListResponse = z.object({
+  items: z.array(libraryEntry),
+});
+export type LibraryListResponse = z.infer<typeof libraryListResponse>;
+
+/**
+ * D2 — descartados vêm de `swipes` (direction = -1), NÃO de `library_entries`.
+ *
+ * São ciclos de vida diferentes: o dislike é reciclável em 180 dias e some
+ * sozinho da lista; a entrada de catálogo é uma decisão que o usuário tomou e
+ * só ele desfaz. Por isso não há `status: "discarded"` — o tipo aqui é `Title`
+ * puro, e é o contrato que impede alguém de fundir as duas tabelas depois.
+ */
+export const discardedResponse = z.object({
+  items: z.array(title),
+});
+export type DiscardedResponse = z.infer<typeof discardedResponse>;
+
+/** Piso de agregação — PLAN §8.3. Abaixo disso nenhum agregado sai da API. */
+export const STATS_MIN_WATCHED = 10;
+
+export const profileStats = z.object({
+  watchedCount: z.number().int(),
+  /**
+   * `null` abaixo de STATS_MIN_WATCHED. Com 2 filmes assistidos, "gênero
+   * dominante" e "década favorita" praticamente reconstroem o catálogo —
+   * agregado de amostra minúscula não é agregado, é o dado cru.
+   */
+  aggregates: z
+    .object({
+      topGenres: z.array(
+        z.object({ genreId, count: z.number().int() }),
+      ),
+      /** Soma de runtime_minutes; título sem runtime conta como zero. */
+      estimatedMinutes: z.number().int(),
+      favoriteDecade: z.number().int(),
+    })
+    .nullable(),
+});
+export type ProfileStats = z.infer<typeof profileStats>;

@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { pg } from "./db/client.ts";
 import { feedRoutes } from "./routes/feed.ts";
+import { libraryRoutes } from "./routes/library.ts";
 import { swipeRoutes } from "./routes/swipes.ts";
 
 /**
@@ -15,6 +16,7 @@ export function buildServer() {
 
   feedRoutes(app);
   swipeRoutes(app);
+  libraryRoutes(app);
 
   return app;
 }

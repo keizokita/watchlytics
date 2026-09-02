@@ -2,6 +2,7 @@ import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { feedResponse, type Title } from "@watchlytics/contract";
 import { Deck } from "./Deck.tsx";
+import { Library } from "./Library.tsx";
 import { drop, enqueue, startFlushing } from "./swipeQueue.ts";
 import { t } from "./strings.ts";
 
@@ -120,8 +121,51 @@ function App() {
   );
 }
 
+/**
+ * Navegação pelo hash — duas telas não pagam um router.
+ *
+ * ponytail: vira react-router na terceira rota, ou na primeira que precisar de
+ * parâmetro de caminho (o perfil público de D5 já precisa).
+ */
+function Root() {
+  const [hash, setHash] = useState(() => location.hash);
+
+  useEffect(() => {
+    const onHash = () => setHash(location.hash);
+    addEventListener("hashchange", onHash);
+    return () => removeEventListener("hashchange", onHash);
+  }, []);
+
+  const inLibrary = hash.startsWith("#/library");
+
+  return (
+    <div className="shell">
+      <style>{`
+        .shell { display: grid; gap: 1.25rem; justify-items: center; }
+        .shell nav { display: flex; gap: 0.5rem; }
+        .shell nav a {
+          padding: 0.4rem 0.9rem; border-radius: 999px; text-decoration: none;
+          color: var(--muted); font-size: 0.9rem; font-weight: 600;
+        }
+        .shell nav a[aria-current="page"] {
+          color: var(--fg); background: rgb(255 255 255 / 0.08);
+        }
+      `}</style>
+      <nav>
+        <a href="#/" aria-current={inLibrary ? undefined : "page"}>
+          {t.navDeck}
+        </a>
+        <a href="#/library" aria-current={inLibrary ? "page" : undefined}>
+          {t.navLibrary}
+        </a>
+      </nav>
+      {inLibrary ? <Library /> : <App />}
+    </div>
+  );
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <Root />
   </StrictMode>,
 );

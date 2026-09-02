@@ -4,7 +4,7 @@ import { z } from "zod";
 import { swipeBatch } from "@watchlytics/contract";
 import { requireUserId } from "../auth.ts";
 import { db } from "../db/client.ts";
-import { swipes, titles } from "../db/schema.ts";
+import { libraryEntries, swipes, titles } from "../db/schema.ts";
 
 export function swipeRoutes(app: FastifyInstance) {
   /**
@@ -56,16 +56,36 @@ export function swipeRoutes(app: FastifyInstance) {
       });
 
     if (rows.length) {
-      await db
-        .insert(swipes)
-        .values(rows)
-        .onConflictDoUpdate({
-          target: [swipes.userId, swipes.titleId],
-          set: {
-            direction: sql`excluded.direction`,
-            updatedAt: sql`excluded.updated_at`,
-          },
-        });
+      await db.transaction(async (tx) => {
+        await tx
+          .insert(swipes)
+          .values(rows)
+          .onConflictDoUpdate({
+            target: [swipes.userId, swipes.titleId],
+            set: {
+              direction: sql`excluded.direction`,
+              updatedAt: sql`excluded.updated_at`,
+            },
+          });
+
+        // D1 — o LIKE vira entrada de catálogo aqui, na mesma transação em que
+        // a decisão é gravada. DO NOTHING para nunca rebaixar um `watched` que
+        // o usuário já marcou.
+        const liked = rows.filter((r) => r.direction === 1);
+        if (liked.length) {
+          await tx
+            .insert(libraryEntries)
+            .values(
+              liked.map((r) => ({
+                userId,
+                titleId: r.titleId,
+                status: "interested",
+                addedAt: r.createdAt,
+              })),
+            )
+            .onConflictDoNothing();
+        }
+      });
     }
 
     return { accepted: rows.length, skipped: ids.length - rows.length };
