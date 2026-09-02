@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//tmp/watchlytics-run/**)",
+      "Bash(curl -s -o /dev/null -w 'favicon.ico -> %{http_code}\\\\n' http://localhost:5173/favicon.ico)",
+      "Edit(/.claude/skills/run-watchlytics/**)",
+      "Bash(PGPASSWORD=dev psql -h localhost -p 5433 -U dev -d watchlytics -At -c ' *)",
+      "Bash(PGPASSWORD=dev psql -h localhost -p 5433 -U dev -d watchlytics -c \"select id, handle, display_name, created_at from users;\")",
+      "Bash(apt-cache policy *)",
+      "Bash(rpm -q google-chrome-stable)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(sed -i -e 's#^| B5 | Mutação otimista + `POST /v1/swipes` em lote | Card sai da tela antes da resposta | 🟡 envio fire-and-forget feito; lote real vem com B6 |#| B5 | Mutação otimista + `POST /v1/swipes` em lote | Card sai da tela antes da resposta | ✅ |#' -e 's#^| B6 | \\\\\\(.*\\\\\\) | Modo avião: 10 swipes, volta a rede, os 10 chegam | |#| B6 | \\\\1 | Modo avião: 10 swipes, volta a rede, os 10 chegam | ✅ |#' -e 's#^| B7 | Undo de 1 | Desfaz sem duplicar swipe no servidor | |#| B7 | Undo de 1 | Desfaz sem duplicar swipe no servidor | ✅ |#' docs/BACKLOG.md)",
+      "Bash(sed -i 's#^| A1 | Filtros: tipo, gênero, ano, idioma | Contrato e query aceitam os quatro | |#| A1 | Filtros: tipo, gênero, ano, idioma | Contrato e query aceitam os quatro | |\\\\n| A7 | `DELETE /v1/swipes/:titleId` | Idempotente: 204 tendo apagado linha ou não | ✅ |#' docs/BACKLOG.md)",
+      "Bash(PATH=/home/keizokita/.nvm/versions/node/v25.4.0/bin:__TRACKED_VAR__ npx vite --port 5173 --host)",
+      "Bash(git log *)",
+      "Edit(~/.claude/skills/smart-commit/**)"
+    ],
+    "defaultMode": "bypassPermissions"
+  }
+}
