@@ -94,8 +94,8 @@ B trabalha contra mock do contrato e não espera A.
 | C2 | Google OAuth PKCE, troca do código **no backend** | Login real ponta a ponta | ✅ |
 | C3 | JWT 15min + refresh opaco rotacionado em `sessions` | Refresh usado duas vezes é rejeitado | ✅ |
 | C4 | Middleware de auth + rate limit | 401 correto, limite por IP e por conta | ✅ |
-| C5 | Consentimento versionado no primeiro login | Linha em `consents` com versão | |
-| C6 | `DELETE /v1/me` e `POST /v1/me/export` | Exclusão em cascata verificada; export abre como JSON | |
+| C5 | Consentimento versionado no primeiro login | Linha em `consents` com versão | ✅ |
+| C6 | `DELETE /v1/me` e `POST /v1/me/export` | Exclusão em cascata verificada; export abre como JSON | ✅ |
 
 > C1 é dívida deliberada. Sai no merge de C2 — não deixe virar bypass permanente.
 

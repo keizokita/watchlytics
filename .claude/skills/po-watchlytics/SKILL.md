@@ -41,8 +41,9 @@ Marca `✅` é afirmação, não prova. Confira as que o usuário vai tocar agor
 - Suíte e typecheck: `npm run check && npm test` (precisa do banco; veja o
   skill `run-watchlytics`).
 - Mexeu em API ou deck? `node .claude/skills/run-watchlytics/driver.mjs all`.
-- Existir arquivo não é estar pronto: `Filters.tsx` compila, tem backend
-  completo e **não está montado** — A1 está `✅ backend; UI pendente`.
+- Existir arquivo não é estar pronto, e commit não é o mesmo que árvore de
+  trabalho. Já aconteceu duas vezes: `Filters.tsx` compilava sem estar montado
+  (A1), e o C6 chegou pronto e verde só no `git status`. Cheque os dois.
 
 Achou marca mentindo, nos dois sentidos, corrija a linha do backlog. É a saída
 mais barata que este skill produz.

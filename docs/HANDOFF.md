@@ -24,14 +24,14 @@ HTML renderizado no servidor. Toda decisão de arquitetura protege esse caminho.
 O `git log` é documentação de verdade aqui: cada commit explica a decisão, não
 só a mudança. Vale ler antes de propor refazer algo.
 
-## Estado: 27 de 39 tarefas
+## Estado: 29 de 39 tarefas
 
 | Trilha | | |
 |---|---|---|
 | **S** esqueleto | 6/7 | falta só o deploy (bloqueado em contas) |
 | **A** feed | 8/8 | backend e UI de filtro completos |
 | **B** swipe | 6/7 | B4 (pré-carga de imagem) pausada — não há pôster |
-| **C** identidade | 4/6 | falta C5 (consentimento) e C6 (exclusão/export) |
+| **C** identidade | 6/6 | completa — falta exercitar contra o Google real |
 | **D** catálogo | 3/5 | falta D4 (onboarding) e D5 (perfil público) |
 | **E** social | 0/6 | não começou |
 
@@ -39,7 +39,7 @@ só a mudança. Vale ler antes de propor refazer algo.
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
 repetir; o LIKE vira coleção com abas e estatísticas.
 
-**48 testes** (43 API + 5 fila), `npm run check` limpo nos três pacotes.
+**53 testes** (48 API + 5 fila), `npm run check` limpo nos três pacotes.
 
 ## Ambiente — o que custa caro redescobrir
 
@@ -98,9 +98,9 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 
 ## Bloqueado na pessoa, não no código
 
-1. **Contas para o S7** — Neon, Fly, Cloudflare, GitHub. Os artefatos estão
-   prontos e verificados em container. Vira urgente quando alguém mais commitar:
-   **o CI nunca rodou**, não há remote.
+1. **Contas para o S7** — Neon, Fly, Cloudflare. Os artefatos estão prontos e
+   verificados em container. O remote existe e recebeu o primeiro push em
+   2026-09-02, então o CI do GitHub já roda; falta o destino do deploy.
 2. **Credenciais do Google Cloud** para C2 funcionar de verdade. A troca de
    código está isolada em `providers.google` e testada com stub; o fluxo real
    nunca foi exercitado.
@@ -124,7 +124,9 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 
 ## Próximos passos sugeridos
 
-1. **D4 + D5** — onboarding e perfil público fecham a trilha D.
-2. **C5 + C6** — consentimento versionado e exclusão/exportação. São requisito
-   legal (LGPD/GDPR), não item de backlog comum.
-3. **Trilha E** — social e match. Depende de C para ter usuários de verdade.
+1. **D5** — perfil público e `GET /u/:handle` com OG tags. Agora que o C6
+   existe, expor perfil já vem com exclusão e portabilidade atrás.
+2. **D4** — onboarding. Decida o recorte antes: 20 swipes obrigatórios sobre 94
+   títulos queimam 20% do catálogo na porta de entrada.
+3. **Trilha E** — social e match. C está completa, então a dependência de
+   usuários de verdade virou só a credencial do Google.
