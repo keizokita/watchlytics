@@ -18,6 +18,8 @@ export const t = {
   error: (m: string) => `error: ${m}`,
   movie: "Movie",
   series: "Series",
+  /** O número sozinho no chip do card não diz de que escala ele é. */
+  voteHint: (n: number) => `Rated ${n.toFixed(1)} out of 10`,
 
   // D2 — catálogo pessoal
   navDeck: "Deck",

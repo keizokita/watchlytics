@@ -200,11 +200,11 @@ function App() {
       {relaxed.includes("dislikes") && <p className="notice">{t.recycled}</p>}
 
       {error ? (
-        <p className="notice error">{t.error(error)}</p>
+        <p className="notice deck-slot error">{t.error(error)}</p>
       ) : !ready ? (
-        <p className="notice">{t.loading}</p>
+        <p className="notice deck-slot loading">{t.loading}</p>
       ) : queue.length === 0 ? (
-        <div className="notice">
+        <div className="notice deck-slot empty">
           <p>{offer ? t.recycleOffer : t.exhausted}</p>
           {offer ? (
             <button

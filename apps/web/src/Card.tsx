@@ -18,18 +18,30 @@ export function Card({ title: item }: { title: Title }) {
     .filter(Boolean)
     .join(" · ");
 
+  /** Ano e gênero são a mesma classe de informação: uma linha, um separador. */
+  const meta = [String(item.releaseYear), genres].filter(Boolean).join(" · ");
+
   return (
     <article className="card">
-      <div className="card-meta">
-        {item.type === "movie" ? t.movie : t.series} · {item.releaseYear} ·{" "}
-        {item.voteAverage.toFixed(1)}
+      {/* Tipo e nota sobem para o topo: são o filtro rápido de quem decide em
+          um segundo, e no rodapé viravam mais uma linha cinza antes do título. */}
+      <div className="card-top">
+        <span className="card-kind">
+          {item.type === "movie" ? t.movie : t.series}
+        </span>
+        <span className="card-score" aria-label={t.voteHint(item.voteAverage)}>
+          {item.voteAverage.toFixed(1)}
+        </span>
       </div>
-      <h2 className="card-title">{item.title}</h2>
-      {item.originalTitle && item.originalTitle !== item.title && (
-        <div className="card-original">{item.originalTitle}</div>
-      )}
-      <div className="card-genres">{genres}</div>
-      <p className="card-overview">{item.overview}</p>
+
+      <div className="card-body">
+        <h2 className="card-title">{item.title}</h2>
+        {item.originalTitle && item.originalTitle !== item.title && (
+          <p className="card-original">{item.originalTitle}</p>
+        )}
+        <p className="card-meta">{meta}</p>
+        <p className="card-overview">{item.overview}</p>
+      </div>
     </article>
   );
 }

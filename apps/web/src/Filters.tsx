@@ -94,22 +94,27 @@ export function Filters({
         ))}
       </select>
 
-      <input
-        type="number"
-        inputMode="numeric"
-        aria-label={t.filterYearFrom}
-        placeholder={t.yearFrom}
-        value={value.yearFrom ?? ""}
-        onChange={(e) => set({ yearFrom: year(e.target.value) })}
-      />
-      <input
-        type="number"
-        inputMode="numeric"
-        aria-label={t.filterYearTo}
-        placeholder={t.yearTo}
-        value={value.yearTo ?? ""}
-        onChange={(e) => set({ yearTo: year(e.target.value) })}
-      />
+      {/* De/até é UM controle. Soltos, os dois campos quebravam em linhas
+          diferentes numa tela de 360px — três linhas de filtro em vez de
+          duas, que é o que a reserva de altura do deck assume. */}
+      <div className="filter-range">
+        <input
+          type="number"
+          inputMode="numeric"
+          aria-label={t.filterYearFrom}
+          placeholder={t.yearFrom}
+          value={value.yearFrom ?? ""}
+          onChange={(e) => set({ yearFrom: year(e.target.value) })}
+        />
+        <input
+          type="number"
+          inputMode="numeric"
+          aria-label={t.filterYearTo}
+          placeholder={t.yearTo}
+          value={value.yearTo ?? ""}
+          onChange={(e) => set({ yearTo: year(e.target.value) })}
+        />
+      </div>
     </div>
   );
 }

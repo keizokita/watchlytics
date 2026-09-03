@@ -117,7 +117,6 @@ export function Deck({
   };
 
   const ms = reduced.current ? 0 : FLY_MS;
-  const clamp = (n: number) => Math.max(0, Math.min(1, n));
   const x = flying ? flying * window.innerWidth * 1.4 : drag.dx;
   const y = Math.max(
     -MAX_DRIFT_Y,
@@ -144,41 +143,38 @@ export function Deck({
                 key={item.id}
                 className="deck-card"
                 aria-hidden={!isTop}
-                style={{
-                  background: item.posterUrl
-                    ? `center / cover url(${item.posterUrl})`
-                    : gradient(item.id),
-                  transform: isTop
-                    ? `translate3d(${x}px, ${y}px, 0) rotate(${x / 22}deg)`
-                    : // Para CIMA, não para baixo: o deslocamento precisa
-                      // superar o que o scale encolhe (senão o card de trás
-                      // some), e por cima o que aparece é gradiente limpo —
-                      // por baixo apareceria o rodapé de texto do outro card.
-                      `translate3d(0, ${-i * 24}px, 0) scale(${1 - i * 0.05})`,
-                  transition:
-                    isTop && drag.active
-                      ? "none"
-                      : `transform ${ms}ms cubic-bezier(.2,.7,.3,1)`,
-                  zIndex: VISIBLE - i,
-                }}
+                style={
+                  {
+                    background: item.posterUrl
+                      ? `center / cover url(${item.posterUrl})`
+                      : gradient(item.id),
+                    transform: isTop
+                      ? `translate3d(${x}px, ${y}px, 0) rotate(${x / 22}deg)`
+                      : // Para CIMA, não para baixo: o deslocamento precisa
+                        // superar o que o scale encolhe (senão o card de trás
+                        // some), e por cima o que aparece é gradiente limpo —
+                        // por baixo apareceria o rodapé de texto do outro card.
+                        `translate3d(0, ${-i * 18}px, 0) scale(${1 - i * 0.04})`,
+                    transition:
+                      isTop && drag.active
+                        ? "none"
+                        : `transform ${ms}ms cubic-bezier(.2,.7,.3,1)`,
+                    zIndex: VISIBLE - i,
+                    // O CSS decide o que fazer com o progresso do gesto: -1 no
+                    // limiar de pass, +1 no de like. `opacity` fora de 0–1 é
+                    // clampada pelo próprio CSS, então um valor com sinal
+                    // basta para os dois carimbos.
+                    ...(isTop ? { "--swipe": x / COMMIT_PX } : {}),
+                  } as React.CSSProperties
+                }
                 {...(isTop
                   ? { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp }
                   : {})}
               >
                 {isTop && (
                   <>
-                    <span
-                      className="badge badge-like"
-                      style={{ opacity: clamp(x / COMMIT_PX) }}
-                    >
-                      {t.like}
-                    </span>
-                    <span
-                      className="badge badge-pass"
-                      style={{ opacity: clamp(-x / COMMIT_PX) }}
-                    >
-                      {t.pass}
-                    </span>
+                    <span className="badge badge-like">{t.like}</span>
+                    <span className="badge badge-pass">{t.pass}</span>
                   </>
                 )}
                 <Card title={item} />
@@ -187,8 +183,16 @@ export function Deck({
           })}
       </div>
 
+      {/* Classe por papel, não por posição: o CSS pintava pass/like por
+          :first-child/:last-child e a ordem já mudou uma vez (B7 pôs o Undo
+          no meio) — teria trocado de dono sem quebrar nada visível. */}
       <div className="actions">
-        <button type="button" onClick={() => commit(-1)} aria-label={t.passHint}>
+        <button
+          type="button"
+          className="pass"
+          onClick={() => commit(-1)}
+          aria-label={t.passHint}
+        >
           {t.pass}
         </button>
         <button
@@ -200,7 +204,12 @@ export function Deck({
         >
           {t.undo}
         </button>
-        <button type="button" onClick={() => commit(1)} aria-label={t.likeHint}>
+        <button
+          type="button"
+          className="like"
+          onClick={() => commit(1)}
+          aria-label={t.likeHint}
+        >
           {t.like}
         </button>
       </div>
