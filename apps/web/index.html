@@ -388,6 +388,78 @@
       }
       @keyframes ghost { 50% { opacity: 0.4; } }
 
+      /* ─── onboarding (D4) ──────────────────────────────────────────────── */
+
+      .onboarding {
+        display: grid;
+        gap: 1rem;
+        justify-items: center;
+        text-align: center;
+        max-width: min(34rem, 92vw);
+      }
+      .onboarding h1 {
+        margin: 0;
+        font-size: clamp(1.15rem, 5vw, 1.5rem);
+        letter-spacing: -0.015em;
+        text-wrap: balance;
+      }
+
+      /* Chip, não checkbox: 19 caixas empilhadas é formulário, e o PLAN §11
+         conta o atrito do onboarding como risco. `aria-pressed` é o que carrega
+         o estado — o visual é consequência dele, não uma segunda verdade. */
+      .genre-pick { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+      .genre-pick button {
+        min-height: var(--tap);
+        padding: 0 0.9rem;
+        border-radius: var(--r-pill);
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--fg);
+        font: inherit;
+        font-size: 0.9rem;
+        cursor: pointer;
+      }
+      .genre-pick button[aria-pressed="true"] {
+        border-color: var(--like);
+        color: var(--like);
+        background: color-mix(in srgb, var(--like) 12%, transparent);
+      }
+
+      .onboarding-go {
+        min-height: var(--tap);
+        padding: 0 1.6rem;
+        border-radius: var(--r-pill);
+        border: 1px solid var(--like);
+        background: color-mix(in srgb, var(--like) 16%, transparent);
+        color: var(--like);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .onboarding-go:disabled { opacity: 0.4; cursor: default; }
+
+      /* O contador é a mitigação declarada do atrito dos 20 swipes (PLAN §11):
+         fica sempre visível, acima do card. `<progress>` nativo em vez de duas
+         divs — `accent-color` já o põe no tema. */
+      .onboarding-count {
+        display: grid;
+        gap: 0.4rem;
+        justify-items: center;
+        margin: 0;
+        /* os cards de trás sobem 18px (Deck.tsx), o que come a folga do grid —
+           sem isto a barra encosta na pilha */
+        padding-bottom: 0.5rem;
+        font-size: 0.85rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .onboarding-count progress {
+        width: min(22rem, 88vw);
+        height: 0.35rem;
+        accent-color: var(--like);
+      }
+
       .notice.error { color: var(--pass); }
       /* O que falhou foi o deck, então o erro ocupa o lugar dele: painel com a
          mesma pegada, em vez de uma linha vermelha solta no meio da página. */

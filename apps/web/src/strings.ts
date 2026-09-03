@@ -21,6 +21,14 @@ export const t = {
   /** O número sozinho no chip do card não diz de que escala ele é. */
   voteHint: (n: number) => `Rated ${n.toFixed(1)} out of 10`,
 
+  // D4 — onboarding
+  onboardingTitle: "Let's calibrate your feed.",
+  onboardingGenresHint:
+    "Pick the genres you actually watch. You can change this later.",
+  onboardingStart: "Start swiping",
+  onboardingCount: (done: number, total: number) =>
+    `${done} of ${total} swipes`,
+
   // D2 — catálogo pessoal
   navDeck: "Deck",
   navLibrary: "Library",

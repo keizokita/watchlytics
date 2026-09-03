@@ -43,7 +43,7 @@ type Relaxable = (typeof LADDER)[number];
 type Row = typeof titles.$inferSelect;
 
 /** numeric volta como string do postgres.js; o contrato pede número. */
-const toTitle = (r: Row): Title => ({
+export const toTitle = (r: Row): Title => ({
   id: r.id,
   type: r.type as Title["type"],
   title: r.title,

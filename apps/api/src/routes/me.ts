@@ -1,6 +1,7 @@
 import { desc, eq, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { GENRE_IDS, genreId } from "@watchlytics/contract";
 import { requireUserId } from "../auth.ts";
 import { db } from "../db/client.ts";
 import {
@@ -93,23 +94,47 @@ export function meRoutes(app: FastifyInstance): void {
   });
 
   /**
-   * D5 — o perfil nasce privado (PLAN §8.2) e só o dono torna público. Um
-   * campo só: o resto do perfil vem do provedor OAuth e não se edita aqui.
+   * Os dois campos editáveis da conta: a visibilidade do perfil (D5, PLAN §8.2
+   * — nasce privado e só o dono abre) e os gêneros preferidos (D4, PLAN §4.1 —
+   * escolhidos no onboarding e editáveis depois). O resto do perfil vem do
+   * provedor OAuth e não se edita aqui.
+   *
+   * Os dois são opcionais e pelo menos um é obrigatório: PATCH com corpo vazio
+   * é erro do cliente, não UPDATE sem colunas.
    */
   app.patch("/v1/me", async (req, reply) => {
     const userId = requireUserId(req);
 
-    const parsed = z.object({ isPublic: z.boolean() }).safeParse(req.body);
+    const parsed = z
+      .object({
+        isPublic: z.boolean().optional(),
+        // Sem duplicata: o vetor de gosto indexa por gênero, e id repetido só
+        // significa que a tela mandou o mesmo chip duas vezes.
+        preferredGenres: z
+          .array(genreId)
+          .max(GENRE_IDS.length)
+          .refine((g) => new Set(g).size === g.length, {
+            message: "gênero repetido",
+          })
+          .optional(),
+      })
+      .refine((b) => Object.values(b).some((v) => v !== undefined), {
+        message: "nada para atualizar",
+      })
+      .safeParse(req.body);
     if (!parsed.success) {
       reply.code(400);
-      return { error: "requisição inválida" };
+      return { error: "requisição inválida", detail: parsed.error.issues };
     }
 
     const [row] = await db
       .update(users)
-      .set({ isPublic: parsed.data.isPublic })
+      .set(parsed.data)
       .where(eq(users.id, userId))
-      .returning({ isPublic: users.isPublic });
+      .returning({
+        isPublic: users.isPublic,
+        preferredGenres: users.preferredGenres,
+      });
 
     if (!row) {
       reply.code(404);

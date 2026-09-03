@@ -106,7 +106,7 @@ B trabalha contra mock do contrato e não espera A.
 | D1 | `PUT /v1/library/:id` — status e rating | LIKE vira entrada; `interested → watched` grava `watched_at` | ✅ |
 | D2 | Telas: interessado / assistido / descartados | Descartados lê de `swipes`, não de `library_entries` | ✅ |
 | D3 | Stats + piso de 10 assistidos | Abaixo de 10 a página pública não mostra agregados | ✅ |
-| D4 | Onboarding: gêneros → deck estratificado de 20 → `taste_vector` | Contador visível; feed sai calibrado | |
+| D4 | Onboarding: gêneros → deck estratificado de 20 → `taste_vector` | Contador visível; feed sai calibrado | ✅ |
 | D5 | Perfil público + rota `GET /u/:handle` com OG tags | Link em WhatsApp/Slack renderiza preview | ✅ |
 
 > **D4 colide com a fixture.** 20 swipes obrigatórios sobre ~100 títulos queimam

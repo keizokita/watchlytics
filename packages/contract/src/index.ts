@@ -56,6 +56,32 @@ export const feedResponse = z.object({
 });
 export type FeedResponse = z.infer<typeof feedResponse>;
 
+/**
+ * D4 — o onboarding exige 20 swipes antes do feed calibrado (PLAN §1 item 10).
+ *
+ * O número é contrato e não constante de um lado só: a tela mostra o contador e
+ * a API decide quando acabou. Duas definições divergiriam no dia em que alguém
+ * mudasse uma.
+ */
+export const ONBOARDING_SWIPES = 20;
+
+/**
+ * `remaining: 0` é o fim do onboarding, e aí `items` vem vazio de propósito —
+ * o cliente consulta esta rota na abertura e não paga 20 títulos para descobrir
+ * que já terminou.
+ *
+ * `genres` vazio significa "ainda não escolheu", que é o primeiro degrau da
+ * tela. O deck vem estratificado sobre os gêneros escolhidos, ou sobre todos
+ * enquanto não houver escolha — as 19 dimensões do taste_vector precisam de
+ * sinal, não só as preferidas.
+ */
+export const onboardingDeck = z.object({
+  genres: z.array(genreId),
+  remaining: z.number().int().min(0),
+  items: z.array(title),
+});
+export type OnboardingDeck = z.infer<typeof onboardingDeck>;
+
 export const swipeDirection = z.union([z.literal(1), z.literal(-1)]);
 
 export const swipeInput = z.object({

@@ -9,6 +9,7 @@ import { Deck } from "./Deck.tsx";
 import { Filters, toParams, type FeedFilters } from "./Filters.tsx";
 import { Library } from "./Library.tsx";
 import { Login } from "./Login.tsx";
+import { Onboarding } from "./Onboarding.tsx";
 import { drop, enqueue, startFlushing } from "./swipeQueue.ts";
 import { t } from "./strings.ts";
 
@@ -236,6 +237,25 @@ function App() {
 }
 
 /**
+ * D4 — o deck só abre depois do onboarding, e é o `Onboarding` que decide:
+ * ele consulta a rota na montagem e chama `onDone` na hora se já cumpriu. Um
+ * componente só, uma requisição só — o App nem monta antes disso, então o
+ * feed não é buscado durante os 20 swipes de entrada.
+ *
+ * ponytail: o portão é do deck, não do shell. As outras telas continuam
+ * alcançáveis pela nav durante o onboarding; travar a navegação inteira é
+ * decisão de produto, não de código.
+ */
+function Home() {
+  const [onboarded, setOnboarded] = useState(false);
+  return onboarded ? (
+    <App />
+  ) : (
+    <Onboarding onDone={() => setOnboarded(true)} />
+  );
+}
+
+/**
  * Navegação pelo hash — duas telas não pagam um router.
  *
  * ponytail: vira react-router na terceira rota, ou na primeira que precisar de
@@ -274,7 +294,7 @@ function Root() {
         </a>
         <Login />
       </nav>
-      {inLibrary ? <Library /> : <App />}
+      {inLibrary ? <Library /> : <Home />}
     </div>
   );
 }

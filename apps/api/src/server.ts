@@ -4,6 +4,7 @@ import { registerAuth } from "./routes/auth.ts";
 import { feedRoutes } from "./routes/feed.ts";
 import { libraryRoutes } from "./routes/library.ts";
 import { meRoutes } from "./routes/me.ts";
+import { onboardingRoutes } from "./routes/onboarding.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import { swipeRoutes } from "./routes/swipes.ts";
 
@@ -22,6 +23,7 @@ export function buildServer() {
   swipeRoutes(app);
   libraryRoutes(app);
   meRoutes(app);
+  onboardingRoutes(app);
   profileRoutes(app);
 
   return app;
