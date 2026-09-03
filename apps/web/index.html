@@ -47,11 +47,15 @@
       .deck {
         position: relative;
         /* O terceiro termo é o que impede o `overflow: clip` de cortar algo:
-           limita a largura pelo que sobra de altura (botões, folgas e o topo
-           do stack ≈ 9rem), então em tela baixa o deck encolhe em vez de
-           vazar. O `max` põe um piso — abaixo disso o card seria ilegível de
-           qualquer jeito. */
-        width: min(22rem, 88vw, max(11rem, calc((100dvh - 9rem) * 2 / 3)));
+           limita a largura pelo que sobra de altura (botões, folgas, o topo
+           do stack e a linha de filtros ≈ 17rem), então em tela baixa o deck
+           encolhe em vez de vazar. O `max` põe um piso — abaixo disso o card
+           seria ilegível de qualquer jeito, e aí a página rola mesmo.
+
+           A reserva é fixa porque CSS não mede quantas linhas os filtros
+           ocuparam; 17rem é o caso de duas linhas, que é o que acontece de
+           360px de largura para cima. */
+        width: min(22rem, 88vw, max(11rem, calc((100dvh - 17rem) * 2 / 3)));
         aspect-ratio: 2 / 3;
       }
 
@@ -156,6 +160,25 @@
         font: inherit;
         cursor: pointer;
       }
+
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+        max-width: min(30rem, 92vw);
+      }
+      .filters select, .filters input {
+        padding: 0.45rem 0.6rem;
+        border-radius: 999px;
+        border: 1px solid rgb(255 255 255 / 0.18);
+        background: rgb(255 255 255 / 0.06);
+        color: var(--fg);
+        font: inherit;
+        font-size: 0.9rem;
+      }
+      /* o campo de ano não precisa da largura de um select */
+      .filters input { width: 5.5rem; }
 
       .notice { text-align: center; color: var(--muted); max-width: 22rem; }
       .notice.error { color: var(--pass); }

@@ -67,6 +67,7 @@ export const t = {
   // A5 — o aviso é obrigatório: deck vazio sem explicação parece bug
   relaxedNames: {
     year: "year",
+    genre: "genre",
     type: "type",
     language: "language",
   } as Record<string, string>,
