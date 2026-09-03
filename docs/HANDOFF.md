@@ -28,10 +28,10 @@ só a mudança. Vale ler antes de propor refazer algo.
 
 | Trilha | | |
 |---|---|---|
-| **S** esqueleto | 6/7 | falta só o deploy (bloqueado em contas) |
+| **S** esqueleto | 6/7 | infra no ar; o card na URL pública ainda não foi visto |
 | **A** feed | 8/8 | backend e UI de filtro completos |
 | **B** swipe | 6/7 | B4 (pré-carga de imagem) pausada — não há pôster |
-| **C** identidade | 6/6 | completa — falta exercitar contra o Google real |
+| **C** identidade | 6/6 | completa e exercitada contra o Google real em produção |
 | **D** catálogo | 5/5 | completa |
 | **E** social | 6/6 | completa |
 
@@ -39,7 +39,7 @@ só a mudança. Vale ler antes de propor refazer algo.
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
 repetir; o LIKE vira coleção com abas e estatísticas.
 
-**86 testes** (81 API + 5 fila), `npm run check` limpo nos três pacotes.
+**88 testes** (81 API + 7 fila), `npm run check` limpo nos três pacotes.
 
 ## Ambiente — o que custa caro redescobrir
 
@@ -98,27 +98,45 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 
 ## Bloqueado na pessoa, não no código
 
-1. **Contas para o S7** — Neon, Fly, Cloudflare. Os artefatos estão prontos e
-   verificados em container. O remote existe e recebeu o primeiro push em
-   2026-09-02, então o CI do GitHub já roda; falta o destino do deploy.
-2. **Credenciais do Google Cloud** para C2 funcionar de verdade. A troca de
-   código está isolada em `providers.google` e testada com stub; o fluxo real
-   nunca foi exercitado.
-3. **Escolher o fornecedor de catálogo.** Não bloqueia A/B/C/D, bloqueia o beta.
-4. **Veredito do gesto no celular.** Duas perguntas em aberto que revertem
+1. **Escolher o fornecedor de catálogo.** Não bloqueia A/B/C/D, bloqueia o beta.
+2. **Veredito do gesto no celular.** Duas perguntas em aberto que revertem
    decisões: o gesto tem peso? (senão, `framer-motion` se justifica) e o card
    convence sem pôster? (senão, a escolha de fornecedor sobe para o topo).
+
+As contas do S7 e as credenciais do Google saíram desta lista em 2026-09-03.
+O que está provado hoje, e vale mais escrito do que redescoberto:
+
+- **api** <https://watchlytics-api.fly.dev> — `/health` devolve `{"ok":true}`,
+  uma máquina em `gru` com auto-suspend.
+- **front** <https://watchlytics.pages.dev> — a Function de `/v1/*` e `/u/*`
+  faz proxy para o Fly. Origem única, sem CORS, como o PLAN previa.
+- **banco** Neon com pgvector, schema migrado e os 94 títulos semeados.
+- **OAuth Google validado em produção**: `redirectUri` fora da allowlist leva
+  400 e um `code` falso leva 401 "provedor recusou o código" — ou seja, client
+  id e secret estão carregados e a troca com o Google acontece de verdade.
+
+O que **não** está provado, e por isso o S7 não é ✅: o card aparecendo na URL
+pública e as OG de `/u/<handle>`. Nenhum dos dois fecha sem um navegador.
 
 ## Problemas conhecidos
 
 - **Flake não explicado:** `A5 degrau 1` falhou uma vez e não reproduziu em 6
   tentativas, incluindo com banco sujo e simulando primeira execução. Se
   aparecer de novo, há uma pista a mais.
-- **C1 é dívida com prazo.** O shim `DEV_USER_ID` em `auth.ts` injeta usuário
-  fixo. Produção não define a variável e responde 401. Sai quando o OAuth estiver
-  em produção — não deixe virar permanente.
+- **C1 é dívida com prazo, e o cliente já saiu dela.** O shim `DEV_USER_ID` em
+  `auth.ts` injeta usuário fixo; produção não define a variável e responde 401.
+  O lado web não depende mais dele: o token vive em `apps/web/src/session.ts` e
+  todo fetch autenticado (feed, fila de swipes, undo, onboarding, conta, social)
+  manda `Authorization` pelo helper `auth()`. Falta remover o shim do servidor,
+  e isso só acontece com o OAuth de verdade em produção — não deixe virar
+  permanente.
 - **Fixture esgota numa sessão.** 94 títulos, e o onboarding do D4 consome 20
   na porta de entrada. Serve para construir e demonstrar, não para o beta.
+- **O shim escondeu um 401 até a produção.** Com login válido, `/v1/feed`
+  respondia 401 no ar porque o front nunca mandava `Authorization`; em dev o
+  `DEV_USER_ID` atendia a requisição sem header e o bug não aparecia. Foi o
+  deploy que revelou, não o teste — um shim que substitui a autenticação
+  esconde exatamente a classe de bug que ele finge cobrir.
 - **`POST /v1/swipes` passou a respeitar o Bearer.** Antes chamava
   `requireUserId()` sem `req`, então swipe de usuário logado era gravado no
   `DEV_USER_ID`. Com OAuth em produção isso teria misturado catálogo de gente
@@ -137,8 +155,15 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 
 ## Próximos passos sugeridos
 
-1. **E5 + E6, só a tela.** As rotas existem e estão testadas; falta a aba de
-   títulos em comum, o badge e o polling de 60s. Comece por `Friends.tsx`, que
-   está na árvore sem commit.
-2. **D4** — onboarding, o último da trilha D. Decida o recorte antes: 20 swipes
-   obrigatórios sobre 94 títulos queimam 20% do catálogo na porta de entrada.
+1. **Republicar o Pages** com o `Authorization` do front e **abrir a URL
+   pública**. É o que fecha o S7: o "pronto quando" dele é *URL pública mostra o
+   card*, e o front que está no ar pede o feed sem header e leva 401. Na mesma
+   passada, conferir as OG de `/u/<handle>` com um perfil real. Infra no ar não
+   é o mesmo que card na tela — foi por isso que o S7 não virou ✅ com as contas.
+2. **Remover o shim `DEV_USER_ID`** do `auth.ts`. Com o OAuth real validado em
+   produção, a razão de existir dele acabou; é dívida com prazo vencido.
+3. **Veredito do gesto no celular** (§Bloqueado 2). Duas perguntas que revertem
+   decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
+4. **Escolher o fornecedor de catálogo** (§Bloqueado 1). 94 títulos de fixture
+   com o onboarding queimando 20 na porta de entrada não sustentam um beta, e
+   é essa escolha que também destrava o B4.

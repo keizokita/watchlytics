@@ -30,7 +30,7 @@ watchlytics/
 | S4 | Seed: 19 gêneros + `titles.json` | `npm run seed` roda duas vezes sem duplicar | ✅ |
 | S5 | `GET /v1/feed` — 20 títulos, sem filtro, sem auth | `curl` devolve JSON que valida contra o contrato | ✅ |
 | S6 | Uma página, um card, gradiente no lugar do pôster | Card vindo do Postgres na tela | ✅ |
-| S7 | **Deploy do esqueleto** — Neon + Fly + Pages | URL pública mostra o card | 🔑 artefatos prontos e testados; falta autenticar as contas — [DEPLOY.md](./DEPLOY.md) |
+| S7 | **Deploy do esqueleto** — Neon + Fly + Pages | URL pública mostra o card | infra no ar e OAuth validado; falta ver o card e as OG no navegador — [DEPLOY.md](./DEPLOY.md) |
 
 **Desvios do plano original, decididos na execução:**
 
