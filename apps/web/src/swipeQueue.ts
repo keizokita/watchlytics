@@ -1,4 +1,5 @@
 import { swipeBatch, type SwipeInput } from "@watchlytics/contract";
+import { auth } from "./session.ts";
 
 /**
  * B6 — fila durável de swipes.
@@ -76,7 +77,7 @@ export async function flush(): Promise<void> {
   try {
     const res = await fetch("/v1/swipes", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...auth() },
       body: JSON.stringify(batch),
     });
     if (!res.ok) throw new Error(`/v1/swipes respondeu ${res.status}`);

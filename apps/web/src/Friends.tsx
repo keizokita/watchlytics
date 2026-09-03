@@ -9,7 +9,7 @@ import {
   type MatchEntry,
   type PublicUser,
 } from "@watchlytics/contract";
-import { getAccessToken } from "./Login.tsx";
+import { auth } from "./session.ts";
 import { SCREEN_CSS } from "./screenCss.ts";
 import { t } from "./strings.ts";
 
@@ -20,11 +20,6 @@ import { t } from "./strings.ts";
  * Três abas numa tela só, e não três telas: as três leem do mesmo par de
  * rotas e ninguém procura "matches" num lugar diferente de "amigos".
  */
-
-const auth = (): HeadersInit => {
-  const token = getAccessToken();
-  return token ? { authorization: `Bearer ${token}` } : {};
-};
 
 const vazio: FriendsResponse = { friends: [], incoming: [], outgoing: [] };
 

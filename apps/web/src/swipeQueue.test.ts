@@ -19,13 +19,20 @@ Object.defineProperty(globalThis, "localStorage", {
 
 let online = true;
 let received: unknown[][] = [];
-globalThis.fetch = (async (_url: string, init: { body: string }) => {
+let headers: Record<string, string>[] = [];
+const spy = (async (
+  _url: string,
+  init: { body: string; headers: Record<string, string> },
+) => {
   if (!online) throw new TypeError("fetch failed");
   received.push(JSON.parse(init.body));
+  headers.push(init.headers);
   return { ok: true, status: 200 };
 }) as unknown as typeof fetch;
+globalThis.fetch = spy;
 
 const { enqueue, flush, drop, pendingCount } = await import("./swipeQueue.ts");
+const { setAccessToken } = await import("./session.ts");
 
 const swipe = (n: number, direction: 1 | -1 = 1) => ({
   titleId: `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
@@ -36,7 +43,12 @@ const swipe = (n: number, direction: 1 | -1 = 1) => ({
 beforeEach(() => {
   store.clear();
   received = [];
+  headers = [];
   online = true;
+  // Há testes que trocam o fetch para simular 503; sem isto o spy fica perdido
+  // e os testes seguintes observam um mock que não registra nada.
+  globalThis.fetch = spy;
+  setAccessToken(null);
 });
 
 test("offline acumula, online entrega tudo", async () => {
@@ -82,4 +94,21 @@ test("drop remove da fila antes do envio (undo sem rede)", () => {
 test("fila corrompida no storage é descartada, não propagada", () => {
   store.set("watchlytics.pending-swipes", "{ isto não é json válido");
   assert.equal(pendingCount(), 0);
+});
+
+/**
+ * Em produção não existe o shim do C1: sem este header o lote inteiro leva 401
+ * e a fila retenta para sempre, em silêncio, com o card já fora da tela.
+ */
+test("o lote viaja com a sessão quando há login", async () => {
+  setAccessToken("tok-123");
+  enqueue(swipe(1));
+  await flush();
+  assert.equal(headers[0]?.["authorization"], "Bearer tok-123");
+});
+
+test("sem login o lote vai sem Authorization, não com um header vazio", async () => {
+  enqueue(swipe(1));
+  await flush();
+  assert.ok(headers.every((h) => h["authorization"] === undefined));
 });

@@ -6,6 +6,7 @@ import {
   type SessionUser,
 } from "@watchlytics/contract";
 import { t } from "./strings.ts";
+import { auth, setAccessToken } from "./session.ts";
 
 /**
  * C2 — login com Google via PKCE.
@@ -26,13 +27,6 @@ const REDIRECT_URI = `${window.location.origin}/`;
 const VERIFIER_KEY = "wl.pkce.verifier";
 const STATE_KEY = "wl.pkce.state";
 
-let accessToken: string | null = null;
-
-/**
- * ponytail: o deck ainda entra pelo shim do C1. Quando ele sair, o fetch do
- * feed e o do buffer de swipes passam a mandar `Bearer ${getAccessToken()}`.
- */
-export const getAccessToken = () => accessToken;
 
 const b64url = (bytes: ArrayBuffer | Uint8Array) =>
   btoa(String.fromCharCode(...new Uint8Array(bytes)))
@@ -92,7 +86,7 @@ async function exchange(code: string, state: string): Promise<SessionUser> {
   if (!res.ok) throw new Error(`${res.status}`);
 
   const body = authResponse.parse(await res.json());
-  accessToken = body.access;
+  setAccessToken(body.access);
   return body.user;
 }
 
@@ -100,11 +94,9 @@ async function exchange(code: string, state: string): Promise<SessionUser> {
 async function resume(): Promise<SessionUser | null> {
   const res = await fetch("/v1/auth/refresh", { method: "POST" });
   if (!res.ok) return null;
-  accessToken = authTokens.parse(await res.json()).access;
+  setAccessToken(authTokens.parse(await res.json()).access);
 
-  const me = await fetch("/v1/auth/me", {
-    headers: { authorization: `Bearer ${accessToken}` },
-  });
+  const me = await fetch("/v1/auth/me", { headers: auth() });
   return me.ok ? sessionUser.parse(await me.json()) : null;
 }
 
@@ -143,7 +135,7 @@ export function Login() {
 
   const onSignOut = async () => {
     await fetch("/v1/auth/logout", { method: "POST" });
-    accessToken = null;
+    setAccessToken(null);
     started = Promise.resolve(null);
     setUser(null);
   };
