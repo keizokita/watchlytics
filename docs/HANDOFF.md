@@ -118,6 +118,12 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 O que **não** está provado, e por isso o S7 não é ✅: o card aparecendo na URL
 pública e as OG de `/u/<handle>`. Nenhum dos dois fecha sem um navegador.
 
+E há um terceiro, maior: **nenhum login jamais completou** — 0 usuários e 0
+sessões no banco de produção. O que a linha acima prova é que a troca com o
+Google acontece; não prova que alguém atravessou ela até o fim. Falta saber se o
+`POST /v1/auth/oauth/google` chega a ser chamado ou se o Google barra antes com
+`redirect_uri_mismatch`, e isso só o Network do DevTools responde.
+
 ## Problemas conhecidos
 
 - **Flake não explicado:** `A5 degrau 1` falhou uma vez e não reproduziu em 6
@@ -160,8 +166,10 @@ pública e as OG de `/u/<handle>`. Nenhum dos dois fecha sem um navegador.
    card*, e o front que está no ar pede o feed sem header e leva 401. Na mesma
    passada, conferir as OG de `/u/<handle>` com um perfil real. Infra no ar não
    é o mesmo que card na tela — foi por isso que o S7 não virou ✅ com as contas.
-2. **Remover o shim `DEV_USER_ID`** do `auth.ts`. Com o OAuth real validado em
-   produção, a razão de existir dele acabou; é dívida com prazo vencido.
+2. **Remover o shim `DEV_USER_ID`** do `auth.ts` — mas só depois de um login
+   real completar. A troca com o Google já foi exercitada; enquanto o banco de
+   produção estiver com 0 sessões, tirar o shim tira também o único caminho que
+   ainda funciona para entrar no app em dev.
 3. **Veredito do gesto no celular** (§Bloqueado 2). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
 4. **Escolher o fornecedor de catálogo** (§Bloqueado 1). 94 títulos de fixture
