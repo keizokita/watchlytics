@@ -254,6 +254,7 @@ async function loadUser(userId: string): Promise<SessionUser> {
       handle: users.handle,
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
+      isPublic: users.isPublic,
     })
     .from(users)
     .where(eq(users.id, userId));

@@ -202,6 +202,8 @@ export const sessionUser = z.object({
   handle: z.string(),
   displayName: z.string(),
   avatarUrl: z.url().nullable(),
+  /** D5 — privado por padrão (PLAN §8.2). A tela precisa saber para oferecer. */
+  isPublic: z.boolean(),
 });
 export type SessionUser = z.infer<typeof sessionUser>;
 

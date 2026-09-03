@@ -4,10 +4,12 @@ import {
   GENRE_NAME_BY_ID,
   libraryListResponse,
   profileStats,
+  sessionUser,
   STATS_MIN_WATCHED,
   type LibraryEntry,
   type LibraryStatus,
   type ProfileStats,
+  type SessionUser,
   type Title,
 } from "@watchlytics/contract";
 import { getAccessToken } from "./Login.tsx";
@@ -130,6 +132,8 @@ function Stats({ stats }: { stats: ProfileStats }) {
 function Account() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** `null` até a conta responder — e enquanto isso não se oferece nada. */
+  const [me, setMe] = useState<SessionUser | null>(null);
 
   // O deck ainda entra pelo shim do C1, mas conta é conta: se houver sessão de
   // verdade, estas duas chamadas vão nela.
@@ -145,6 +149,29 @@ function Account() {
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setBusy(false));
   };
+
+  useEffect(() => {
+    let live = true;
+    fetch("/v1/auth/me", { headers: auth() })
+      .then((r) => (r.ok ? (r.json() as Promise<unknown>) : null))
+      .then((j) => live && j && setMe(sessionUser.parse(j)))
+      // Sem sessão não há o que oferecer: a seção some, não vira erro na tela.
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const onVisibility = (isPublic: boolean) =>
+    run(async () => {
+      const res = await fetch("/v1/me", {
+        method: "PATCH",
+        headers: { ...auth(), "content-type": "application/json" },
+        body: JSON.stringify({ isPublic }),
+      });
+      if (!res.ok) throw new Error(`PATCH /v1/me respondeu ${res.status}`);
+      setMe((u) => (u ? { ...u, isPublic } : u));
+    });
 
   const onExport = () =>
     run(async () => {
@@ -188,6 +215,30 @@ function Account() {
       <h2>{t.account}</h2>
       <p className="lib-locked">{t.accountHint}</p>
       {error && <p className="notice error">{t.error(error)}</p>}
+
+      {me && (
+        <>
+          <label className="lib-public">
+            <input
+              type="checkbox"
+              checked={me.isPublic}
+              disabled={busy}
+              onChange={(e) => onVisibility(e.target.checked)}
+            />
+            {t.publicProfile}
+          </label>
+          {/* O link só aparece quando existe de verdade: perfil privado
+              responde 404, e link que não abre é pior que link nenhum. */}
+          {me.isPublic ? (
+            <p className="lib-locked">
+              <a href={`/u/${me.handle}`}>{`${location.origin}/u/${me.handle}`}</a>
+            </p>
+          ) : (
+            <p className="lib-locked">{t.publicProfileHint}</p>
+          )}
+        </>
+      )}
+
       <div className="lib-account-actions">
         <button type="button" className="lib-move" disabled={busy} onClick={onExport}>
           {t.exportData}

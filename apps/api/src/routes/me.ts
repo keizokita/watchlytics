@@ -1,5 +1,6 @@
 import { desc, eq, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { requireUserId } from "../auth.ts";
 import { db } from "../db/client.ts";
 import {
@@ -89,6 +90,32 @@ export function meRoutes(app: FastifyInstance): void {
       `attachment; filename="watchlytics-${user.handle.replace(/[^a-z0-9-]/gi, "")}.json"`,
     );
     return data;
+  });
+
+  /**
+   * D5 — o perfil nasce privado (PLAN §8.2) e só o dono torna público. Um
+   * campo só: o resto do perfil vem do provedor OAuth e não se edita aqui.
+   */
+  app.patch("/v1/me", async (req, reply) => {
+    const userId = requireUserId(req);
+
+    const parsed = z.object({ isPublic: z.boolean() }).safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400);
+      return { error: "requisição inválida" };
+    }
+
+    const [row] = await db
+      .update(users)
+      .set({ isPublic: parsed.data.isPublic })
+      .where(eq(users.id, userId))
+      .returning({ isPublic: users.isPublic });
+
+    if (!row) {
+      reply.code(404);
+      return { error: "conta não encontrada" };
+    }
+    return row;
   });
 
   /**

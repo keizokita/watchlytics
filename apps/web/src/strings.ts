@@ -90,6 +90,11 @@ export const t = {
     "Your export opens as a JSON file: swipes, library, friends and matches. Deleting erases all of it right away — there is no undo and no grace period.",
   exportData: "Download my data",
   deleteAccount: "Delete my account",
+  // D5 — perfil público
+  publicProfile: "Public profile",
+  publicProfileHint:
+    "Your profile is private. Turning it on publishes only aggregate stats — never your library, and only once you have watched 10 titles.",
+
   /** Diz o que some ANTES do clique irreversível — o resumo é o aviso. */
   deleteAccountConfirm:
     "Delete your account for good? Your swipes, library, matches and friendships are erased immediately. This cannot be undone.",
