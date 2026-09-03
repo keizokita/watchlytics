@@ -1,13 +1,29 @@
-import { and, count, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { FriendsResponse, PublicUser } from "@watchlytics/contract";
+import {
+  MATCH_NOTIFY_STRENGTH,
+  type FriendsResponse,
+  type MatchEntry,
+  type PublicUser,
+} from "@watchlytics/contract";
 import { httpError, requireUserId } from "../auth.ts";
 import { db } from "../db/client.ts";
-import { friendships, matches, notifications, users } from "../db/schema.ts";
+import {
+  friendships,
+  matches,
+  notifications,
+  titles,
+  users,
+} from "../db/schema.ts";
+import { toTitle } from "./feed.ts";
+
+/** Uma página de matches. Mesmo lote do feed: cabe numa tela e num swipe. */
+const PAGE = 20;
 
 /** O que `db.transaction` entrega — e o próprio `db`, que serve nos dois. */
 type Tx = { execute: (q: SQL) => Promise<unknown> };
+type TxCompleta = Tx & Pick<typeof db, "insert">;
 
 /**
  * E2 — pedido e aceite de amizade.
@@ -46,8 +62,10 @@ const byId = async (ids: string[]): Promise<Map<string, PublicUser>> => {
  * Reenvio do buffer offline não duplica nem reescreve a força — quando alguém
  * marca `watched` depois, quem atualiza é o PUT /v1/library, não este caminho.
  */
-function insertMatches(tx: Tx, recorte: SQL): Promise<unknown> {
-  return tx.execute(sql`
+type LinhaInserida = { user_a: string; user_b: string; title_id: string; strength: number };
+
+async function insertMatches(tx: Tx, recorte: SQL): Promise<LinhaInserida[]> {
+  const inseridas = await tx.execute(sql`
     insert into matches (user_a, user_b, title_id, strength)
     select
       least(eu.user_id, amigo.user_id),
@@ -68,7 +86,11 @@ function insertMatches(tx: Tx, recorte: SQL): Promise<unknown> {
      and f.user_b = greatest(eu.user_id, amigo.user_id)
     where ${recorte}
     on conflict do nothing
+    returning user_a, user_b, title_id, strength
   `);
+  // `on conflict do nothing` faz o returning trazer só o que entrou agora —
+  // é isso que impede o E5 de notificar de novo um match que já existia.
+  return inseridas as LinhaInserida[];
 }
 
 /**
@@ -77,17 +99,41 @@ function insertMatches(tx: Tx, recorte: SQL): Promise<unknown> {
  * Não é otimização: a graça do produto é o match aparecer na hora, e fila
  * assíncrona custaria latência sem comprar nada nesta escala.
  */
-export function matchOnLike(
-  tx: Tx,
+export async function matchOnLike(
+  tx: TxCompleta,
   userId: string,
   titleIds: string[],
-): Promise<unknown> {
-  return insertMatches(
+): Promise<void> {
+  const novos = await insertMatches(
     tx,
     sql`eu.user_id = ${userId} and eu.title_id in (${sql.join(
       titleIds.map((id) => sql`${id}::uuid`),
       sql`, `,
     )})`,
+  );
+
+  // E5 — só o match FORTE notifica (PLAN §5.3): os dois querem ver, é o
+  // gancho "vamos assistir isso". Médio e fraco aparecem na aba e pronto —
+  // notificar "vocês dois já assistiram" é aviso que ninguém pediu.
+  //
+  // Uma linha por pessoa e por match, sem agregar: aqui é um evento só. Quem
+  // agrega é o aceite (E4), onde um clique pode render centenas.
+  const fortes = novos.filter((m) => m.strength === MATCH_NOTIFY_STRENGTH);
+  if (fortes.length === 0) return;
+
+  await tx.insert(notifications).values(
+    fortes.flatMap((m) => [
+      {
+        userId: m.user_a,
+        type: "match",
+        payload: { friendId: m.user_b, titleId: m.title_id },
+      },
+      {
+        userId: m.user_b,
+        type: "match",
+        payload: { friendId: m.user_a, titleId: m.title_id },
+      },
+    ]),
   );
 }
 
@@ -110,6 +156,64 @@ export function friendRoutes(app: FastifyInstance): void {
       friends: pick((r) => r.status === "accepted"),
       incoming: pick((r) => r.status === "pending" && r.requestedBy !== userId),
       outgoing: pick((r) => r.status === "pending" && r.requestedBy === userId),
+    };
+  });
+
+  /**
+   * E5 — os títulos em comum, do mais recente para o mais antigo.
+   *
+   * Keyset pelo par (created_at, title_id), não OFFSET: a lista cresce
+   * enquanto a pessoa rola, e OFFSET repetiria ou pularia linha. O par
+   * desempata porque um aceite retroativo grava dezenas de matches com o
+   * mesmo timestamp.
+   */
+  app.get<{ Querystring: { cursor?: string } }>("/v1/matches", async (req, reply) => {
+    const userId = requireUserId(req);
+
+    const cursor = req.query.cursor?.split("|");
+    if (cursor && (cursor.length !== 2 || Number.isNaN(Date.parse(cursor[0]!)))) {
+      reply.code(400);
+      return { error: "cursor inválido" };
+    }
+
+    const amigo = sql`case when ${matches.userA} = ${userId} then ${matches.userB} else ${matches.userA} end`;
+
+    const rows = await db
+      .select({
+        friend: publicColumns,
+        title: titles,
+        strength: matches.strength,
+        createdAt: matches.createdAt,
+      })
+      .from(matches)
+      .innerJoin(titles, eq(titles.id, matches.titleId))
+      .innerJoin(users, sql`${users.id} = ${amigo}`)
+      .where(
+        and(
+          or(eq(matches.userA, userId), eq(matches.userB, userId)),
+          cursor
+            ? sql`(${matches.createdAt}, ${matches.titleId}) < (${cursor[0]}::timestamptz, ${cursor[1]}::uuid)`
+            : undefined,
+        ),
+      )
+      .orderBy(desc(matches.createdAt), desc(matches.titleId))
+      .limit(PAGE);
+
+    const items: MatchEntry[] = rows.map((r) => ({
+      friend: r.friend,
+      title: toTitle(r.title),
+      strength: r.strength as MatchEntry["strength"],
+      createdAt: r.createdAt.toISOString(),
+    }));
+
+    const ultimo = rows.at(-1);
+    return {
+      items,
+      // Cursor só quando a página encheu: página curta é fim de lista.
+      nextCursor:
+        rows.length === PAGE && ultimo
+          ? `${ultimo.createdAt.toISOString()}|${ultimo.title.id}`
+          : null,
     };
   });
 

@@ -4,6 +4,8 @@ import { and, eq, inArray, or } from "drizzle-orm";
 import {
   friendsResponse,
   HANDLE_SEARCH_MIN,
+  matchesResponse,
+  notificationsResponse,
   userSearchResponse,
 } from "@watchlytics/contract";
 import { signAccess } from "../auth.ts";
@@ -404,8 +406,120 @@ test("E4 — o que o E3 já casou não vira notificação repetida nem match dup
   await curtir(pool[0]!.id, BRUNO);
   assert.equal((await matchesDe(ANA)).length, 1);
 
-  // Aceitar de novo é 404 (já não está pending), então nada roda duas vezes.
+  // O match forte do like já notificou uma vez (E5).
+  assert.equal((await notificacoesDe(ANA)).length, 1);
+
+  // Aceitar de novo é 404 (já não está pending), então nada roda duas vezes:
+  // nem o match retroativo, nem o aviso agregado.
   assert.equal((await aceitar(ANA, BRUNO)).statusCode, 404);
   assert.equal((await matchesDe(ANA)).length, 1);
-  assert.deepEqual(await notificacoesDe(ANA), [], "o match do like não notifica — isso é E6");
+  assert.equal((await notificacoesDe(ANA)).length, 1, "nenhum aviso novo");
+});
+
+/**
+ * E5 e E6 — o lado de servidor: quem notifica, o que a aba lê e como o badge
+ * zera. A tela (aba de comuns, badge, polling) é da sessão que está no web.
+ */
+test("E5 — match forte notifica na hora; médio e fraco só aparecem", async () => {
+  await limparSocial();
+  await pedir("bruno-teste-e1", ANA);
+  await aceitar(ANA, BRUNO);
+
+  // Forte: os dois querem ver.
+  await curtir(pool[0]!.id, ANA);
+  await curtir(pool[0]!.id, BRUNO);
+
+  // Médio: o BRUNO já assistiu o segundo título.
+  await curtir(pool[1]!.id, BRUNO);
+  await db
+    .update(libraryEntries)
+    .set({ status: "watched", watchedAt: new Date() })
+    .where(and(eq(libraryEntries.userId, BRUNO), eq(libraryEntries.titleId, pool[1]!.id)));
+  await curtir(pool[1]!.id, ANA);
+
+  assert.equal((await matchesDe(ANA)).length, 2, "os dois viraram match");
+
+  const avisos = await notificacoesDe(ANA);
+  assert.equal(avisos.length, 1, "só o forte notifica (PLAN §5.3)");
+  assert.equal(avisos[0]?.type, "match");
+  assert.deepEqual(avisos[0]?.payload, { friendId: BRUNO, titleId: pool[0]!.id });
+});
+
+test("E5 — a aba lê título, amigo e força, e pagina sem repetir", async () => {
+  await limparSocial();
+  await pedir("bruno-teste-e1", ANA);
+  await aceitar(ANA, BRUNO);
+  for (const titulo of pool.slice(0, 3)) {
+    await curtir(titulo.id, ANA);
+    await curtir(titulo.id, BRUNO);
+  }
+
+  const res = await app.inject({ method: "GET", url: "/v1/matches", headers: como(ANA) });
+  assert.equal(res.statusCode, 200, res.body);
+  const page = matchesResponse.parse(res.json());
+
+  assert.equal(page.items.length, 3);
+  assert.equal(page.nextCursor, null, "página curta é fim de lista");
+  for (const item of page.items) {
+    assert.equal(item.friend.handle, "bruno-teste-e1");
+    assert.equal(item.strength, 3);
+    assert.ok(item.title.title.length > 0, "o título vem inteiro, não só o id");
+  }
+
+  // O cursor é (created_at, title_id): o aceite retroativo grava dezenas de
+  // linhas com o mesmo timestamp, e sem o desempate a página repetiria.
+  const primeiro = page.items[0]!;
+  const segunda = await app.inject({
+    method: "GET",
+    url: `/v1/matches?cursor=${encodeURIComponent(`${primeiro.createdAt}|${primeiro.title.id}`)}`,
+    headers: como(ANA),
+  });
+  const resto = matchesResponse.parse(segunda.json());
+  assert.equal(resto.items.length, 2);
+  assert.ok(
+    !resto.items.some((i) => i.title.id === primeiro.title.id),
+    "a segunda página não repete a primeira",
+  );
+});
+
+test("E6 — o badge conta as não lidas e zera ao marcar", async () => {
+  await limparSocial();
+  await pedir("bruno-teste-e1", ANA);
+  await aceitar(ANA, BRUNO);
+  await curtir(pool[0]!.id, ANA);
+  await curtir(pool[0]!.id, BRUNO);
+
+  const antes = notificationsResponse.parse(
+    (await app.inject({ method: "GET", url: "/v1/notifications", headers: como(ANA) })).json(),
+  );
+  assert.equal(antes.unread, 1);
+  assert.equal(antes.items[0]?.readAt, null);
+
+  const marcou = await app.inject({
+    method: "POST",
+    url: "/v1/notifications/read",
+    headers: como(ANA),
+  });
+  assert.equal(marcou.json().unread, 0);
+
+  const depois = notificationsResponse.parse(
+    (await app.inject({ method: "GET", url: "/v1/notifications", headers: como(ANA) })).json(),
+  );
+  assert.equal(depois.unread, 0, "o badge zerou");
+  assert.ok(depois.items[0]?.readAt, "a notificação continua na caixa, lida");
+});
+
+test("E6 — a caixa é de quem pede; ninguém lê a do outro", async () => {
+  await limparSocial();
+  await pedir("bruno-teste-e1", ANA);
+  await aceitar(ANA, BRUNO);
+  await curtir(pool[0]!.id, ANA);
+  await curtir(pool[0]!.id, BRUNO);
+
+  await app.inject({ method: "POST", url: "/v1/notifications/read", headers: como(ANA) });
+
+  const doBruno = notificationsResponse.parse(
+    (await app.inject({ method: "GET", url: "/v1/notifications", headers: como(BRUNO) })).json(),
+  );
+  assert.equal(doBruno.unread, 1, "marcar as minhas não mexe nas do amigo");
 });

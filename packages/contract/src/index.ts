@@ -261,6 +261,46 @@ export const friendsResponse = z.object({
 });
 export type FriendsResponse = z.infer<typeof friendsResponse>;
 
+/**
+ * E5 — um título em comum com um amigo. A força é o par de status (PLAN §5.3):
+ * 3 ambos querem ver, 2 um já viu, 1 os dois já viram.
+ */
+export const matchEntry = z.object({
+  friend: publicUser,
+  title,
+  strength: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  createdAt: z.iso.datetime(),
+});
+export type MatchEntry = z.infer<typeof matchEntry>;
+
+export const matchesResponse = z.object({
+  items: z.array(matchEntry),
+  nextCursor: z.string().nullable(),
+});
+
+/** Força que vira notificação na hora (PLAN §5.3). O resto só aparece na aba. */
+export const MATCH_NOTIFY_STRENGTH = 3;
+
+/**
+ * E6 — o payload é `unknown` de propósito: cada `type` tem a sua forma, e
+ * congelar aqui obrigaria a subir o contrato a cada notificação nova. Quem
+ * decide o que renderizar é a tela, pelo `type`.
+ */
+export const notification = z.object({
+  id: z.uuid(),
+  type: z.string(),
+  payload: z.unknown(),
+  createdAt: z.iso.datetime(),
+  readAt: z.iso.datetime().nullable(),
+});
+
+export const notificationsResponse = z.object({
+  items: z.array(notification),
+  /** O badge. Zera quando a tela marca como lidas. */
+  unread: z.number().int(),
+});
+export type NotificationsResponse = z.infer<typeof notificationsResponse>;
+
 export const authResponse = authTokens.extend({ user: sessionUser });
 export type AuthResponse = z.infer<typeof authResponse>;
 

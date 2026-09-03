@@ -5,6 +5,7 @@ import { feedRoutes } from "./routes/feed.ts";
 import { friendRoutes } from "./routes/friends.ts";
 import { libraryRoutes } from "./routes/library.ts";
 import { meRoutes } from "./routes/me.ts";
+import { notificationRoutes } from "./routes/notifications.ts";
 import { onboardingRoutes } from "./routes/onboarding.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import { swipeRoutes } from "./routes/swipes.ts";
@@ -27,6 +28,7 @@ export function buildServer() {
   onboardingRoutes(app);
   profileRoutes(app);
   friendRoutes(app);
+  notificationRoutes(app);
 
   return app;
 }
