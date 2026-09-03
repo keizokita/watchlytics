@@ -7,6 +7,7 @@ import {
 } from "@watchlytics/contract";
 import { Deck } from "./Deck.tsx";
 import { Filters, toParams, type FeedFilters } from "./Filters.tsx";
+import { Friends, NotificationsBadge } from "./Friends.tsx";
 import { Library } from "./Library.tsx";
 import { Login } from "./Login.tsx";
 import { Onboarding } from "./Onboarding.tsx";
@@ -271,6 +272,7 @@ function Root() {
   }, []);
 
   const inLibrary = hash.startsWith("#/library");
+  const inFriends = hash.startsWith("#/friends");
 
   return (
     <div className="shell">
@@ -286,15 +288,19 @@ function Root() {
         }
       `}</style>
       <nav>
-        <a href="#/" aria-current={inLibrary ? undefined : "page"}>
+        <a href="#/" aria-current={inLibrary || inFriends ? undefined : "page"}>
           {t.navDeck}
         </a>
         <a href="#/library" aria-current={inLibrary ? "page" : undefined}>
           {t.navLibrary}
         </a>
+        <a href="#/friends" aria-current={inFriends ? "page" : undefined}>
+          {t.navFriends}
+          <NotificationsBadge />
+        </a>
         <Login />
       </nav>
-      {inLibrary ? <Library /> : <Home />}
+      {inLibrary ? <Library /> : inFriends ? <Friends /> : <Home />}
     </div>
   );
 }

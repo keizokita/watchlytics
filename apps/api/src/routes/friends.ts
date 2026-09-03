@@ -23,7 +23,7 @@ const PAGE = 20;
 
 /** O que `db.transaction` entrega — e o próprio `db`, que serve nos dois. */
 type Tx = { execute: (q: SQL) => Promise<unknown> };
-type TxCompleta = Tx & Pick<typeof db, "insert">;
+type TxCompleta = Tx & Pick<typeof db, "insert" | "select">;
 
 /**
  * E2 — pedido e aceite de amizade.
@@ -121,20 +121,66 @@ export async function matchOnLike(
   const fortes = novos.filter((m) => m.strength === MATCH_NOTIFY_STRENGTH);
   if (fortes.length === 0) return;
 
-  await tx.insert(notifications).values(
-    fortes.flatMap((m) => [
-      {
-        userId: m.user_a,
-        type: "match",
-        payload: { friendId: m.user_b, titleId: m.title_id },
-      },
-      {
-        userId: m.user_b,
-        type: "match",
-        payload: { friendId: m.user_a, titleId: m.title_id },
-      },
-    ]),
+  // Handle e título viajam DENTRO do payload, não só os ids: notificação é
+  // instantâneo, não consulta. Sem isso a tela faria um fetch por linha para
+  // escrever "vocês dois querem ver X" — e um handle trocado depois faria o
+  // aviso antigo mudar de texto sozinho.
+  const nomes = await rotulos(
+    tx,
+    fortes.flatMap((m) => [m.user_a, m.user_b]),
+    fortes.map((m) => m.title_id),
   );
+
+  await tx.insert(notifications).values(
+    fortes.flatMap((m) => {
+      const title = nomes.titles.get(m.title_id) ?? "";
+      return [
+        {
+          userId: m.user_a,
+          type: "match",
+          payload: {
+            friendId: m.user_b,
+            friendHandle: nomes.users.get(m.user_b) ?? "",
+            titleId: m.title_id,
+            title,
+          },
+        },
+        {
+          userId: m.user_b,
+          type: "match",
+          payload: {
+            friendId: m.user_a,
+            friendHandle: nomes.users.get(m.user_a) ?? "",
+            titleId: m.title_id,
+            title,
+          },
+        },
+      ];
+    }),
+  );
+}
+
+/** Handles e títulos de uma vez — duas queries, não uma por notificação. */
+async function rotulos(
+  tx: TxCompleta,
+  userIds: string[],
+  titleIds: string[],
+): Promise<{ users: Map<string, string>; titles: Map<string, string> }> {
+  const [pessoas, filmes] = await Promise.all([
+    tx
+      .select({ id: users.id, handle: users.handle })
+      .from(users)
+      .where(inArray(users.id, userIds)),
+    tx
+      .select({ id: titles.id, title: titles.title })
+      .from(titles)
+      .where(inArray(titles.id, titleIds)),
+  ]);
+
+  return {
+    users: new Map(pessoas.map((p) => [p.id, p.handle])),
+    titles: new Map(filmes.map((f) => [f.id, f.title])),
+  };
 }
 
 export function friendRoutes(app: FastifyInstance): void {
@@ -288,6 +334,11 @@ export function friendRoutes(app: FastifyInstance): void {
 
       const outro = parsed.data;
       const chave = pair(userId, outro);
+      const [eu] = await db
+        .select({ handle: users.handle })
+        .from(users)
+        .where(eq(users.id, userId));
+      const quemAceita = eu?.handle ?? "";
 
       const comuns = await db.transaction(async (tx) => {
         const aceitos = await tx
@@ -321,6 +372,10 @@ export function friendRoutes(app: FastifyInstance): void {
           );
 
         const comuns = total?.n ?? 0;
+        const [amigo] = await tx
+          .select({ handle: users.handle })
+          .from(users)
+          .where(eq(users.id, outro));
 
         // UMA notificação por pessoa, com o total — nunca uma por título. 37
         // títulos em comum viram "vocês têm 37 em comum", que é o que alguém
@@ -330,8 +385,16 @@ export function friendRoutes(app: FastifyInstance): void {
         // ninguém descobre, e é justamente o gancho do produto.
         if (comuns > 0) {
           await tx.insert(notifications).values([
-            { userId, type: "friend_matches", payload: { friendId: outro, count: comuns } },
-            { userId: outro, type: "friend_matches", payload: { friendId: userId, count: comuns } },
+            {
+              userId,
+              type: "friend_matches",
+              payload: { friendId: outro, friendHandle: amigo?.handle ?? "", count: comuns },
+            },
+            {
+              userId: outro,
+              type: "friend_matches",
+              payload: { friendId: userId, friendHandle: quemAceita, count: comuns },
+            },
           ]);
         }
 

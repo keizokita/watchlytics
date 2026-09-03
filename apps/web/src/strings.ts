@@ -32,6 +32,7 @@ export const t = {
   // D2 — catálogo pessoal
   navDeck: "Deck",
   navLibrary: "Library",
+  navFriends: "Friends",
   tabInterested: "Interested",
   tabWatched: "Watched",
   tabDiscarded: "Discarded",
@@ -100,6 +101,44 @@ export const t = {
     "Your export opens as a JSON file: swipes, library, friends and matches. Deleting erases all of it right away — there is no undo and no grace period.",
   exportData: "Download my data",
   deleteAccount: "Delete my account",
+  // E1/E2 — amigos
+  friends: "Friends",
+  friendSearchLabel: "Search people by handle",
+  friendSearchPlaceholder: "handle",
+  friendSearchAction: "Search",
+  friendResults: "Results",
+  /** Uma mensagem para os dois casos: termo curto e ninguém encontrado. */
+  friendNoResults: (min: number) =>
+    `Nobody to show. Search by handle, at least ${min} characters — never by email.`,
+  friendTabPeople: "People",
+  friendTabCommon: "In common",
+  friendTabAlerts: "Alerts",
+  friendAdd: "Add friend",
+  friendIncoming: "Friend requests",
+  friendAccept: "Accept",
+  friendYours: "Your friends",
+  friendNone: "No friends yet. Search a handle above.",
+  friendOutgoing: "Sent",
+
+  // E5 — a força do match é o par de status dos dois lados
+  matchStrength: {
+    3: "You both want to watch it",
+    2: "One of you has seen it",
+    1: "You have both seen it",
+  } as Record<number, string>,
+  commonNone: "Nothing in common yet. Add a friend, or keep swiping.",
+  commonMore: "Load more",
+
+  // E6 — notificações
+  alertCommon: (handle: string, n: number) =>
+    `You and @${handle} have ${n} ${n === 1 ? "title" : "titles"} in common.`,
+  alertMatch: (handle: string, title: string) =>
+    `You and @${handle} both want to watch ${title}.`,
+  /** Cliente antigo, tipo novo: some com a linha seria pior que isto. */
+  alertUnknown: "Something new happened.",
+  alertsNone: "Nothing new.",
+  alertsBadge: (n: number) => `${n} unread ${n === 1 ? "notification" : "notifications"}`,
+
   // D5 — perfil público
   publicProfile: "Public profile",
   publicProfileHint:

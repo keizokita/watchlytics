@@ -247,7 +247,12 @@ const limparSocial = async () => {
   await limpar();
 };
 
-const pool = await db.select({ id: titles.id }).from(titles).orderBy(titles.id).limit(6);
+const pool = await db
+  .select({ id: titles.id, title: titles.title })
+  .from(titles)
+  .orderBy(titles.id)
+  .limit(6);
+const tituloDe = (id: string) => pool.find((t) => t.id === id)!.title;
 assert.ok(pool.length === 6, "o banco precisa estar semeado (npm run seed)");
 const [umTitulo, outroTitulo] = [pool[0]!, pool[1]!];
 
@@ -378,8 +383,17 @@ test("E4 — 3 títulos em comum geram 1 notificação para cada, não 3", async
   assert.equal(doBruno.length, 1);
   assert.equal(daAna[0]?.type, "friend_matches");
   // O total vai no payload: é o que faz a mensagem ser "vocês têm 3 em comum".
-  assert.deepEqual(daAna[0]?.payload, { friendId: BRUNO, count: 3 });
-  assert.deepEqual(doBruno[0]?.payload, { friendId: ANA, count: 3 });
+  // Handle no payload: a tela escreve "vocês têm 3 em comum" sem outro fetch.
+  assert.deepEqual(daAna[0]?.payload, {
+    friendId: BRUNO,
+    friendHandle: "bruno-teste-e1",
+    count: 3,
+  });
+  assert.deepEqual(doBruno[0]?.payload, {
+    friendId: ANA,
+    friendHandle: "ana-teste-e1",
+    count: 3,
+  });
   assert.equal(daAna[0]?.readAt, null, "nasce não lida — é o badge do E6");
 });
 
@@ -442,7 +456,12 @@ test("E5 — match forte notifica na hora; médio e fraco só aparecem", async (
   const avisos = await notificacoesDe(ANA);
   assert.equal(avisos.length, 1, "só o forte notifica (PLAN §5.3)");
   assert.equal(avisos[0]?.type, "match");
-  assert.deepEqual(avisos[0]?.payload, { friendId: BRUNO, titleId: pool[0]!.id });
+  assert.deepEqual(avisos[0]?.payload, {
+    friendId: BRUNO,
+    friendHandle: "bruno-teste-e1",
+    titleId: pool[0]!.id,
+    title: tituloDe(pool[0]!.id),
+  });
 });
 
 test("E5 — a aba lê título, amigo e força, e pagina sem repetir", async () => {
