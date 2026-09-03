@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   authResponse,
   authTokens,
@@ -6,7 +6,13 @@ import {
   type SessionUser,
 } from "@watchlytics/contract";
 import { t } from "./strings.ts";
-import { auth, setAccessToken } from "./session.ts";
+import {
+  auth,
+  getUser,
+  setAccessToken,
+  setUser,
+  subscribeUser,
+} from "./session.ts";
 
 /**
  * C2 — login com Google via PKCE.
@@ -117,8 +123,12 @@ function boot() {
   return started;
 }
 
+export function useSession() {
+  return useSyncExternalStore(subscribeUser, getUser, getUser);
+}
+
 export function Login() {
-  const [user, setUser] = useState<SessionUser | null>(null);
+  const user = useSession();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
 
@@ -127,7 +137,13 @@ export function Login() {
     boot()
       .then((u) => live && setUser(u))
       .catch((e: unknown) => live && setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => live && setBusy(false));
+      .finally(() => {
+        if (!live) return;
+        // Boot que falhou é boot que terminou: sem isto o shell ficaria em
+        // "ainda não sei" para sempre, mostrando tela nenhuma.
+        if (getUser() === undefined) setUser(null);
+        setBusy(false);
+      });
     return () => {
       live = false;
     };

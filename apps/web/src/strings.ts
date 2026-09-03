@@ -58,6 +58,10 @@ export const t = {
     `${missing} more watched to unlock your stats — averages over fewer than ${floor} titles would just spell out your library.`,
 
   signIn: "Sign in with Google",
+  /** Porta de entrada: é a primeira coisa que um visitante deslogado lê. */
+  signedOutTitle: "Find what to watch next.",
+  signedOutBody:
+    "Swipe through a catalog, keep what you like, and see what you have in common with friends. Sign in to start.",
   signOut: "Sign out",
   signedInAs: (handle: string) => `Signed in as @${handle}`,
   authNotConfigured: "Sign-in is not configured on this build.",

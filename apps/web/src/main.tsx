@@ -9,7 +9,7 @@ import { Deck } from "./Deck.tsx";
 import { Filters, toParams, type FeedFilters } from "./Filters.tsx";
 import { Friends, NotificationsBadge } from "./Friends.tsx";
 import { Library } from "./Library.tsx";
-import { Login } from "./Login.tsx";
+import { Login, useSession } from "./Login.tsx";
 import { auth } from "./session.ts";
 import { Onboarding } from "./Onboarding.tsx";
 import { drop, enqueue, startFlushing } from "./swipeQueue.ts";
@@ -266,7 +266,30 @@ function Home() {
  * ponytail: vira react-router na terceira rota, ou na primeira que precisar de
  * parâmetro de caminho (o perfil público de D5 já precisa).
  */
+/**
+ * Porta de entrada de quem ainda não logou.
+ *
+ * Existe porque sem ela o shell montava o app inteiro sem sessão: Onboarding,
+ * Library e Friends disparavam chamadas autenticadas, todas voltavam 401 — o
+ * certo, do lado da api — e o cliente pintava o primeiro 401 como erro fatal.
+ * Um visitante novo via um card vermelho em vez de um convite.
+ */
+function SignedOut() {
+  return (
+    <div className="signed-out">
+      <style>{`
+        .signed-out { max-width: 32rem; text-align: center; display: grid; gap: 0.75rem; }
+        .signed-out h1 { margin: 0; font-size: 1.6rem; line-height: 1.2; }
+        .signed-out p { margin: 0; color: var(--muted); line-height: 1.5; }
+      `}</style>
+      <h1>{t.signedOutTitle}</h1>
+      <p>{t.signedOutBody}</p>
+    </div>
+  );
+}
+
 function Root() {
+  const user = useSession();
   const [hash, setHash] = useState(() => location.hash);
 
   useEffect(() => {
@@ -292,19 +315,33 @@ function Root() {
         }
       `}</style>
       <nav>
-        <a href="#/" aria-current={inLibrary || inFriends ? undefined : "page"}>
-          {t.navDeck}
-        </a>
-        <a href="#/library" aria-current={inLibrary ? "page" : undefined}>
-          {t.navLibrary}
-        </a>
-        <a href="#/friends" aria-current={inFriends ? "page" : undefined}>
-          {t.navFriends}
-          <NotificationsBadge />
-        </a>
+        {/* Sem sessão as três telas são 401: link que não leva a lugar nenhum
+            é pior que link ausente. */}
+        {user ? (
+          <>
+            <a href="#/" aria-current={inLibrary || inFriends ? undefined : "page"}>
+              {t.navDeck}
+            </a>
+            <a href="#/library" aria-current={inLibrary ? "page" : undefined}>
+              {t.navLibrary}
+            </a>
+            <a href="#/friends" aria-current={inFriends ? "page" : undefined}>
+              {t.navFriends}
+              <NotificationsBadge />
+            </a>
+          </>
+        ) : null}
         <Login />
       </nav>
-      {inLibrary ? <Library /> : inFriends ? <Friends /> : <Home />}
+      {user === undefined ? null : !user ? (
+        <SignedOut />
+      ) : inLibrary ? (
+        <Library />
+      ) : inFriends ? (
+        <Friends />
+      ) : (
+        <Home />
+      )}
     </div>
   );
 }
