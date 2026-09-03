@@ -66,7 +66,7 @@ B trabalha contra mock do contrato e não espera A.
 | id | Tarefa | Pronto quando | |
 |---|---|---|---|
 | A0 | `POST /v1/swipes` em lote e idempotente | Reenviar o mesmo lote não duplica nem falha. Teste automatizado | ✅ |
-| A1 | Filtros: tipo, gênero, ano, idioma | Contrato e query aceitam os quatro | ✅ backend; UI pendente |
+| A1 | Filtros: tipo, gênero, ano, idioma | Contrato e query aceitam os quatro | ✅ |
 | A7 | `DELETE /v1/swipes/:titleId` | Idempotente: 204 tendo apagado linha ou não | ✅ |
 | A2 | Exclusão de já-avaliado + reciclagem de dislike (180d) | Título curtido nunca reaparece; descartado volta após a janela | ✅ |
 | A3 | Paginação por cursor, lotes de 20 | Duas páginas seguidas sem sobreposição | ✅ |

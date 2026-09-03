@@ -29,7 +29,7 @@ só a mudança. Vale ler antes de propor refazer algo.
 | Trilha | | |
 |---|---|---|
 | **S** esqueleto | 6/7 | falta só o deploy (bloqueado em contas) |
-| **A** feed | 8/8 | backend completo; **`Filters.tsx` não está montado** |
+| **A** feed | 8/8 | backend e UI de filtro completos |
 | **B** swipe | 6/7 | B4 (pré-carga de imagem) pausada — não há pôster |
 | **C** identidade | 4/6 | falta C5 (consentimento) e C6 (exclusão/export) |
 | **D** catálogo | 3/5 | falta D4 (onboarding) e D5 (perfil público) |
@@ -111,8 +111,6 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 
 ## Problemas conhecidos
 
-- **`Filters.tsx` existe, compila e não está montado.** A1 tem backend completo
-  e nenhuma interface. É o menor pedaço solto.
 - **Flake não explicado:** `A5 degrau 1` falhou uma vez e não reproduziu em 6
   tentativas, incluindo com banco sujo e simulando primeira execução. Se
   aparecer de novo, há uma pista a mais.
@@ -126,8 +124,7 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 
 ## Próximos passos sugeridos
 
-1. **Montar `Filters.tsx`** — backend pronto esperando interface.
-2. **D4 + D5** — onboarding e perfil público fecham a trilha D.
-3. **C5 + C6** — consentimento versionado e exclusão/exportação. São requisito
+1. **D4 + D5** — onboarding e perfil público fecham a trilha D.
+2. **C5 + C6** — consentimento versionado e exclusão/exportação. São requisito
    legal (LGPD/GDPR), não item de backlog comum.
-4. **Trilha E** — social e match. Depende de C para ter usuários de verdade.
+3. **Trilha E** — social e match. Depende de C para ter usuários de verdade.
