@@ -3,6 +3,7 @@ import { pg } from "./db/client.ts";
 import { registerAuth } from "./routes/auth.ts";
 import { feedRoutes } from "./routes/feed.ts";
 import { libraryRoutes } from "./routes/library.ts";
+import { meRoutes } from "./routes/me.ts";
 import { swipeRoutes } from "./routes/swipes.ts";
 
 /**
@@ -19,6 +20,7 @@ export function buildServer() {
   feedRoutes(app);
   swipeRoutes(app);
   libraryRoutes(app);
+  meRoutes(app);
 
   return app;
 }

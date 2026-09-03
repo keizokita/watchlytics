@@ -83,4 +83,14 @@ export const t = {
   recycleOffer: "Nothing new matches. Want to see titles you passed on before?",
   recycleAction: "Show passed titles",
   recycled: "Showing titles you passed on before.",
+
+  // C6 — os dois direitos sobre a própria conta (LGPD/GDPR)
+  account: "Your data",
+  accountHint:
+    "Your export opens as a JSON file: swipes, library, friends and matches. Deleting erases all of it right away — there is no undo and no grace period.",
+  exportData: "Download my data",
+  deleteAccount: "Delete my account",
+  /** Diz o que some ANTES do clique irreversível — o resumo é o aviso. */
+  deleteAccountConfirm:
+    "Delete your account for good? Your swipes, library, matches and friendships are erased immediately. This cannot be undone.",
 } as const;

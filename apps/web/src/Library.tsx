@@ -10,6 +10,7 @@ import {
   type ProfileStats,
   type Title,
 } from "@watchlytics/contract";
+import { getAccessToken } from "./Login.tsx";
 import { t } from "./strings.ts";
 
 /**
@@ -116,6 +117,85 @@ function Stats({ stats }: { stats: ProfileStats }) {
           </div>
         </dl>
       )}
+    </section>
+  );
+}
+
+/**
+ * C6 — exportar e apagar a conta, onde a pessoa procura os próprios dados.
+ *
+ * ponytail: mora aqui porque é a única tela de perfil que existe. Sai para um
+ * Account.tsx no D5, que traz a tela de perfil de verdade.
+ */
+function Account() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // O deck ainda entra pelo shim do C1, mas conta é conta: se houver sessão de
+  // verdade, estas duas chamadas vão nela.
+  const auth = (): HeadersInit => {
+    const token = getAccessToken();
+    return token ? { authorization: `Bearer ${token}` } : {};
+  };
+
+  const run = (fn: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    fn()
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false));
+  };
+
+  const onExport = () =>
+    run(async () => {
+      const res = await fetch("/v1/me/export", { method: "POST", headers: auth() });
+      if (!res.ok) throw new Error(`/v1/me/export respondeu ${res.status}`);
+
+      // `fetch` não obedece content-disposition — quem salva o arquivo é a
+      // página. O nome vem do cabeçalho para não existir em dois lugares.
+      const name = /filename="([^"]+)"/.exec(
+        res.headers.get("content-disposition") ?? "",
+      )?.[1];
+
+      const url = URL.createObjectURL(await res.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name ?? "watchlytics.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+
+  const onDelete = () => {
+    // Irreversível: o confirm nativo é o diálogo que o navegador já sabe
+    // apresentar, inclusive para leitor de tela. Modal próprio não somaria nada.
+    if (!window.confirm(t.deleteAccountConfirm)) return;
+
+    run(async () => {
+      const res = await fetch("/v1/me", { method: "DELETE", headers: auth() });
+      if (!res.ok) throw new Error(`DELETE /v1/me respondeu ${res.status}`);
+
+      // Apagar a conta e deixar rastro local seria a mesma meia-exclusão que o
+      // PLAN §8.4 proíbe no servidor — e a fila de swipes pendentes ficaria
+      // tentando gravar para um usuário que não existe mais.
+      localStorage.clear();
+      sessionStorage.clear();
+      location.reload();
+    });
+  };
+
+  return (
+    <section className="lib-account">
+      <h2>{t.account}</h2>
+      <p className="lib-locked">{t.accountHint}</p>
+      {error && <p className="notice error">{t.error(error)}</p>}
+      <div className="lib-account-actions">
+        <button type="button" className="lib-move" disabled={busy} onClick={onExport}>
+          {t.exportData}
+        </button>
+        <button type="button" className="lib-danger" disabled={busy} onClick={onDelete}>
+          {t.deleteAccount}
+        </button>
+      </div>
     </section>
   );
 }
@@ -251,6 +331,8 @@ export function Library() {
           )}
         </>
       )}
+
+      <Account />
     </div>
   );
 }
@@ -297,4 +379,15 @@ const CSS = `
   border: 1px solid rgb(255 255 255 / 0.18); background: none; color: var(--fg);
   font: inherit; font-size: 0.85rem; cursor: pointer; }
 .lib button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+
+.lib-account { border: 1px solid rgb(255 255 255 / 0.12); border-radius: 14px;
+  padding: 1rem; display: grid; gap: 0.75rem; }
+.lib-account h2 { margin: 0; font-size: 0.8rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); }
+.lib-account-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.lib-account button:disabled { opacity: 0.4; cursor: default; }
+/* A cor do botão destrutivo é a do pass, e só ele é vermelho na tela. */
+.lib-danger { padding: 0.45rem 0.9rem; border-radius: 999px;
+  border: 1px solid var(--pass); background: none; color: var(--pass);
+  font: inherit; font-size: 0.85rem; cursor: pointer; }
 `;
