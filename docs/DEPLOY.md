@@ -10,7 +10,7 @@ O que falta são as três contas. Todas em tier gratuito.
 
 ```
 navegador ──► Cloudflare Pages (estático + Function)
-                      │  /v1/*  proxy
+                      │  /v1/*  e  /u/*  proxy
                       ▼
                  Fly.io (api, container)
                       │
@@ -124,6 +124,8 @@ pgvector como service container.
 - [ ] `https://watchlytics-api.fly.dev/health` devolve `{"ok":true}`
 - [ ] A URL pública do Pages mostra o card do Breaking Bad
 - [ ] `/v1/feed` na URL do Pages responde (prova que o proxy funciona)
+- [ ] `PUBLIC_ORIGIN` definida no Fly com a URL do Pages, e `/u/<handle>` de um
+      perfil público abre com as OG tags (é o que o WhatsApp lê)
 - [ ] Um push em `main` dispara o CI e redeploya as duas pontas
 
 ## Custo

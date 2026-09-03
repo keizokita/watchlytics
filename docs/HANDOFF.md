@@ -24,7 +24,7 @@ HTML renderizado no servidor. Toda decisão de arquitetura protege esse caminho.
 O `git log` é documentação de verdade aqui: cada commit explica a decisão, não
 só a mudança. Vale ler antes de propor refazer algo.
 
-## Estado: 29 de 39 tarefas
+## Estado: 30 de 39 tarefas
 
 | Trilha | | |
 |---|---|---|
@@ -32,14 +32,14 @@ só a mudança. Vale ler antes de propor refazer algo.
 | **A** feed | 8/8 | backend e UI de filtro completos |
 | **B** swipe | 6/7 | B4 (pré-carga de imagem) pausada — não há pôster |
 | **C** identidade | 6/6 | completa — falta exercitar contra o Google real |
-| **D** catálogo | 3/5 | falta D4 (onboarding) e D5 (perfil público) |
+| **D** catálogo | 4/5 | falta D4 (onboarding) |
 | **E** social | 0/6 | não começou |
 
 **Funciona ponta a ponta:** Postgres → API Fastify → deck no navegador. Swipe
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
 repetir; o LIKE vira coleção com abas e estatísticas.
 
-**53 testes** (48 API + 5 fila), `npm run check` limpo nos três pacotes.
+**58 testes** (53 API + 5 fila), `npm run check` limpo nos três pacotes.
 
 ## Ambiente — o que custa caro redescobrir
 
@@ -124,9 +124,7 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 
 ## Próximos passos sugeridos
 
-1. **D5** — perfil público e `GET /u/:handle` com OG tags. Agora que o C6
-   existe, expor perfil já vem com exclusão e portabilidade atrás.
-2. **D4** — onboarding. Decida o recorte antes: 20 swipes obrigatórios sobre 94
-   títulos queimam 20% do catálogo na porta de entrada.
-3. **Trilha E** — social e match. C está completa, então a dependência de
-   usuários de verdade virou só a credencial do Google.
+1. **Trilha E** — social e match. C está completa e o D5 já expõe perfil por
+   handle; a dependência de usuários de verdade virou só a credencial do Google.
+2. **D4** — onboarding, o último da trilha D. Decida o recorte antes: 20 swipes
+   obrigatórios sobre 94 títulos queimam 20% do catálogo na porta de entrada.

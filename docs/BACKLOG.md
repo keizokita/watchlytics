@@ -107,7 +107,7 @@ B trabalha contra mock do contrato e não espera A.
 | D2 | Telas: interessado / assistido / descartados | Descartados lê de `swipes`, não de `library_entries` | ✅ |
 | D3 | Stats + piso de 10 assistidos | Abaixo de 10 a página pública não mostra agregados | ✅ |
 | D4 | Onboarding: gêneros → deck estratificado de 20 → `taste_vector` | Contador visível; feed sai calibrado | |
-| D5 | Perfil público + rota `GET /u/:handle` com OG tags | Link em WhatsApp/Slack renderiza preview | |
+| D5 | Perfil público + rota `GET /u/:handle` com OG tags | Link em WhatsApp/Slack renderiza preview | ✅ |
 
 > **D4 colide com a fixture.** 20 swipes obrigatórios sobre ~100 títulos queimam
 > 20% do catálogo na porta de entrada. Aceitável para construir e demonstrar,
