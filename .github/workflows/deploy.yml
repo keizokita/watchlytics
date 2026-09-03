@@ -41,7 +41,12 @@ jobs:
         run: |
           node apps/api/src/seed.ts | grep -q "inseridos: 0"
       - run: npm test
+      # O client id do Google entra em build time (Login.tsx) e é público por
+      # natureza: vai como `vars`, não como secret. Sem ele o front sobe com o
+      # login inerte.
       - run: npm run build -w @watchlytics/web
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist

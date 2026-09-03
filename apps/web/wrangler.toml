@@ -1,0 +1,8 @@
+name = "watchlytics"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-09-01"
+
+# Origem da api para o proxy em functions/. É URL pública, não segredo — fica
+# aqui e não no painel do Pages para que um deploy do CI já saia configurado.
+[vars]
+API_ORIGIN = "https://watchlytics-api.fly.dev"
