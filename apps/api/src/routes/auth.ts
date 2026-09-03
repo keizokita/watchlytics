@@ -95,8 +95,16 @@ async function exchangeWithGoogle(
     }),
   });
 
-  // Código expirado, já usado ou verifier errado. Não vaza o motivo do Google.
-  if (!res.ok) throw httpError(401, "provedor recusou o código");
+  // Código expirado, já usado ou verifier errado. Não vaza o motivo do Google
+  // para o cliente — mas registra no servidor: um 401 opaco nos dois lados é
+  // indepurável em produção, e o corpo de erro do Google não tem segredo
+  // nenhum (é `{"error":"invalid_grant"}` e afins, sem token).
+  if (!res.ok) {
+    console.warn(
+      `google/token ${res.status}: ${(await res.text()).slice(0, 300)}`,
+    );
+    throw httpError(401, "provedor recusou o código");
+  }
 
   const body = (await res.json()) as { id_token?: unknown };
   if (typeof body.id_token !== "string") {
@@ -116,6 +124,12 @@ async function exchangeWithGoogle(
     typeof claims["sub"] !== "string" ||
     !claims["sub"]
   ) {
+    // O aud é o client_id que o FRONT usou na autorização; o clientId daqui
+    // vem do secret do servidor. Divergir significa dois client ids em jogo,
+    // e sem este log a diferença é invisível.
+    console.warn(
+      `id_token rejeitado: iss=${String(claims["iss"])} aud=${String(claims["aud"])} esperado=${clientId}`,
+    );
     throw httpError(401, "id_token não é para esta aplicação");
   }
 
