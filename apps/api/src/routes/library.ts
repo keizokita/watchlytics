@@ -165,68 +165,71 @@ export function libraryRoutes(app: FastifyInstance): void {
     return { items: rows.map((r) => toTitle(r.titles)) };
   });
 
-  /**
-   * D3 — estatísticas do próprio perfil.
-   *
-   * Agrega em JS de propósito: a lista de assistidos de uma pessoa é limitada
-   * pelo tamanho do catálogo, e três GROUP BY (um deles com unnest) para
-   * dezenas de linhas é SQL que ninguém vai querer manter.
-   *
-   * ponytail: vira uma query agregada quando o catálogo passar da casa dos
-   * milhares E alguém tiver assistido milhares.
-   */
-  app.get("/v1/me/stats", async () => {
-    const userId = requireUserId();
+  /** D3 — estatísticas do próprio perfil. O D5 usa a MESMA função. */
+  app.get("/v1/me/stats", async () => statsOf(requireUserId()));
+}
 
-    const rows = await db
-      .select({
-        releaseYear: titles.releaseYear,
-        runtimeMinutes: titles.runtimeMinutes,
-        genreIds: titles.genreIds,
-      })
-      .from(libraryEntries)
-      .innerJoin(titles, eq(titles.id, libraryEntries.titleId))
-      .where(
-        and(
-          eq(libraryEntries.userId, userId),
-          eq(libraryEntries.status, "watched"),
-        ),
-      );
+/**
+ * Agregados de um usuário qualquer — o dono (D3) ou um perfil público (D5).
+ * Uma função só: piso de agregação que vale num lugar e não no outro é
+ * exatamente como dado vaza.
+ *
+ * Agrega em JS de propósito: a lista de assistidos de uma pessoa é limitada
+ * pelo tamanho do catálogo, e três GROUP BY (um deles com unnest) para
+ * dezenas de linhas é SQL que ninguém vai querer manter.
+ *
+ * ponytail: vira uma query agregada quando o catálogo passar da casa dos
+ * milhares E alguém tiver assistido milhares.
+ */
+export async function statsOf(userId: string): Promise<ProfileStats> {
+  const rows = await db
+    .select({
+      releaseYear: titles.releaseYear,
+      runtimeMinutes: titles.runtimeMinutes,
+      genreIds: titles.genreIds,
+    })
+    .from(libraryEntries)
+    .innerJoin(titles, eq(titles.id, libraryEntries.titleId))
+    .where(
+      and(
+        eq(libraryEntries.userId, userId),
+        eq(libraryEntries.status, "watched"),
+      ),
+    );
 
-    // Piso de agregação (PLAN §8.3): abaixo dele o agregado NÃO é calculado,
-    // não é só escondido na tela. O que a API não devolve não vaza.
-    if (rows.length < STATS_MIN_WATCHED) {
-      return { watchedCount: rows.length, aggregates: null } satisfies ProfileStats;
-    }
+  // Piso de agregação (PLAN §8.3): abaixo dele o agregado NÃO é calculado,
+  // não é só escondido na tela. O que a API não devolve não vaza.
+  if (rows.length < STATS_MIN_WATCHED) {
+    return { watchedCount: rows.length, aggregates: null } satisfies ProfileStats;
+  }
 
-    const byGenre = new Map<number, number>();
-    const byDecade = new Map<number, number>();
-    let estimatedMinutes = 0;
+  const byGenre = new Map<number, number>();
+  const byDecade = new Map<number, number>();
+  let estimatedMinutes = 0;
 
-    for (const r of rows) {
-      estimatedMinutes += r.runtimeMinutes ?? 0;
-      const decade = decadeOf(r.releaseYear);
-      byDecade.set(decade, (byDecade.get(decade) ?? 0) + 1);
-      for (const g of r.genreIds) byGenre.set(g, (byGenre.get(g) ?? 0) + 1);
-    }
+  for (const r of rows) {
+    estimatedMinutes += r.runtimeMinutes ?? 0;
+    const decade = decadeOf(r.releaseYear);
+    byDecade.set(decade, (byDecade.get(decade) ?? 0) + 1);
+    for (const g of r.genreIds) byGenre.set(g, (byGenre.get(g) ?? 0) + 1);
+  }
 
-    // Empate desempatado pelo id do gênero / pela década mais recente: sem
-    // isso a ordem sai da iteração do Map e a tela muda sozinha entre reloads.
-    const topGenres = [...byGenre]
-      .sort(([ga, ca], [gb, cb]) => cb - ca || ga - gb)
-      .slice(0, 3)
-      .map(([genreId, count]) => ({ genreId, count }));
+  // Empate desempatado pelo id do gênero / pela década mais recente: sem
+  // isso a ordem sai da iteração do Map e a tela muda sozinha entre reloads.
+  const topGenres = [...byGenre]
+    .sort(([ga, ca], [gb, cb]) => cb - ca || ga - gb)
+    .slice(0, 3)
+    .map(([genreId, count]) => ({ genreId, count }));
 
-    const decades = [...byDecade].sort(([da, ca], [db, cb]) => cb - ca || db - da);
+  const decades = [...byDecade].sort(([da, ca], [db, cb]) => cb - ca || db - da);
 
-    return {
-      watchedCount: rows.length,
-      aggregates: {
-        topGenres,
-        estimatedMinutes,
-        // rows.length >= STATS_MIN_WATCHED garante ao menos uma década.
-        favoriteDecade: decades[0]![0],
-      },
-    } satisfies ProfileStats;
-  });
+  return {
+    watchedCount: rows.length,
+    aggregates: {
+      topGenres,
+      estimatedMinutes,
+      // rows.length >= STATS_MIN_WATCHED garante ao menos uma década.
+      favoriteDecade: decades[0]![0],
+    },
+  } satisfies ProfileStats;
 }
