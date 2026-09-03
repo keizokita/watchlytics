@@ -24,7 +24,7 @@ HTML renderizado no servidor. Toda decisão de arquitetura protege esse caminho.
 O `git log` é documentação de verdade aqui: cada commit explica a decisão, não
 só a mudança. Vale ler antes de propor refazer algo.
 
-## Estado: 35 de 39 tarefas
+## Estado: 37 de 39 tarefas
 
 | Trilha | | |
 |---|---|---|
@@ -33,7 +33,7 @@ só a mudança. Vale ler antes de propor refazer algo.
 | **B** swipe | 6/7 | B4 (pré-carga de imagem) pausada — não há pôster |
 | **C** identidade | 6/6 | completa — falta exercitar contra o Google real |
 | **D** catálogo | 5/5 | completa |
-| **E** social | 4/6 | falta E5 (aba de comuns) e E6 (notificações na tela) |
+| **E** social | 6/6 | completa |
 
 **Funciona ponta a ponta:** Postgres → API Fastify → deck no navegador. Swipe
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
@@ -125,16 +125,15 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
   diferente.
 - **Rate limit é por instância** (Map em memória). Com duas máquinas no Fly, o
   teto dobra.
-- **E5 e E6 estão pela metade, e a metade que falta é tela.** O servidor já
-  faz tudo: `GET /v1/matches` (keyset por `created_at, title_id`),
-  `GET /v1/notifications` com a contagem de não lidas e
-  `POST /v1/notifications/read`. Match **forte** notifica na hora, médio e
-  fraco só aparecem na aba (PLAN §5.3). Falta a aba de comuns, o badge e o
-  polling de 60s — tudo em `apps/web`, por isso as duas tarefas seguem
-  abertas no backlog.
-- **`Friends.tsx` existe e não está commitado.** A tela de busca/pedido/aceite
-  (E1+E2) ficou de fora porque `apps/web` estava com outra sessão. Está na
-  árvore de trabalho, com o mount em `main.tsx` — confira antes de recriar.
+- **A notificação carrega o texto pronto.** `friendHandle` e `title` vão
+  dentro do payload, não só os ids: a caixa é instantâneo, não consulta. Um
+  handle trocado depois não reescreve aviso antigo — e é por isso que a tela
+  não faz um fetch por linha.
+- **CSS de tela mora em `screenCss.ts`.** As classes `.lib-*` eram do
+  `Library.tsx` e não existiam quando a tela de amigos montava: mesmas classes,
+  aparência de formulário cru. O `index.html` continua sendo só do deck.
+- **A aba da tela social vive no hash** (`#/friends/common`). É o que deixa o
+  botão voltar funcionar e o que torna a tela dirigível pelo driver.
 
 ## Próximos passos sugeridos
 
