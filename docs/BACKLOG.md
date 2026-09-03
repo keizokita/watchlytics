@@ -117,10 +117,10 @@ B trabalha contra mock do contrato e não espera A.
 
 | id | Tarefa | Pronto quando | |
 |---|---|---|---|
-| E1 | Handle único + busca (≥3 chars, nunca por email) | Busca não confirma existência de conta | |
-| E2 | Pedido e aceite de amizade | Par normalizado `user_a < user_b`, sem linha invertida | |
-| E3 | Match no like, na mesma transação | Dois amigos curtem o mesmo título → linha em `matches` | |
-| E4 | Match retroativo no aceite, notificação **agregada** | 37 comuns geram 1 notificação, não 37 | |
+| E1 | Handle único + busca (≥3 chars, nunca por email) | Busca não confirma existência de conta | ✅ |
+| E2 | Pedido e aceite de amizade | Par normalizado `user_a < user_b`, sem linha invertida | ✅ |
+| E3 | Match no like, na mesma transação | Dois amigos curtem o mesmo título → linha em `matches` | ✅ |
+| E4 | Match retroativo no aceite, notificação **agregada** | 37 comuns geram 1 notificação, não 37 | ✅ |
 | E5 | Aba "títulos em comum" com força do match | Forte notifica, fraco só aparece | |
 | E6 | Notificações + polling 60s + badge | Badge zera ao abrir | |
 

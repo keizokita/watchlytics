@@ -24,7 +24,7 @@ HTML renderizado no servidor. Toda decisão de arquitetura protege esse caminho.
 O `git log` é documentação de verdade aqui: cada commit explica a decisão, não
 só a mudança. Vale ler antes de propor refazer algo.
 
-## Estado: 30 de 39 tarefas
+## Estado: 35 de 39 tarefas
 
 | Trilha | | |
 |---|---|---|
@@ -32,14 +32,14 @@ só a mudança. Vale ler antes de propor refazer algo.
 | **A** feed | 8/8 | backend e UI de filtro completos |
 | **B** swipe | 6/7 | B4 (pré-carga de imagem) pausada — não há pôster |
 | **C** identidade | 6/6 | completa — falta exercitar contra o Google real |
-| **D** catálogo | 4/5 | falta D4 (onboarding) |
-| **E** social | 0/6 | não começou |
+| **D** catálogo | 5/5 | completa |
+| **E** social | 4/6 | falta E5 (aba de comuns) e E6 (notificações na tela) |
 
 **Funciona ponta a ponta:** Postgres → API Fastify → deck no navegador. Swipe
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
 repetir; o LIKE vira coleção com abas e estatísticas.
 
-**58 testes** (53 API + 5 fila), `npm run check` limpo nos três pacotes.
+**82 testes** (77 API + 5 fila), `npm run check` limpo nos três pacotes.
 
 ## Ambiente — o que custa caro redescobrir
 
@@ -117,14 +117,24 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 - **C1 é dívida com prazo.** O shim `DEV_USER_ID` em `auth.ts` injeta usuário
   fixo. Produção não define a variável e responde 401. Sai quando o OAuth estiver
   em produção — não deixe virar permanente.
-- **Fixture esgota numa sessão.** 94 títulos, e o onboarding do D4 vai consumir
-  20 na porta de entrada. Serve para construir e demonstrar, não para o beta.
+- **Fixture esgota numa sessão.** 94 títulos, e o onboarding do D4 consome 20
+  na porta de entrada. Serve para construir e demonstrar, não para o beta.
+- **`POST /v1/swipes` passou a respeitar o Bearer.** Antes chamava
+  `requireUserId()` sem `req`, então swipe de usuário logado era gravado no
+  `DEV_USER_ID`. Com OAuth em produção isso teria misturado catálogo de gente
+  diferente.
 - **Rate limit é por instância** (Map em memória). Com duas máquinas no Fly, o
   teto dobra.
+- **Notificação só existe no aceite, e ninguém a lê.** O E4 grava uma linha
+  agregada por pessoa quando a amizade é aceita; o match que nasce de um like
+  (E3) não notifica — pela tabela do PLAN §5.3 quem notifica é match forte, e
+  isso é E6. Não há `GET /v1/notifications` nem tela: as linhas ficam no banco
+  esperando o E6, e o match esperando a aba do E5.
 
 ## Próximos passos sugeridos
 
-1. **Trilha E** — social e match. C está completa e o D5 já expõe perfil por
-   handle; a dependência de usuários de verdade virou só a credencial do Google.
+1. **E5 + E6** — a trilha E inteira está no banco e não tem tela: aba de
+   títulos em comum e a lista de notificações com badge. É trabalho de
+   `apps/web`, onde outra sessão está mexendo — combine antes de começar.
 2. **D4** — onboarding, o último da trilha D. Decida o recorte antes: 20 swipes
    obrigatórios sobre 94 títulos queimam 20% do catálogo na porta de entrada.
