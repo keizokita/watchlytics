@@ -13,6 +13,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   vector,
 } from "drizzle-orm/pg-core";
@@ -28,18 +29,32 @@ const createdAt = () =>
  * `handle` e `email` são armazenados SEMPRE em minúsculas, normalizados na
  * borda da API. Evita a extensão citext e o índice funcional que ela pouparia.
  */
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  handle: text("handle").notNull().unique(),
-  displayName: text("display_name").notNull(),
-  email: text("email"), // informativo, NUNCA chave de login
-  avatarUrl: text("avatar_url"),
-  isPublic: boolean("is_public").notNull().default(false),
-  preferredGenres: smallint("preferred_genres").array(),
-  tasteVector: vector("taste_vector", { dimensions: TASTE_VECTOR_DIM }),
-  createdAt: createdAt(),
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    handle: text("handle").notNull().unique(),
+    displayName: text("display_name").notNull(),
+    email: text("email"), // informativo, NUNCA chave de login
+    avatarUrl: text("avatar_url"),
+    isPublic: boolean("is_public").notNull().default(false),
+    preferredGenres: smallint("preferred_genres").array(),
+    tasteVector: vector("taste_vector", { dimensions: TASTE_VECTOR_DIM }),
+    createdAt: createdAt(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (t) => [
+    /**
+     * E1 — "handle único" é único IGNORANDO caixa. Sem isto @Ana e @ana são
+     * duas contas, e toda busca por handle (que compara em lower) passa a ter
+     * duas respostas certas — inclusive a do perfil público do D5.
+     *
+     * O unique simples da coluna fica: é o alvo do ON CONFLICT do login, e
+     * índice em expressão não serve para isso.
+     */
+    uniqueIndex("users_handle_lower").on(sql`lower(${t.handle})`),
+  ],
+);
 
 export const identities = pgTable(
   "identities",
@@ -186,6 +201,13 @@ export const libraryEntries = pgTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.titleId] }),
     index("library_by_user_status").on(t.userId, t.status, sql`added_at DESC`),
+    /**
+     * E3 — o lado do AMIGO no match. O PLAN §4 previu esse índice em `swipes`;
+     * a força do match lê o status dos dois lados, então quem é varrido a cada
+     * like é `library_entries`, não `swipes`. Sem ele o match no like vira seq
+     * scan da tabela inteira por título curtido.
+     */
+    index("library_by_title").on(t.titleId, t.status),
     check("library_status_valid", sql`${t.status} IN ('interested','watched')`),
     check(
       "library_rating_range",

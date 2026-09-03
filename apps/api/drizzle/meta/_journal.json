@@ -8,6 +8,20 @@
       "when": 1786211273755,
       "tag": "0000_kind_guardsmen",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788450273169,
+      "tag": "0001_optimal_doomsday",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788452435094,
+      "tag": "0002_square_alex_wilder",
+      "breakpoints": true
     }
   ]
 }

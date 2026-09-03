@@ -233,6 +233,34 @@ export const sessionUser = z.object({
 });
 export type SessionUser = z.infer<typeof sessionUser>;
 
+/**
+ * E1 — o que uma pessoa vê de outra antes de haver amizade. Sem email, sem
+ * `is_public`, sem contagem: a busca não é lugar de vazar nada além do nome
+ * que a própria pessoa escolheu.
+ */
+export const publicUser = z.object({
+  id: z.uuid(),
+  handle: z.string(),
+  displayName: z.string(),
+  avatarUrl: z.url().nullable(),
+});
+export type PublicUser = z.infer<typeof publicUser>;
+
+/** Piso da busca (PLAN §10): abaixo disso a rota nem consulta. */
+export const HANDLE_SEARCH_MIN = 3;
+
+export const userSearchResponse = z.object({ items: z.array(publicUser) });
+
+/** E2 — as três listas saem juntas: a tela mostra as três ao mesmo tempo. */
+export const friendsResponse = z.object({
+  friends: z.array(publicUser),
+  /** Pedidos que EU recebi e posso aceitar. */
+  incoming: z.array(publicUser),
+  /** Pedidos que eu mandei e ainda não foram respondidos. */
+  outgoing: z.array(publicUser),
+});
+export type FriendsResponse = z.infer<typeof friendsResponse>;
+
 export const authResponse = authTokens.extend({ user: sessionUser });
 export type AuthResponse = z.infer<typeof authResponse>;
 

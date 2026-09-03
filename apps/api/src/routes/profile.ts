@@ -1,11 +1,14 @@
-import { eq, sql } from "drizzle-orm";
+import { and, ne, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
   GENRE_NAME_BY_ID,
+  HANDLE_SEARCH_MIN,
   STATS_MIN_WATCHED,
   type ProfileStats,
+  type PublicUser,
 } from "@watchlytics/contract";
+import { httpError, rateLimit, requireUserId } from "../auth.ts";
 import { db } from "../db/client.ts";
 import { users } from "../db/schema.ts";
 import { statsOf } from "./library.ts";
@@ -116,7 +119,54 @@ ${meta("og:url", url)}
 `;
 }
 
+/** Quem procura amigo procura poucas vezes; quem varre handle procura muito. */
+const SEARCH_PER_MIN = 30;
+
+/**
+ * `%` e `_` dentro do termo são curinga do LIKE — sem escapar, buscar por `%`
+ * lista o banco inteiro, que é exatamente a enumeração que o piso de 3
+ * caracteres existe para impedir.
+ */
+const likePrefix = (q: string) => `${q.replace(/[\\%_]/g, "\\$&")}%`;
+
 export function profileRoutes(app: FastifyInstance): void {
+  /**
+   * E1 — busca por handle, e SÓ por handle. O email nem entra na query: a
+   * coluna existe para contato, nunca para achar gente (PLAN §8.6).
+   *
+   * Devolve lista vazia, nunca 404: "não achei" e "existe mas não te mostro"
+   * têm que ser indistinguíveis de fora.
+   */
+  app.get<{ Querystring: { q?: string } }>("/v1/users", async (req) => {
+    const userId = requireUserId(req);
+    if (!rateLimit(`search:${userId}`, SEARCH_PER_MIN)) {
+      throw httpError(429, "muitas buscas");
+    }
+
+    const q = (req.query.q ?? "").trim();
+    if (q.length < HANDLE_SEARCH_MIN) return { items: [] };
+
+    const items: PublicUser[] = await db
+      .select({
+        id: users.id,
+        handle: users.handle,
+        displayName: users.displayName,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(users)
+      .where(
+        and(
+          sql`lower(${users.handle}) like lower(${likePrefix(q)})`,
+          // Achar a si mesmo não ajuda ninguém e ainda ocupa um resultado.
+          ne(users.id, userId),
+        ),
+      )
+      .orderBy(users.handle)
+      .limit(10);
+
+    return { items };
+  });
+
   app.get<{ Params: { handle: string } }>(
     "/v1/users/:handle",
     async (req, reply) => {

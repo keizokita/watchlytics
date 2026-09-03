@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import { pg } from "./db/client.ts";
 import { registerAuth } from "./routes/auth.ts";
 import { feedRoutes } from "./routes/feed.ts";
+import { friendRoutes } from "./routes/friends.ts";
 import { libraryRoutes } from "./routes/library.ts";
 import { meRoutes } from "./routes/me.ts";
 import { onboardingRoutes } from "./routes/onboarding.ts";
@@ -25,6 +26,7 @@ export function buildServer() {
   meRoutes(app);
   onboardingRoutes(app);
   profileRoutes(app);
+  friendRoutes(app);
 
   return app;
 }

@@ -1,0 +1,1 @@
+CREATE INDEX "library_by_title" ON "library_entries" USING btree ("title_id","status");

@@ -5,6 +5,7 @@ import { swipeBatch } from "@watchlytics/contract";
 import { requireUserId } from "../auth.ts";
 import { db } from "../db/client.ts";
 import { libraryEntries, swipes, titles } from "../db/schema.ts";
+import { matchOnLike } from "./friends.ts";
 
 export function swipeRoutes(app: FastifyInstance) {
   /**
@@ -14,7 +15,7 @@ export function swipeRoutes(app: FastifyInstance) {
    * upsert. Sem UUID de request, sem tabela de dedup.
    */
   app.post("/v1/swipes", async (req, reply) => {
-    const userId = requireUserId();
+    const userId = requireUserId(req);
 
     const parsed = swipeBatch.safeParse(req.body);
     if (!parsed.success) {
@@ -84,6 +85,15 @@ export function swipeRoutes(app: FastifyInstance) {
               })),
             )
             .onConflictDoNothing();
+
+          // E3 — o match sai na mesma transação do like: se o swipe existe, o
+          // match existe. Depois do insert do catálogo de propósito, porque a
+          // força do match lê o status dos DOIS lados em library_entries.
+          await matchOnLike(
+            tx,
+            userId,
+            liked.map((r) => r.titleId),
+          );
         }
       });
     }
@@ -98,7 +108,7 @@ export function swipeRoutes(app: FastifyInstance) {
   app.delete<{ Params: { titleId: string } }>(
     "/v1/swipes/:titleId",
     async (req, reply) => {
-      const userId = requireUserId();
+      const userId = requireUserId(req);
       const titleId = req.params.titleId;
 
       if (!z.uuid().safeParse(titleId).success) {

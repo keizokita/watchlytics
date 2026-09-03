@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "users_handle_lower" ON "users" USING btree (lower("handle"));
