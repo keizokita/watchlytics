@@ -28,7 +28,15 @@ if (!DEV) throw new Error("DEV_USER_ID não definida (veja .env.example)");
 const LOVES_DRAMA = "00000000-0000-4000-8000-0000000000a1";
 const LOVES_ANIMATION = "00000000-0000-4000-8000-0000000000a2";
 const SAW_EVERYTHING = "00000000-0000-4000-8000-0000000000a3";
-const TEST_USERS = [LOVES_DRAMA, LOVES_ANIMATION, SAW_EVERYTHING];
+/**
+ * A3 pagina, e paginar exige que o conjunto não mude entre as duas páginas.
+ * No DEV_USER_ID isso é corrida perdida: `swipes.test.ts` roda em paralelo e
+ * apaga os swipes dele seis vezes, e como o score leva o peso por gênero
+ * (A4), sumir com os swipes reordena o feed no meio da paginação — a segunda
+ * página volta com item da primeira.
+ */
+const PAGINATES = "00000000-0000-4000-8000-0000000000a4";
+const TEST_USERS = [LOVES_DRAMA, LOVES_ANIMATION, SAW_EVERYTHING, PAGINATES];
 
 /** Os dois gêneros mais representados na fixture — material de sobra dos dois lados. */
 const DRAMA = 7;
@@ -117,12 +125,12 @@ test("A1: filtro inválido responde 400, não 500", async () => {
 // ─── A3 ─────────────────────────────────────────────────────────────────────
 
 test("A3: duas páginas seguidas não repetem item", async () => {
-  const first = await feed(DEV);
+  const first = await feed(PAGINATES);
   assert.equal(first.items.length, 20, "lote de 20");
   assert.ok(first.nextCursor, "página cheia devolve cursor");
 
   const second = await feed(
-    DEV,
+    PAGINATES,
     `?cursor=${encodeURIComponent(first.nextCursor)}`,
   );
   assert.equal(second.items.length, 20);
