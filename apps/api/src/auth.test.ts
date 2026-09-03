@@ -4,7 +4,7 @@ import { eq, inArray } from "drizzle-orm";
 import { authResponse, sessionUser } from "@watchlytics/contract";
 import { ACCESS_TTL_S, signAccess, verifyAccess } from "./auth.ts";
 import { db, pg } from "./db/client.ts";
-import { identities, sessions, users } from "./db/schema.ts";
+import { consents, identities, sessions, users } from "./db/schema.ts";
 import { providers } from "./routes/auth.ts";
 import { buildServer } from "./server.ts";
 
@@ -403,4 +403,29 @@ test("rate limit por conta nas rotas autenticadas", async () => {
   // O teto é por conta, então trocar de IP a cada chamada não ajuda.
   for (let i = 0; i < 121; i++) last = (await me()).statusCode;
   assert.equal(last, 429);
+});
+
+test("C5 — primeiro login grava consentimento versionado, o segundo não duplica", async () => {
+  const first = authResponse.parse((await login({ sub: "sub-consent" })).json());
+  created.push(first.user.id);
+
+  const afterFirst = await db
+    .select()
+    .from(consents)
+    .where(eq(consents.userId, first.user.id));
+
+  assert.equal(afterFirst.length, 1, "uma linha por kind consentido");
+  assert.equal(afterFirst[0]?.kind, "profiling");
+  // A versão é o contrato do C5: sem ela não dá para provar O QUE foi aceito.
+  assert.match(String(afterFirst[0]?.version), /^\d{4}-\d{2}-\d{2}$/);
+  assert.ok(afterFirst[0]?.acceptedAt instanceof Date);
+  assert.ok(afterFirst[0]?.ip, "o IP de quem aceitou fica registrado");
+
+  await login({ sub: "sub-consent" });
+  const afterSecond = await db
+    .select()
+    .from(consents)
+    .where(eq(consents.userId, first.user.id));
+  assert.equal(afterSecond.length, 1, "voltar a entrar não é aceitar de novo");
+  assert.deepEqual(afterSecond[0]?.acceptedAt, afterFirst[0]?.acceptedAt);
 });

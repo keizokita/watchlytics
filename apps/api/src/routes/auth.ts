@@ -23,7 +23,7 @@ import {
   signAccess,
 } from "../auth.ts";
 import { db } from "../db/client.ts";
-import { identities, sessions, users } from "../db/schema.ts";
+import { consents, identities, sessions, users } from "../db/schema.ts";
 
 /**
  * C2/C3/C4 — troca do código OAuth, rotação do refresh e sessão.
@@ -37,6 +37,23 @@ import { identities, sessions, users } from "../db/schema.ts";
 const MINT_PER_MIN = 20;
 
 const COOKIE = "wl_refresh";
+
+/**
+ * C5 — a versão do aviso que o usuário leu ao entrar, não a de um documento
+ * jurídico (que ainda não existe; PLAN §9). Mude junto com o texto de
+ * `consentNotice` em apps/web/src/strings.ts, nunca sozinha.
+ *
+ * `profiling` é o único kind gravado: pelo PLAN §8.1 a conta em si roda por
+ * execução de contrato, e é o perfilamento de gosto que precisa de
+ * consentimento específico. O grafo social entra como kind próprio quando a
+ * trilha E existir — a PK (user, kind, version) já aceita a segunda linha.
+ *
+ * ponytail: sem re-consentimento. Subir a versão passa a valer só para quem
+ * criar conta depois; quem já entrou continua com a linha antiga. Vira
+ * problema quando o texto mudar de verdade, e aí o lugar é um gate no
+ * middleware de auth, não aqui.
+ */
+const CONSENT_VERSION = "2026-09-02";
 
 const unauthorized = () => httpError(401, "não autenticado");
 
@@ -164,6 +181,7 @@ const suffix = () => Math.random().toString(36).slice(2, 6);
 async function findOrCreateUser(
   provider: string,
   identity: ProviderIdentity,
+  ip: string,
 ): Promise<string> {
   const lookup = async () => {
     const [row] = await db
@@ -208,6 +226,15 @@ async function findOrCreateUser(
         providerUserId: identity.providerUserId,
         userId,
         emailAtProvider: identity.email,
+      });
+
+      // Na MESMA transação da conta: conta que existe sem consentimento é
+      // exatamente o que o registro versionado deveria provar que não acontece.
+      await tx.insert(consents).values({
+        userId,
+        kind: "profiling",
+        version: CONSENT_VERSION,
+        ip,
       });
       return userId;
     });
@@ -382,7 +409,11 @@ export function registerAuth(app: FastifyInstance): void {
         codeVerifier,
         redirectUri,
       );
-      const userId = await findOrCreateUser(provider.data, identity);
+      const userId = await findOrCreateUser(
+        provider.data,
+        identity,
+        clientIp(req),
+      );
       const refresh = await startSession(userId, req.headers["user-agent"]);
 
       return {

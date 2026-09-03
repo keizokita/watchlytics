@@ -174,6 +174,11 @@ export function Login() {
       ) : (
         t.authNotConfigured
       )}
+      {!user && CLIENT_ID && (
+        // C5 — o consentimento é gravado na criação da conta; o aviso tem que
+        // estar VISÍVEL no clique que cria, senão o registro é teatro.
+        <span className="consent">{t.consentNotice}</span>
+      )}
     </p>
   );
 }

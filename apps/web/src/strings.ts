@@ -50,6 +50,13 @@ export const t = {
   signOut: "Sign out",
   signedInAs: (handle: string) => `Signed in as @${handle}`,
   authNotConfigured: "Sign-in is not configured on this build.",
+  /**
+   * C5 — o que a conta grava em `consents` na primeira entrada. Mudou o texto,
+   * suba a CONSENT_VERSION do backend: é a versão DESTE aviso que fica
+   * registrada. Sem link porque a política ainda não existe (PLAN §9).
+   */
+  consentNotice:
+    "By signing in you agree that your swipes are used to personalize what you see next.",
   authStateMismatch: "Sign-in did not come back from where it started.",
 
   // A1 — filtros
