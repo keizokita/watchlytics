@@ -306,6 +306,10 @@ function Root() {
       <style>{`
         .shell { display: grid; gap: 1.25rem; justify-items: center; }
         .shell nav { display: flex; gap: 0.5rem; }
+        /* Deslogada, a nav é só o botão de entrar, e ele tem que vir DEPOIS do
+           que explica o app — senão a pessoa lê o call-to-action antes de
+           saber para o que está entrando. */
+        .shell nav.below { order: 2; }
         .shell nav a {
           padding: 0.4rem 0.9rem; border-radius: 999px; text-decoration: none;
           color: var(--muted); font-size: 0.9rem; font-weight: 600;
@@ -314,7 +318,7 @@ function Root() {
           color: var(--fg); background: rgb(255 255 255 / 0.08);
         }
       `}</style>
-      <nav>
+      <nav className={user ? undefined : "below"}>
         {/* Sem sessão as três telas são 401: link que não leva a lugar nenhum
             é pior que link ausente. */}
         {user ? (
