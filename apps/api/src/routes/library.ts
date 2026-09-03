@@ -7,35 +7,11 @@ import {
   STATS_MIN_WATCHED,
   type LibraryEntry,
   type ProfileStats,
-  type Title,
 } from "@watchlytics/contract";
 import { requireUserId } from "../auth.ts";
 import { db } from "../db/client.ts";
 import { libraryEntries, swipes, titles } from "../db/schema.ts";
-
-type Row = typeof titles.$inferSelect;
-
-/**
- * ponytail: cópia do mapeador do feed. Vira import quando o feed sair de
- * server.ts para routes/feed.ts — enquanto os dois arquivos têm donos
- * diferentes, extrair para um módulo comum é conflito garantido no merge.
- */
-const toTitle = (r: Row): Title => ({
-  id: r.id,
-  type: r.type as Title["type"],
-  title: r.title,
-  originalTitle: r.originalTitle,
-  overview: r.overview,
-  posterUrl: r.posterUrl,
-  backdropUrl: r.backdropUrl,
-  releaseYear: r.releaseYear,
-  runtimeMinutes: r.runtimeMinutes,
-  originalLanguage: r.originalLanguage,
-  genreIds: r.genreIds,
-  score: r.score,
-  voteAverage: Number(r.voteAverage ?? 0),
-});
-
+import { toTitle } from "./feed.ts";
 
 const uuid = z.uuid();
 
