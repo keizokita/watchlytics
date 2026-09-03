@@ -39,7 +39,7 @@ só a mudança. Vale ler antes de propor refazer algo.
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
 repetir; o LIKE vira coleção com abas e estatísticas.
 
-**82 testes** (77 API + 5 fila), `npm run check` limpo nos três pacotes.
+**86 testes** (81 API + 5 fila), `npm run check` limpo nos três pacotes.
 
 ## Ambiente — o que custa caro redescobrir
 
@@ -125,16 +125,21 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
   diferente.
 - **Rate limit é por instância** (Map em memória). Com duas máquinas no Fly, o
   teto dobra.
-- **Notificação só existe no aceite, e ninguém a lê.** O E4 grava uma linha
-  agregada por pessoa quando a amizade é aceita; o match que nasce de um like
-  (E3) não notifica — pela tabela do PLAN §5.3 quem notifica é match forte, e
-  isso é E6. Não há `GET /v1/notifications` nem tela: as linhas ficam no banco
-  esperando o E6, e o match esperando a aba do E5.
+- **E5 e E6 estão pela metade, e a metade que falta é tela.** O servidor já
+  faz tudo: `GET /v1/matches` (keyset por `created_at, title_id`),
+  `GET /v1/notifications` com a contagem de não lidas e
+  `POST /v1/notifications/read`. Match **forte** notifica na hora, médio e
+  fraco só aparecem na aba (PLAN §5.3). Falta a aba de comuns, o badge e o
+  polling de 60s — tudo em `apps/web`, por isso as duas tarefas seguem
+  abertas no backlog.
+- **`Friends.tsx` existe e não está commitado.** A tela de busca/pedido/aceite
+  (E1+E2) ficou de fora porque `apps/web` estava com outra sessão. Está na
+  árvore de trabalho, com o mount em `main.tsx` — confira antes de recriar.
 
 ## Próximos passos sugeridos
 
-1. **E5 + E6** — a trilha E inteira está no banco e não tem tela: aba de
-   títulos em comum e a lista de notificações com badge. É trabalho de
-   `apps/web`, onde outra sessão está mexendo — combine antes de começar.
+1. **E5 + E6, só a tela.** As rotas existem e estão testadas; falta a aba de
+   títulos em comum, o badge e o polling de 60s. Comece por `Friends.tsx`, que
+   está na árvore sem commit.
 2. **D4** — onboarding, o último da trilha D. Decida o recorte antes: 20 swipes
    obrigatórios sobre 94 títulos queimam 20% do catálogo na porta de entrada.
