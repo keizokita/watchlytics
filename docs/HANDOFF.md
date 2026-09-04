@@ -24,11 +24,11 @@ HTML renderizado no servidor. Toda decisão de arquitetura protege esse caminho.
 O `git log` é documentação de verdade aqui: cada commit explica a decisão, não
 só a mudança. Vale ler antes de propor refazer algo.
 
-## Estado: 37 de 39 tarefas
+## Estado: 38 de 39 tarefas
 
 | Trilha | | |
 |---|---|---|
-| **S** esqueleto | 6/7 | infra no ar; o card na URL pública ainda não foi visto |
+| **S** esqueleto | 7/7 | completa — em produção, com login real atravessado |
 | **A** feed | 8/8 | backend e UI de filtro completos |
 | **B** swipe | 6/7 | B4 (pré-carga de imagem) pausada — não há pôster |
 | **C** identidade | 6/6 | completa e exercitada contra o Google real em produção |
@@ -115,8 +115,9 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
   400 e um `code` falso leva 401 "provedor recusou o código" — ou seja, client
   id e secret estão carregados e a troca com o Google acontece de verdade.
 
-O que **não** está provado, e por isso o S7 não é ✅: o card aparecendo na URL
-pública e as OG de `/u/<handle>`. Nenhum dos dois fecha sem um navegador.
+**Atravessado de ponta a ponta em 2026-09-04**: login Google real (usuário
+`keizokita1`), onboarding com os 20 swipes gravados no Postgres de produção, e
+`/u/keizokita1` servindo `og:url` com o `PUBLIC_ORIGIN`. O S7 é ✅.
 
 E há um terceiro, maior: **nenhum login jamais completou** — 0 usuários e 0
 sessões no banco de produção. O que a linha acima prova é que a troca com o
@@ -161,15 +162,15 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
 
 ## Próximos passos sugeridos
 
-1. **Republicar o Pages** com o `Authorization` do front e **abrir a URL
-   pública**. É o que fecha o S7: o "pronto quando" dele é *URL pública mostra o
-   card*, e o front que está no ar pede o feed sem header e leva 401. Na mesma
-   passada, conferir as OG de `/u/<handle>` com um perfil real. Infra no ar não
-   é o mesmo que card na tela — foi por isso que o S7 não virou ✅ com as contas.
-2. **Remover o shim `DEV_USER_ID`** do `auth.ts` — mas só depois de um login
-   real completar. A troca com o Google já foi exercitada; enquanto o banco de
-   produção estiver com 0 sessões, tirar o shim tira também o único caminho que
-   ainda funciona para entrar no app em dev.
+1. **Cadastrar os secrets do CI** e mergear o branch do S7. É o último item
+   aberto do deploy: sem `FLY_API_TOKEN`, `CLOUDFLARE_API_TOKEN`,
+   `CLOUDFLARE_ACCOUNT_ID` e a variable `VITE_GOOGLE_CLIENT_ID`, um push em
+   `main` roda os checks e falha nos dois jobs de deploy. Enquanto isso, quem
+   publica é a mão — `wrangler pages deploy` precisa de `--branch main` fora da
+   `main`, senão vai para um alias de preview.
+2. **Remover o shim `DEV_USER_ID`** do `auth.ts`. A condição que segurava isto
+   caiu: um login real completou em produção, então o shim já não é o único
+   caminho de entrada. O cliente saiu dele no S7+C1; falta o servidor.
 3. **Veredito do gesto no celular** (§Bloqueado 2). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
 4. **Escolher o fornecedor de catálogo** (§Bloqueado 1). 94 títulos de fixture
