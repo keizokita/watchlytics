@@ -151,4 +151,12 @@ export const t = {
   /** Diz o que some ANTES do clique irreversível — o resumo é o aviso. */
   deleteAccountConfirm:
     "Delete your account for good? Your swipes, library, matches and friendships are erased immediately. This cannot be undone.",
+
+  /**
+   * Exigência dos termos de uso do TMDB, não cortesia. O texto é o que eles
+   * pedem literalmente — não reescreva nem traduza: é a fonte do catálogo e a
+   * condição de usar o tier gratuito.
+   */
+  tmdbAttribution:
+    "This product uses the TMDB API but is not endorsed or certified by TMDB.",
 } as const;
