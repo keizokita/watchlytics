@@ -12,7 +12,7 @@ import {
   type SessionUser,
   type Title,
 } from "@watchlytics/contract";
-import { getAccessToken } from "./Login.tsx";
+import { auth } from "./session.ts";
 import { SCREEN_CSS } from "./screenCss.ts";
 import { t } from "./strings.ts";
 
@@ -135,13 +135,6 @@ function Account() {
   const [error, setError] = useState<string | null>(null);
   /** `null` até a conta responder — e enquanto isso não se oferece nada. */
   const [me, setMe] = useState<SessionUser | null>(null);
-
-  // O deck ainda entra pelo shim do C1, mas conta é conta: se houver sessão de
-  // verdade, estas duas chamadas vão nela.
-  const auth = (): HeadersInit => {
-    const token = getAccessToken();
-    return token ? { authorization: `Bearer ${token}` } : {};
-  };
 
   const run = (fn: () => Promise<void>) => {
     setBusy(true);

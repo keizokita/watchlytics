@@ -18,6 +18,12 @@ primary_region = "gru"
   force_https = true
   auto_stop_machines = "suspend"
   auto_start_machines = true
+  # ponytail: suspender custa quase zero e cobra ~6s de boot na primeira
+  # requisição. O preço real não é a espera: é o proxy responder PM11 enquanto
+  # a máquina sobe, e o `code` do Google (uso único) morrer junto — foi assim
+  # que o primeiro login de verdade se perdeu. O cliente retenta em 5xx, o que
+  # cobre o caso. Subir para 1 quando alguém reclamar de login, e aí custa
+  # ~US$3/mês em vez de centavos.
   min_machines_running = 0
 
   [[http_service.checks]]

@@ -9,7 +9,8 @@ import { Deck } from "./Deck.tsx";
 import { Filters, toParams, type FeedFilters } from "./Filters.tsx";
 import { Friends, NotificationsBadge } from "./Friends.tsx";
 import { Library } from "./Library.tsx";
-import { Login } from "./Login.tsx";
+import { Login, useSession } from "./Login.tsx";
+import { auth } from "./session.ts";
 import { Onboarding } from "./Onboarding.tsx";
 import { drop, enqueue, startFlushing } from "./swipeQueue.ts";
 import { t } from "./strings.ts";
@@ -33,7 +34,7 @@ async function fetchFeed(
   if (cursor) p.set("cursor", cursor);
   // `recycle` é z.stringbool no contrato — vai como string, não como boolean.
   if (recycle) p.set("recycle", "true");
-  const res = await fetch(`/v1/feed?${p}`);
+  const res = await fetch(`/v1/feed?${p}`, { headers: auth() });
   if (!res.ok) throw new Error(`feed respondeu ${res.status}`);
   return feedResponse.parse(await res.json());
 }
@@ -175,7 +176,10 @@ function App() {
 
     // Se ainda estava na fila local, o undo não precisa da rede.
     if (!drop(title.id)) {
-      void fetch(`/v1/swipes/${title.id}`, { method: "DELETE" }).catch(
+      void fetch(`/v1/swipes/${title.id}`, {
+        method: "DELETE",
+        headers: auth(),
+      }).catch(
         (e: unknown) => console.error("undo não chegou ao servidor", e),
       );
     }
@@ -262,7 +266,30 @@ function Home() {
  * ponytail: vira react-router na terceira rota, ou na primeira que precisar de
  * parâmetro de caminho (o perfil público de D5 já precisa).
  */
+/**
+ * Porta de entrada de quem ainda não logou.
+ *
+ * Existe porque sem ela o shell montava o app inteiro sem sessão: Onboarding,
+ * Library e Friends disparavam chamadas autenticadas, todas voltavam 401 — o
+ * certo, do lado da api — e o cliente pintava o primeiro 401 como erro fatal.
+ * Um visitante novo via um card vermelho em vez de um convite.
+ */
+function SignedOut() {
+  return (
+    <div className="signed-out">
+      <style>{`
+        .signed-out { max-width: 32rem; text-align: center; display: grid; gap: 0.75rem; }
+        .signed-out h1 { margin: 0; font-size: 1.6rem; line-height: 1.2; }
+        .signed-out p { margin: 0; color: var(--muted); line-height: 1.5; }
+      `}</style>
+      <h1>{t.signedOutTitle}</h1>
+      <p>{t.signedOutBody}</p>
+    </div>
+  );
+}
+
 function Root() {
+  const user = useSession();
   const [hash, setHash] = useState(() => location.hash);
 
   useEffect(() => {
@@ -279,6 +306,10 @@ function Root() {
       <style>{`
         .shell { display: grid; gap: 1.25rem; justify-items: center; }
         .shell nav { display: flex; gap: 0.5rem; }
+        /* Deslogada, a nav é só o botão de entrar, e ele tem que vir DEPOIS do
+           que explica o app — senão a pessoa lê o call-to-action antes de
+           saber para o que está entrando. */
+        .shell nav.below { order: 2; }
         .shell nav a {
           padding: 0.4rem 0.9rem; border-radius: 999px; text-decoration: none;
           color: var(--muted); font-size: 0.9rem; font-weight: 600;
@@ -287,20 +318,34 @@ function Root() {
           color: var(--fg); background: rgb(255 255 255 / 0.08);
         }
       `}</style>
-      <nav>
-        <a href="#/" aria-current={inLibrary || inFriends ? undefined : "page"}>
-          {t.navDeck}
-        </a>
-        <a href="#/library" aria-current={inLibrary ? "page" : undefined}>
-          {t.navLibrary}
-        </a>
-        <a href="#/friends" aria-current={inFriends ? "page" : undefined}>
-          {t.navFriends}
-          <NotificationsBadge />
-        </a>
+      <nav className={user ? undefined : "below"}>
+        {/* Sem sessão as três telas são 401: link que não leva a lugar nenhum
+            é pior que link ausente. */}
+        {user ? (
+          <>
+            <a href="#/" aria-current={inLibrary || inFriends ? undefined : "page"}>
+              {t.navDeck}
+            </a>
+            <a href="#/library" aria-current={inLibrary ? "page" : undefined}>
+              {t.navLibrary}
+            </a>
+            <a href="#/friends" aria-current={inFriends ? "page" : undefined}>
+              {t.navFriends}
+              <NotificationsBadge />
+            </a>
+          </>
+        ) : null}
         <Login />
       </nav>
-      {inLibrary ? <Library /> : inFriends ? <Friends /> : <Home />}
+      {user === undefined ? null : !user ? (
+        <SignedOut />
+      ) : inLibrary ? (
+        <Library />
+      ) : inFriends ? (
+        <Friends />
+      ) : (
+        <Home />
+      )}
     </div>
   );
 }

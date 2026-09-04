@@ -9,6 +9,7 @@ import {
 import { Deck } from "./Deck.tsx";
 import { t } from "./strings.ts";
 import { enqueue } from "./swipeQueue.ts";
+import { auth } from "./session.ts";
 
 /**
  * D4 — a porta de entrada: escolher gêneros, swipar 20, cair no feed calibrado.
@@ -30,7 +31,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/v1/onboarding/deck");
+      const res = await fetch("/v1/onboarding/deck", { headers: auth() });
       if (!res.ok) throw new Error(`onboarding respondeu ${res.status}`);
       const data = onboardingDeck.parse(await res.json());
       setError(null);
@@ -59,7 +60,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     try {
       const res = await fetch("/v1/me", {
         method: "PATCH",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...auth() },
         body: JSON.stringify({ preferredGenres: picked }),
       });
       if (!res.ok) throw new Error(`/v1/me respondeu ${res.status}`);
