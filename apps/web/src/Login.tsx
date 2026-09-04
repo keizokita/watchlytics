@@ -30,6 +30,9 @@ const CLIENT_ID = import.meta.env["VITE_GOOGLE_CLIENT_ID"] as string | undefined
 /** Volta para a MESMA página: nenhuma rota de callback, nenhum router. */
 const REDIRECT_URI = `${window.location.origin}/`;
 
+/** Boot medido da api no Fly: ~6s do init até a porta abrir, mais a margem. */
+const COLD_START_MS = 8000;
+
 const VERIFIER_KEY = "wl.pkce.verifier";
 const STATE_KEY = "wl.pkce.state";
 
@@ -84,11 +87,28 @@ async function exchange(code: string, state: string): Promise<SessionUser> {
     throw new Error(t.authStateMismatch);
   }
 
-  const res = await fetch("/v1/auth/oauth/google", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ code, codeVerifier: verifier, redirectUri: REDIRECT_URI }),
-  });
+  /**
+   * A máquina da api suspende quando ninguém acessa, e o retorno do Google cai
+   * justamente depois de meio minuto de ociosidade — o tempo de escolher a
+   * conta. Nesse instante o proxy do Fly responde 5xx sem encostar na
+   * aplicação, e o `code`, que vale UMA vez, morreria com o login perdido.
+   *
+   * Retentar só em 5xx é seguro exatamente por isso: se a aplicação não viu a
+   * requisição, o código continua intacto. Um 401 é o provedor recusando de
+   * verdade — esse não se retenta, seria adivinhação.
+   */
+  const post = () =>
+    fetch("/v1/auth/oauth/google", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code, codeVerifier: verifier, redirectUri: REDIRECT_URI }),
+    });
+
+  let res = await post();
+  if (res.status >= 500) {
+    await new Promise((r) => setTimeout(r, COLD_START_MS));
+    res = await post();
+  }
   if (!res.ok) throw new Error(`${res.status}`);
 
   const body = authResponse.parse(await res.json());
