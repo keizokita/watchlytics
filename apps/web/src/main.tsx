@@ -317,6 +317,18 @@ function Root() {
         .shell nav a[aria-current="page"] {
           color: var(--fg); background: rgb(255 255 255 / 0.08);
         }
+        .shell .attribution {
+          order: 3;
+          max-width: 26rem;
+          text-align: center;
+          font-size: 0.75rem;
+          line-height: 1.4;
+        }
+        .shell .attribution a { color: var(--muted); text-decoration: none; }
+        .shell .attribution a:hover { color: var(--fg); }
+        .shell .attribution a:focus-visible {
+          outline: 2px solid var(--fg); outline-offset: 3px; border-radius: 4px;
+        }
       `}</style>
       <nav className={user ? undefined : "below"}>
         {/* Sem sessão as três telas são 401: link que não leva a lugar nenhum
@@ -346,6 +358,16 @@ function Root() {
       ) : (
         <Home />
       )}
+
+      {/* Atribuição exigida pelos termos do TMDB. Fica no shell, e não numa
+          tela "sobre", porque a condição é ser visível — tela que ninguém abre
+          não cumpre. `order: 3` a mantém por último mesmo quando a nav desce
+          para depois do conteúdo na home deslogada. */}
+      <footer className="attribution">
+        <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer noopener">
+          {t.tmdbAttribution}
+        </a>
+      </footer>
     </div>
   );
 }

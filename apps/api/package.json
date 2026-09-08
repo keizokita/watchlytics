@@ -9,7 +9,8 @@
     "migrate": "node --env-file-if-exists=.env src/db/migrate.ts",
     "seed": "node --env-file-if-exists=.env src/seed.ts",
     "dev": "node --env-file-if-exists=.env --watch src/server.ts",
-    "test": "node --env-file-if-exists=.env --test \"src/**/*.test.ts\""
+    "test": "DATABASE_URL=\"${DATABASE_URL_TEST:-postgres://dev:dev@localhost:5433/watchlytics_test}\" node --env-file-if-exists=.env --test \"src/**/*.test.ts\"",
+    "ingest": "node --env-file-if-exists=.env src/ingest/run.ts"
   },
   "dependencies": {
     "@watchlytics/contract": "*",

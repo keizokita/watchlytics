@@ -85,8 +85,11 @@ npm run check      # typecheck dos 3 pacotes
 
 Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 
-- **Fonte de catálogo em aberto.** O v1 roda sobre `seed/titles.json` (94
-  títulos). `title_external_ids` isola o fornecedor.
+- **Fonte de catálogo: TMDB.** Fechada em 04/09/2026 junto com a decisão de não
+  monetizar — o tier gratuito é não-comercial, e é exatamente o nosso caso.
+  `title_external_ids` continua sendo o seguro contra troca de fornecedor.
+- **Não haverá monetização.** Reabrir isso obriga a reabrir a fonte de dados
+  ANTES de cobrar, não depois.
 - **Anime é gênero (id 3), não tipo.** Um anime é filme OU série.
 - **`swipes` é upsert com PK `(user_id, title_id)`, não append-only.** É essa
   PK que dá dedup, o "já avaliei?" do feed e a idempotência do buffer offline.

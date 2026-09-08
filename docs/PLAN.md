@@ -9,14 +9,14 @@
 
 | # | Tema | Decisão | Consequência principal |
 |---|---|---|---|
-| 1 | Fonte de dados | **Em aberto.** v1 roda sobre fixture hard-coded (§5.1) | Decisão adiada sem custo — `title_external_ids` e `score` interno já isolam o fornecedor |
+| 1 | Fonte de dados | **TMDB.** Fechada em 04/09/2026, junto com a de monetização | Único que entrega metadado + pôster bom + sinal de popularidade numa chave gratuita. AniList enriquece anime; `title_external_ids` segue como seguro |
 | 2 | Anime | **Gênero sintético (`id 3`)**, não tipo | Um só predicado de filtro: `genre_ids && $preferidos` |
-| 3 | Monetização | Em aberto, provavelmente futura | `popularity` do TMDB nunca sai do backend; atribuição correta desde o dia 1 |
+| 3 | Monetização | **Não haverá.** Fechada em 04/09/2026 | Destrava o tier gratuito do TMDB, que é não-comercial. Reabrir monetização obriga a reabrir a fonte de dados **antes** — não depois |
 | 4 | Escala alvo (12m) | ~10k usuários | Feed por query direta, match em tempo real, sem Redis |
 | 5 | Match | **Só entre amigos** no v1, modelado para desconhecidos | `taste_vector` já nasce como `vector(19)` |
 | 6 | Mercado | **Global, base em inglês** | Uma coluna `overview`; `users.region` alimenta o filtro de streaming |
 | 7 | Auth | **Só OAuth** (Google no v1, Apple na fase 4) | Sem senha, sem reset, sem provedor de email |
-| 8 | Catálogo | **Fixture de ~100 títulos** no v1. ~50k populares quando houver fornecedor | Feed, match e onboarding funcionam sem rede |
+| 8 | Catálogo | Fixture de 94 títulos **até a ingestão do TMDB entrar**. Alvo: 10–20k curados por `vote_count`, não o acervo inteiro | Título irreconhecível quebra o ritmo do swipe: catálogo maior seria pior produto, não melhor |
 | 9 | Perfil público | **Só estatísticas agregadas** | Catálogo é sempre restrito a amigos |
 | 10 | Onboarding | Gêneros + **20 swipes obrigatórios** | Deck estratificado, pool estático precomputado |
 | 11 | Interessado × Assistido | Estados **exclusivos**, transição `interessado → assistido` | `watched_at` gravado na transição |
@@ -46,8 +46,10 @@
 
 ### Fora da v1, explicitamente
 
-**Filtro de disponibilidade em streaming** (dependia do fornecedor de catálogo —
-volta quando ele for escolhido) · chat e grupos · watch party · resenhas e comentários · tracking de episódios ·
+**Filtro de disponibilidade em streaming** — passou a ser viável com o TMDB
+(`/watch/providers`, alimentado pela JustWatch, incluso na chave gratuita).
+Continua **fora do escopo do v1** por decisão, não por impedimento; entrar exige
+`users.region` de volta · chat e grupos · watch party · resenhas e comentários · tracking de episódios ·
 listas customizadas · importação Trakt/Letterboxd/MAL · app nativo e push ·
 Sign in with Apple · qualquer ML · deep link para player · notificação por email ·
 i18n · match com desconhecidos · trailers no card.
@@ -449,7 +451,7 @@ analytics, idade mínima no cadastro, e termos nomeando jurisdição.
 
 | Risco | Prob. | Impacto | Mitigação |
 |---|---|---|---|
-| **Termos do fornecedor futuro** (TMDB gratuito é só não-comercial; outros variam) | Média | **Crítico** | Reavaliar junto com a decisão de monetização. `score` interno e `title_external_ids` já desacoplam |
+| ~~Termos do fornecedor~~ **RESOLVIDO** | — | — | O uso é não-comercial, que é exatamente o que o tier gratuito do TMDB permite. Vira risco de novo só se a monetização voltar |
 | **Direitos de imagem dos pôsteres** | Média | Alto | Nunca re-hospedar, atribuição visível ao fornecedor. Adiado com a fixture (sem imagem) |
 | **Cold start social** — 0 amigos = 0 matches | **Alta** | **Alto** | Maior risco do produto. Fase 1 boa sozinha, convite com deep link, comuns já no 1º amigo |
 | **Atrito dos 20 swipes obrigatórios** | Média | Médio | Contador visível, deck reconhecível. **Medir abandono no onboarding desde o dia 1** |
@@ -472,7 +474,9 @@ analytics, idade mínima no cadastro, e termos nomeando jurisdição.
 
 ## 11. Pendências abertas
 
-- [ ] Decidir monetização antes de qualquer feature paga (bloqueia TMDB comercial)
+- [x] ~~Decidir monetização~~ → **não monetizar** (04/09/2026). Consequência: o
+      catálogo real do TMDB está liberado, e a fixture de 94 títulos deixa de
+      ser o teto do beta
 - [ ] Política de privacidade e termos escritos antes do beta aberto — jurídico, não engenharia
 - [ ] Idade mínima no cadastro (COPPA)
 - [ ] Nome/domínio/identidade visual

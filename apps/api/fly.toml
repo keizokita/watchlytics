@@ -6,7 +6,28 @@ primary_region = "gru"
 
 # Roda antes de trocar as máquinas: se a migration falhar, o deploy aborta.
 # O seed está aqui porque o catálogo é uma fixture e é idempotente por PK.
-# REMOVER o seed quando houver fornecedor de catálogo real.
+# TROCA PELO CATÁLOGO REAL — nesta ordem, e a ordem importa:
+#   1. fly secrets set TMDB_READ_TOKEN=... -a watchlytics-api
+#   2. npm run ingest -w @watchlytics/api   (contra a prod)
+#   3. DELETE FROM titles t USING title_external_ids x
+#       WHERE x.title_id = t.id AND x.provider = 'fixture';
+#   4. só então tirar o seed daqui.
+#
+# Por que 2 antes de 4: hoje a fixture é o único catálogo que a prod tem;
+# tirar o seed antes deixa o deck vazio num banco novo.
+#
+# Por que o passo 3 existe: fixture e tmdb são providers disjuntos em
+# title_external_ids, então o seed não sobrescreve a ingestão — ele CONVIVE.
+# Os 94 da fixture são populares (The Matrix, Inception, Parasite) e o
+# /discover traz os mesmos com outro uuid. O A2 exclui por title_id
+# (routes/feed.ts:173-190), então a cópia gêmea reaparece depois do swipe:
+# duplicata quebra a garantia de não-repetição, não é só ruído no deck.
+#
+# Por que o passo 3 é urgente: todas as FKs para titles são ON DELETE CASCADE
+# (db/schema.ts:139,168,193,260 — swipes, library_entries, matches). Apagar a
+# fixture apaga junto todo swipe/biblioteca/match que aponte para ela. Com 0
+# usuários isso custa zero; depois do primeiro login de verdade, custa dado de
+# usuário. A janela barata fecha no primeiro cadastro do beta.
 [deploy]
   release_command = "sh -c 'node apps/api/src/db/migrate.ts && node apps/api/src/seed.ts'"
 

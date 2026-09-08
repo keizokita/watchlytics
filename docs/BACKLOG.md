@@ -165,3 +165,91 @@ encaixar nas janelas em que A/B estiverem bloqueadas.
 
 Fases 4 (Expo) e 5 (recomendação avançada) do [PLAN.md](./PLAN.md#9-roadmap).
 Não fatie agora — o contrato `/v1` precisa congelar primeiro.
+
+---
+
+## 5. Trilhas de ingestão (I) — o catálogo real
+
+> Escrito depois que a fonte fechou em TMDB. O worker de carga inicial já existe
+> (`npm run ingest`); estas trilhas são o que falta para o catálogo ser completo
+> e não apodrecer.
+
+### Fase serial — ANTES de spawnar qualquer agente
+
+Estes dois passos não paralelizam, e pular qualquer um repete os erros da rodada
+anterior de agentes.
+
+| id | Tarefa | Quem | Por que é serial |
+|---|---|---|---|
+| I0.1 | Rodar a ingestão local e escolher `--min-votes` swipando | usuário | Nenhum agente consegue decidir a régua: só olhando o deck se sabe se o título é reconhecível |
+| I0.2 | **Uma** migration + **todas** as adições de contrato que as trilhas precisam | eu | `schema.ts` e `contract/index.ts` foram os pontos de contenção da última vez. Mudam uma vez, antes, e ficam CONGELADOS |
+
+### Regras de paralelização (aprendidas errando)
+
+1. **Worktree a partir do `main` atual**, e confira o `merge-base`. Na rodada
+   anterior os três nasceram de um commit anterior a um refactor e o merge teria
+   revertido a separação de rotas.
+2. **Database próprio por agente** (`wl_i1`, `wl_i2`, …). Os testes fazem
+   `DELETE` e rodam em processos paralelos.
+3. **Todo arquivo tem dono, inclusive os de cola.** Da última vez `swipes.ts`
+   ficou sem dono e a tarefa que precisava dele contornou de um jeito que teve
+   que ser refeito na integração.
+4. **`schema.ts` e `contract/index.ts` estão congelados** após I0.2. Precisou de
+   coluna? Fala antes; não edita.
+5. **Commite antes de terminar.** Um agente morreu por limite de sessão com todo
+   o trabalho fora do git.
+6. **Arquivo de teste cria usuário próprio.** Ver `library.test.ts`.
+
+### I1 — Elenco no card
+
+Estava na descrição original do produto e nunca foi implementado. O card promete
+elenco desde o primeiro dia e nunca mostrou nenhum.
+
+| id | Tarefa | Pronto quando |
+|---|---|---|
+| I1.1 | Segunda passada de ingestão buscando `/{type}/{id}/credits` | Uma requisição por título, respeitando o mesmo rate limit; retomável |
+| I1.2 | Até 3 nomes no card | Título sem elenco não quebra o card, só não mostra a linha |
+
+**Possui:** `apps/api/src/ingest/credits.ts` + teste · `apps/web/src/Card.tsx`
+**Não toca:** `ingest/run.ts`, `ingest/tmdb.ts`, nada de rota.
+**Atenção:** `/discover` não aceita `append_to_response`, então elenco é
+necessariamente uma segunda passada. Decida se roda junto da carga ou como
+comando separado, e diga por quê.
+
+### I2 — Catálogo vivo
+
+Sem isto o catálogo apodrece: em doze meses não tem nenhum título do ano.
+
+| id | Tarefa | Pronto quando |
+|---|---|---|
+| I2.1 | `/changes` diário: atualiza só o que o TMDB marcou como alterado | Roda em minutos, não horas |
+| I2.2 | Pull-through de `synced_at > 30d` | Título frio se atualiza sozinho ao ser lido |
+| I2.3 | Retomada da carga inicial | Morreu em 2003, recomeça em 2003 e não em 1970 |
+
+**Possui:** `apps/api/src/ingest/changes.ts` + teste · `apps/api/src/ingest/state.ts`
+**Não toca:** `tmdb.ts` (parte pura, compartilhada), `Card.tsx`, rotas.
+
+### I3 — Enriquecimento de anime (AniList) · **opcional, e eu não faria agora**
+
+O PLAN §2.2 promete AniList enriquecendo anime com estúdio, fonte (mangá/light
+novel), temporada de exibição e score da comunidade.
+
+**O problema:** nenhum desses campos tem consumidor. O card não mostra estúdio
+nem fonte, e não há tela que mostre. Seria dado entrando no banco para ninguém
+ver — construir adiantado, que é exatamente o que o resto do projeto evitou.
+
+Só vale abrir esta trilha junto de quem vá exibir os campos. Se for aberta:
+
+**Possui:** `apps/api/src/ingest/anilist.ts` + teste.
+**NÃO toca em UI** — `Card.tsx` é da I1, e duas trilhas no mesmo arquivo foi o
+que criou a confusão da rodada passada.
+**Casamento:** por id externo quando houver; senão título + ano. Ambíguo vai
+para fila manual, nunca heurística agressiva — dedup errado gera título
+duplicado, que é o defeito que mais custa a descobrir.
+
+### Fora destas trilhas
+
+A sequência de produção — secret, ingestão real, `DELETE` da fixture, remoção do
+seed do `release_command` — é operação destrutiva contra produção, está
+documentada no `fly.toml` e depende de autorização do usuário. Não é trilha de
+agente.
