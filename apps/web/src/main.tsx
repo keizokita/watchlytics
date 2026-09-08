@@ -310,11 +310,11 @@ function Root() {
            saber para o que está entrando. */
         .shell nav.below { order: 2; }
         .shell nav a {
-          padding: 0.4rem 0.9rem; border-radius: 999px; text-decoration: none;
+          padding: 0.4rem 0.9rem; border-radius: var(--r-pill); text-decoration: none;
           color: var(--muted); font-size: 0.9rem; font-weight: 600;
         }
         .shell nav a[aria-current="page"] {
-          color: var(--fg); background: rgb(255 255 255 / 0.08);
+          color: var(--fg); background: var(--surface);
         }
         .shell .attribution {
           order: 3;

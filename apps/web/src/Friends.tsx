@@ -416,9 +416,9 @@ export function NotificationsBadge() {
 const CSS = SCREEN_CSS + `
 .friend-search { display: flex; gap: 0.5rem; }
 .friend-search input {
-  flex: 1; padding: 0.55rem 0.9rem; border-radius: 999px; font: inherit;
-  border: 1px solid rgb(255 255 255 / 0.18);
-  background: rgb(255 255 255 / 0.06); color: var(--fg);
+  flex: 1; padding: 0.55rem 0.9rem; border-radius: var(--r-pill); font: inherit;
+  border: 1px solid var(--line);
+  background: var(--surface); color: var(--fg);
 }
 .friend-search input:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
 .friend {
@@ -428,7 +428,7 @@ const CSS = SCREEN_CSS + `
   display: inline-block; min-width: 1.15rem; padding: 0 0.3rem; margin-left: 0.3rem;
   /* texto escuro sobre o verde claro: branco em #35c98b dá contraste de ~2:1,
      e o badge é justamente o que precisa ser lido de relance */
-  border-radius: 999px; background: var(--like, #35c98b); color: #06231a;
+  border-radius: var(--r-pill); background: var(--like, #35c98b); color: #06231a;
   font-size: 0.72rem; font-weight: 700; text-align: center; line-height: 1.15rem;
 }
 `;
