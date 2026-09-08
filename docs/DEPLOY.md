@@ -52,8 +52,8 @@ fly secrets set AUTH_SECRET="$(node -e "console.log(require('crypto').randomByte
 fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile
 ```
 
-O `release_command` roda `migrate` e depois `seed` antes de trocar as máquinas —
-se a migration falhar, o deploy aborta sem derrubar o que está no ar.
+O `release_command` roda `migrate` antes de trocar as máquinas — se a migration
+falhar, o deploy aborta sem derrubar o que está no ar.
 
 Verificar:
 
@@ -66,8 +66,10 @@ curl https://watchlytics-api.fly.dev/v1/feed         # 401 não autenticado
 > mercado é global, então quando houver usuário fora do Brasil vale medir e
 > considerar `iad`. Trocar região é uma linha.
 
-> O `seed` no `release_command` existe porque o catálogo é uma fixture e o seed é
-> idempotente por PK. **Remover quando houver fornecedor de catálogo real.**
+> O `seed` saiu do `release_command` em 2026-09-08: o catálogo de produção é o
+> do TMDB (7583 títulos, `--min-votes 800`) e a fixture foi apagada. O porquê de
+> não devolvê-lo está em [`fly.toml`](../apps/api/fly.toml). O CI continua
+> semeando — lá a fixture é o que os testes esperam.
 
 ## 3. Cloudflare Pages (web)
 
