@@ -221,12 +221,15 @@ async function openChrome() {
   await page.cmd("Emulation.setEmulatedMedia", {
     features: [{ name: "prefers-reduced-motion", value: "reduce" }],
   });
-  // Retrato: é um app de swipe, e o card é `aspect-ratio: 2/3`.
+  // Retrato por padrão: é um app de swipe, e o card é `aspect-ratio: 2/3`.
+  // `--viewport LxA` troca para conferir desktop, onde sobra altura e as
+  // decisões de alinhamento vertical aparecem.
+  const [w, h] = arg("--viewport", "430x932").split("x").map(Number);
   await page.cmd("Emulation.setDeviceMetricsOverride", {
-    width: 430,
-    height: 932,
+    width: w,
+    height: h,
     deviceScaleFactor: 2,
-    mobile: true,
+    mobile: w < 700,
   });
 
   return page;
@@ -454,6 +457,116 @@ async function cmdWeb() {
   }
 }
 
+/**
+ * Sessão de verdade para o headless ver as telas autenticadas.
+ *
+ * O shim do DEV_USER_ID não resolve isto: ele vale para `requireUserId`, e o
+ * shell do web decide o que montar pelo `resume()` do Login.tsx, que chama
+ * `POST /v1/auth/refresh` — rota que lê o cookie httpOnly e não passa pelo
+ * shim. Sem cookie, `resume()` devolve null e a tela é sempre a de entrada.
+ *
+ * Grava a linha de `sessions` com a mesma primitiva da api (`newRefreshToken`,
+ * importada e não copiada, senão o formato do token derivaria em silêncio) e
+ * planta o cookie pelo CDP, que enxerga httpOnly. `Path=/v1/auth` é o mesmo do
+ * routes/auth.ts.
+ */
+async function abrirSessao(page) {
+  const userId = process.env["DEV_USER_ID"];
+  if (!userId) throw new Error("--sessao precisa de DEV_USER_ID em apps/api/.env");
+
+  const { newRefreshToken, REFRESH_TTL_S } = await import(
+    join(ROOT, "apps/api/src/auth.ts")
+  );
+  const id = crypto.randomUUID();
+  const { token, hash } = newRefreshToken(id);
+
+  await comBanco(
+    (sql) => sql`
+      insert into sessions (id, user_id, refresh_token_hash, expires_at, user_agent)
+      values (${id}, ${userId}, ${hash},
+              ${new Date(Date.now() + REFRESH_TTL_S * 1000)}, 'driver.mjs shot')`,
+  );
+
+  await page.cmd("Network.setCookie", {
+    name: "wl_refresh",
+    value: token,
+    domain: "localhost",
+    path: "/v1/auth",
+    httpOnly: true,
+  });
+  return id;
+}
+
+/** Conexão própria: db/client.ts é singleton e o cmdApi já deu pg.end() nele. */
+async function comBanco(fn) {
+  const postgres = (await import("postgres")).default;
+  const sql = postgres(process.env["DATABASE_URL"]);
+  try {
+    return await fn(sql);
+  } finally {
+    await sql.end();
+  }
+}
+
+/**
+ * Print de uma tela qualquer, sem asserção nenhuma sobre o conteúdo.
+ *
+ * O `cmdWeb` não serve: ele afirma coisas sobre `.deck-card` antes de disparar
+ * a foto, então apontá-lo para outra rota quebra na primeira consulta.
+ */
+async function cmdShot() {
+  const url = arg("--url", WEB);
+  const selector = arg("--wait", "body");
+  const out = arg("--out", join(SHOTS, "shot.png"));
+  const started = [];
+  const log = [];
+  let sessao = null;
+
+  const up = async (u) => {
+    try {
+      await fetch(u, { signal: AbortSignal.timeout(1500) });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  try {
+    if (!(await up(`${API}/health`))) {
+      console.log("subindo a api…");
+      started.push(spawnGroup("dev:api", log));
+      await waitForHttp(`${API}/health`);
+    }
+    if (!(await up(WEB))) {
+      console.log("subindo o vite…");
+      started.push(spawnGroup("dev:web", log));
+      await waitForHttp(WEB);
+    }
+
+    const page = await openChrome();
+    try {
+      await page.cmd("Network.enable");
+      if (process.argv.includes("--sessao")) sessao = await abrirSessao(page);
+      await page.cmd("Page.navigate", { url });
+      await waitFor(page, selector);
+      await screenshot(page, out);
+      const real = page.errors.filter((e) => !/favicon/i.test(e));
+      ok("console sem erro", real.length === 0, real.join(" | "));
+    } finally {
+      page.close();
+    }
+  } finally {
+    // Sessão descartável não pode sobreviver ao run: são 30 dias de validade.
+    if (sessao) await comBanco((sql) => sql`delete from sessions where id = ${sessao}`);
+    for (const c of started) {
+      try {
+        process.kill(-c.pid, "SIGTERM");
+      } catch {}
+    }
+    if (process.exitCode) console.log(log.join(""));
+  }
+}
+
 // ─── entrada ────────────────────────────────────────────────────────────────
 
 const cmd = process.argv[2] ?? "all";
@@ -468,13 +581,16 @@ try {
 
 if (cmd === "api") await cmdApi();
 else if (cmd === "web") await cmdWeb();
+else if (cmd === "shot") await cmdShot();
 else if (cmd === "all") {
   console.log("── api ──");
   await cmdApi();
   console.log("── web ──");
   await cmdWeb();
 } else {
-  console.error("uso: driver.mjs [api|web|all] [--url U] [--wait SEL] [--out P]");
+  console.error(
+    "uso: driver.mjs [api|web|shot|all] [--url U] [--wait SEL] [--out P] [--sessao]",
+  );
   process.exit(2);
 }
 process.exit(process.exitCode ?? 0);
