@@ -24,6 +24,56 @@ export const auth = (): HeadersInit =>
   accessToken ? { authorization: `Bearer ${accessToken}` } : {};
 
 /**
+ * Troca o refresh do cookie por um access novo. Uma promessa compartilhada, e
+ * não uma chamada por requisição: o refresh é rotacionado e o servidor trata
+ * reuso como replay, revogando a sessão INTEIRA (C3, routes/auth.ts:301). Duas
+ * requisições que levem 401 ao mesmo tempo — o feed e o flush da fila, que é o
+ * caso normal — derrubariam a sessão que estavam tentando salvar.
+ */
+let refreshing: Promise<boolean> | null = null;
+
+export function refreshAccess(): Promise<boolean> {
+  refreshing ??= (async () => {
+    try {
+      const res = await fetch("/v1/auth/refresh", { method: "POST" });
+      if (!res.ok) return false;
+      const body = (await res.json()) as { access?: unknown };
+      if (typeof body.access !== "string") return false;
+      setAccessToken(body.access);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshing = null;
+    }
+  })();
+  return refreshing;
+}
+
+/**
+ * `fetch` com Authorization que sobrevive ao access expirando.
+ *
+ * O access dura 15 minutos (auth.ts:18) e até hoje só era renovado na carga da
+ * página: quem ficasse mais que isso numa tela — os 20 swipes do onboarding
+ * chegam lá — levava 401 na requisição seguinte e o app pintava erro fatal com
+ * a sessão ainda válida no cookie.
+ *
+ * Uma tentativa só de renovar: se o refresh falhou, o 401 é verdadeiro (sessão
+ * revogada ou expirada) e vai para quem chamou, que já sabe pintar a entrada.
+ */
+export async function authedFetch(
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const send = () =>
+    fetch(url, { ...init, headers: { ...init.headers, ...auth() } });
+
+  const res = await send();
+  if (res.status !== 401) return res;
+  return (await refreshAccess()) ? send() : res;
+}
+
+/**
  * Quem está logado, para o shell decidir o que montar.
  *
  * Store externa em vez de estado local do <Login>: o link de entrar mora na

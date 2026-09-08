@@ -10,7 +10,7 @@ import { Filters, toParams, type FeedFilters } from "./Filters.tsx";
 import { Friends, NotificationsBadge } from "./Friends.tsx";
 import { Library } from "./Library.tsx";
 import { Login, useSession } from "./Login.tsx";
-import { auth } from "./session.ts";
+import { authedFetch } from "./session.ts";
 import { Onboarding } from "./Onboarding.tsx";
 import { drop, enqueue, startFlushing } from "./swipeQueue.ts";
 import { t } from "./strings.ts";
@@ -34,7 +34,7 @@ async function fetchFeed(
   if (cursor) p.set("cursor", cursor);
   // `recycle` é z.stringbool no contrato — vai como string, não como boolean.
   if (recycle) p.set("recycle", "true");
-  const res = await fetch(`/v1/feed?${p}`, { headers: auth() });
+  const res = await authedFetch(`/v1/feed?${p}`);
   if (!res.ok) throw new Error(`feed respondeu ${res.status}`);
   return feedResponse.parse(await res.json());
 }
@@ -176,9 +176,8 @@ function App() {
 
     // Se ainda estava na fila local, o undo não precisa da rede.
     if (!drop(title.id)) {
-      void fetch(`/v1/swipes/${title.id}`, {
+      void authedFetch(`/v1/swipes/${title.id}`, {
         method: "DELETE",
-        headers: auth(),
       }).catch(
         (e: unknown) => console.error("undo não chegou ao servidor", e),
       );

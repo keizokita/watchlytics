@@ -12,7 +12,7 @@ import {
   type SessionUser,
   type Title,
 } from "@watchlytics/contract";
-import { auth } from "./session.ts";
+import { authedFetch } from "./session.ts";
 import { SCREEN_CSS } from "./screenCss.ts";
 import { t } from "./strings.ts";
 
@@ -146,7 +146,7 @@ function Account() {
 
   useEffect(() => {
     let live = true;
-    fetch("/v1/auth/me", { headers: auth() })
+    authedFetch("/v1/auth/me")
       .then((r) => (r.ok ? (r.json() as Promise<unknown>) : null))
       .then((j) => live && j && setMe(sessionUser.parse(j)))
       // Sem sessão não há o que oferecer: a seção some, não vira erro na tela.
@@ -158,9 +158,9 @@ function Account() {
 
   const onVisibility = (isPublic: boolean) =>
     run(async () => {
-      const res = await fetch("/v1/me", {
+      const res = await authedFetch("/v1/me", {
         method: "PATCH",
-        headers: { ...auth(), "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ isPublic }),
       });
       if (!res.ok) throw new Error(`PATCH /v1/me respondeu ${res.status}`);
@@ -169,7 +169,7 @@ function Account() {
 
   const onExport = () =>
     run(async () => {
-      const res = await fetch("/v1/me/export", { method: "POST", headers: auth() });
+      const res = await authedFetch("/v1/me/export", { method: "POST" });
       if (!res.ok) throw new Error(`/v1/me/export respondeu ${res.status}`);
 
       // `fetch` não obedece content-disposition — quem salva o arquivo é a
@@ -192,7 +192,7 @@ function Account() {
     if (!window.confirm(t.deleteAccountConfirm)) return;
 
     run(async () => {
-      const res = await fetch("/v1/me", { method: "DELETE", headers: auth() });
+      const res = await authedFetch("/v1/me", { method: "DELETE" });
       if (!res.ok) throw new Error(`DELETE /v1/me respondeu ${res.status}`);
 
       // Apagar a conta e deixar rastro local seria a mesma meia-exclusão que o

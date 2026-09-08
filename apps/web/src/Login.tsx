@@ -1,14 +1,14 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   authResponse,
-  authTokens,
   sessionUser,
   type SessionUser,
 } from "@watchlytics/contract";
 import { t } from "./strings.ts";
 import {
-  auth,
+  authedFetch,
   getUser,
+  refreshAccess,
   setAccessToken,
   setUser,
   subscribeUser,
@@ -118,11 +118,9 @@ async function exchange(code: string, state: string): Promise<SessionUser> {
 
 /** Sessão anterior: o refresh está no cookie, que o servidor lê e rotaciona. */
 async function resume(): Promise<SessionUser | null> {
-  const res = await fetch("/v1/auth/refresh", { method: "POST" });
-  if (!res.ok) return null;
-  setAccessToken(authTokens.parse(await res.json()).access);
+  if (!(await refreshAccess())) return null;
 
-  const me = await fetch("/v1/auth/me", { headers: auth() });
+  const me = await authedFetch("/v1/auth/me");
   return me.ok ? sessionUser.parse(await me.json()) : null;
 }
 
