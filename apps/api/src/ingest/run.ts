@@ -35,6 +35,12 @@ const MIN_VOTES = arg("min-votes", 500);
  * global, "Frieren" não entraria e a aba Anime abriria vazia. Piso próprio.
  */
 const MIN_VOTES_ANIME = arg("min-votes-anime", 80);
+/**
+ * Mesma doença do anime, pior: com a régua global o gênero Reality inteiro
+ * fecha em 8 títulos — reality não acumula voto no TMDB como ficção acumula.
+ * Piso próprio pelo mesmo motivo, e mais baixo porque a base é menor.
+ */
+const MIN_VOTES_REALITY = arg("min-votes-reality", 50);
 const DRY = flag("dry-run");
 
 const token = process.env["TMDB_READ_TOKEN"];
@@ -128,13 +134,27 @@ async function upsert(n: NonNullable<ReturnType<typeof normalize>>) {
   });
 }
 
-async function bucket(type: TitleType, year: number, anime: boolean) {
-  const minVotes = anime ? MIN_VOTES_ANIME : MIN_VOTES;
+async function bucket(type: TitleType, year: number, kind?: "anime" | "reality") {
+  const minVotes =
+    kind === "anime"
+      ? MIN_VOTES_ANIME
+      : kind === "reality"
+        ? MIN_VOTES_REALITY
+        : MIN_VOTES;
   let page = 1;
   let pages = 1;
 
   do {
-    const data = await get(discoverUrl({ type, year, page, minVotes, anime }));
+    const data = await get(
+      discoverUrl({
+        type,
+        year,
+        page,
+        minVotes,
+        anime: kind === "anime",
+        reality: kind === "reality",
+      }),
+    );
     pages = Math.min(data.total_pages ?? 1, 500); // o teto do /discover
 
     for (const item of data.results ?? []) {
@@ -151,16 +171,18 @@ async function bucket(type: TitleType, year: number, anime: boolean) {
 
 const started = Date.now();
 console.log(
-  `ingestão tmdb | anos ${FROM}-${TO} | min-votes ${MIN_VOTES} (anime ${MIN_VOTES_ANIME})${DRY ? " | DRY-RUN" : ""}`,
+  `ingestão tmdb | anos ${FROM}-${TO} | min-votes ${MIN_VOTES} (anime ${MIN_VOTES_ANIME}, reality ${MIN_VOTES_REALITY})${DRY ? " | DRY-RUN" : ""}`,
 );
 
 for (const year of Array.from({ length: TO - FROM + 1 }, (_, i) => FROM + i)) {
   for (const type of ["movie", "tv"] as const) {
-    await bucket(type, year, false);
+    await bucket(type, year);
     // Balde dedicado: no ranking global por votos o anime fica sub-representado,
     // e a aba Anime é feature de manchete. Sem ele, ela abre quase vazia.
-    await bucket(type, year, true);
+    await bucket(type, year, "anime");
   }
+  // Reality só existe como gênero de série no TMDB.
+  await bucket("tv", year, "reality");
   console.log(
     `${year}: +${inserted} novos, ~${updated} atualizados, ${skipped} fora do portão`,
   );
