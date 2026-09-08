@@ -30,7 +30,7 @@ só a mudança. Vale ler antes de propor refazer algo.
 |---|---|---|
 | **S** esqueleto | 7/7 | completa — em produção, com login real atravessado |
 | **A** feed | 8/8 | backend e UI de filtro completos |
-| **B** swipe | 6/7 | B4 (pré-carga de imagem) pausada — não há pôster |
+| **B** swipe | 6/7 | B4 (pré-carga de imagem) despausada em 2026-09-08: já há pôster |
 | **C** identidade | 6/6 | completa e exercitada contra o Google real em produção |
 | **D** catálogo | 5/5 | completa |
 | **E** social | 6/6 | completa |
@@ -101,19 +101,25 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 
 ## Bloqueado na pessoa, não no código
 
-1. **Escolher o fornecedor de catálogo.** Não bloqueia A/B/C/D, bloqueia o beta.
-2. **Veredito do gesto no celular.** Duas perguntas em aberto que revertem
-   decisões: o gesto tem peso? (senão, `framer-motion` se justifica) e o card
-   convence sem pôster? (senão, a escolha de fornecedor sobe para o topo).
+1. **Veredito do gesto no celular.** Uma pergunta em aberto que reverte
+   decisão: o gesto tem peso? (senão, `framer-motion` se justifica). A outra —
+   "o card convence sem pôster?" — perdeu o objeto: agora há pôster.
 
-As contas do S7 e as credenciais do Google saíram desta lista em 2026-09-03.
+As contas do S7 e as credenciais do Google saíram desta lista em 2026-09-03; o
+fornecedor de catálogo saiu em 2026-09-08, fechado em TMDB, e a régua (I0.1)
+fechou no mesmo dia em 800. Os secrets do CI foram cadastrados em 2026-09-08 e
+os três jobs passam em `main`.
+
 O que está provado hoje, e vale mais escrito do que redescoberto:
 
 - **api** <https://watchlytics-api.fly.dev> — `/health` devolve `{"ok":true}`,
   uma máquina em `gru` com auto-suspend.
 - **front** <https://watchlytics.pages.dev> — a Function de `/v1/*` e `/u/*`
   faz proxy para o Fly. Origem única, sem CORS, como o PLAN previa.
-- **banco** Neon com pgvector, schema migrado e os 94 títulos semeados.
+- **banco** Neon com pgvector, schema migrado e **7583 títulos do TMDB**
+  (`--min-votes 800`, anime 80, reality 50). A fixture de 94 foi apagada em
+  2026-09-08 e o seed saiu do `release_command` — não o devolva, o porquê está
+  no `fly.toml`.
 - **OAuth Google validado em produção**: `redirectUri` fora da allowlist leva
   400 e um `code` falso leva 401 "provedor recusou o código" — ou seja, client
   id e secret estão carregados e a troca com o Google acontece de verdade.
@@ -140,8 +146,10 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
   manda `Authorization` pelo helper `auth()`. Falta remover o shim do servidor,
   e isso só acontece com o OAuth de verdade em produção — não deixe virar
   permanente.
-- **Fixture esgota numa sessão.** 94 títulos, e o onboarding do D4 consome 20
-  na porta de entrada. Serve para construir e demonstrar, não para o beta.
+- **A fixture esgotava numa sessão** — 94 títulos com o onboarding do D4
+  consumindo 20 na porta de entrada. Resolvido em 2026-09-08: 7583 títulos do
+  TMDB, ~378 decks de 20. O banco de desenvolvimento e o do CI continuam na
+  fixture, e é ela que os testes esperam.
 - **O shim escondeu um 401 até a produção.** Com login válido, `/v1/feed`
   respondia 401 no ar porque o front nunca mandava `Authorization`; em dev o
   `DEV_USER_ID` atendia a requisição sem header e o bug não aparecia. Foi o
@@ -165,17 +173,13 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
 
 ## Próximos passos sugeridos
 
-1. **Cadastrar os secrets do CI** e mergear o branch do S7. É o último item
-   aberto do deploy: sem `FLY_API_TOKEN`, `CLOUDFLARE_API_TOKEN`,
-   `CLOUDFLARE_ACCOUNT_ID` e a variable `VITE_GOOGLE_CLIENT_ID`, um push em
-   `main` roda os checks e falha nos dois jobs de deploy. Enquanto isso, quem
-   publica é a mão — `wrangler pages deploy` precisa de `--branch main` fora da
-   `main`, senão vai para um alias de preview.
+1. **I0.2 — congelar `schema.ts` e `contract/index.ts`.** Portão serial que
+   sobrou: uma migration com todas as adições que I1 e I2 precisam, antes de
+   spawnar qualquer agente. Foram os pontos de contenção da rodada anterior.
 2. **Remover o shim `DEV_USER_ID`** do `auth.ts`. A condição que segurava isto
    caiu: um login real completou em produção, então o shim já não é o único
    caminho de entrada. O cliente saiu dele no S7+C1; falta o servidor.
-3. **Veredito do gesto no celular** (§Bloqueado 2). Duas perguntas que revertem
+3. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
-4. **Escolher o fornecedor de catálogo** (§Bloqueado 1). 94 títulos de fixture
-   com o onboarding queimando 20 na porta de entrada não sustentam um beta, e
-   é essa escolha que também destrava o B4.
+4. **B4 — pré-carga das 5 próximas imagens.** Despausada: agora há pôster, e
+   sem pré-carga o flash aparece justamente na homologação.

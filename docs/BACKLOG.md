@@ -81,7 +81,7 @@ B trabalha contra mock do contrato e não espera A.
 | B1 | Pilha de 3 cards, `translate3d` | Só 3 cards no DOM, verificado no inspector | ✅ |
 | B2 | Gesto Pointer Events, disparo por distância **ou** velocidade | Flick curto e rápido conta | ✅ |
 | B3 | Botões + setas do teclado + `prefers-reduced-motion` + `aria-live` | Fluxo completo sem tocar na tela | ✅ |
-| B4 | Pré-carregamento das 5 próximas imagens | Sem flash ao trocar de card | ⏸ sem imagem enquanto não há fornecedor |
+| B4 | Pré-carregamento das 5 próximas imagens | Sem flash ao trocar de card | aberta — a pausa caiu em 2026-09-08: o catálogo do TMDB traz `poster_url` e o `Deck.tsx:148` já o pinta |
 | B5 | Mutação otimista + `POST /v1/swipes` em lote | Card sai da tela antes da resposta | ✅ |
 | B6 | Buffer offline em `localStorage`, flush a cada 5 ou 3s | Modo avião: 10 swipes, volta a rede, os 10 chegam | ✅ |
 | B7 | Undo de 1 | Desfaz sem duplicar swipe no servidor | ✅ |
@@ -181,8 +181,15 @@ anterior de agentes.
 
 | id | Tarefa | Quem | Por que é serial |
 |---|---|---|---|
-| I0.1 | Rodar a ingestão local e escolher `--min-votes` swipando | usuário | Nenhum agente consegue decidir a régua: só olhando o deck se sabe se o título é reconhecível |
+| I0.1 ✅ | Rodar a ingestão local e escolher `--min-votes` swipando | usuário | Nenhum agente consegue decidir a régua: só olhando o deck se sabe se o título é reconhecível |
 | I0.2 | **Uma** migration + **todas** as adições de contrato que as trilhas precisam | eu | `schema.ts` e `contract/index.ts` foram os pontos de contenção da última vez. Mudam uma vez, antes, e ficam CONGELADOS |
+
+> **I0.1 fechou em 2026-09-08: régua 800** (anime 80, reality 50) — 7583 títulos
+> em produção, fixture apagada. A régua não foi escolhida pelo volume e sim pela
+> direção do erro: baixá-la depois só insere, subi-la exige `DELETE` em `titles`,
+> e as FKs são `ON DELETE CASCADE` — levaria junto swipe, biblioteca e match de
+> quem já tivesse avaliado. Começar apertado é o único lado que se corrige sem
+> apagar dado de usuário.
 
 ### Regras de paralelização (aprendidas errando)
 
