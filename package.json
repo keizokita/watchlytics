@@ -14,6 +14,7 @@
     "check": "npm run check --workspaces --if-present",
     "db:up": "podman start watchlytics-db || podman run -d --name watchlytics-db -e POSTGRES_PASSWORD=dev -e POSTGRES_USER=dev -e POSTGRES_DB=watchlytics -p 5433:5432 docker.io/pgvector/pgvector:pg17",
     "db:down": "podman rm -f watchlytics-db",
+    "db:test": "podman exec watchlytics-db createdb -U dev watchlytics_test 2>/dev/null; DATABASE_URL=postgres://dev:dev@localhost:5433/watchlytics_test npm run migrate && DATABASE_URL=postgres://dev:dev@localhost:5433/watchlytics_test npm run seed",
     "migrate": "npm run migrate -w @watchlytics/api",
     "seed": "npm run seed -w @watchlytics/api",
     "dev:api": "npm run dev -w @watchlytics/api",
