@@ -119,4 +119,13 @@ test("discover particiona por tipo e ano, com a régua de votos", () => {
   );
   assert.equal(anime.searchParams.get("with_genres"), "16");
   assert.equal(anime.searchParams.get("with_original_language"), "ja");
+
+  // Reality tem piso próprio pelo mesmo motivo do anime, mas sem filtro de
+  // idioma: o gênero é 10764 e vale para série de qualquer país.
+  const reality = new URL(
+    discoverUrl({ type: "tv", year: 2019, page: 1, minVotes: 50, reality: true }),
+  );
+  assert.equal(reality.searchParams.get("with_genres"), "10764");
+  assert.equal(reality.searchParams.get("with_original_language"), null);
+  assert.equal(reality.searchParams.get("vote_count.gte"), "50");
 });

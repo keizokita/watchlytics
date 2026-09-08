@@ -181,6 +181,7 @@ export function discoverUrl(opts: {
   page: number;
   minVotes: number;
   anime?: boolean;
+  reality?: boolean;
 }): string {
   const p = new URLSearchParams({
     include_adult: "false",
@@ -196,5 +197,7 @@ export function discoverUrl(opts: {
     p.set("with_genres", "16");
     p.set("with_original_language", "ja");
   }
+  // Reality é gênero só de série no TMDB (10764); filme não tem equivalente.
+  if (opts.reality) p.set("with_genres", "10764");
   return `${TMDB_API}/discover/${opts.type}?${p}`;
 }
