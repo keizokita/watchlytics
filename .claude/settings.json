@@ -49,7 +49,10 @@
       "Bash(psql -h localhost -p 5433 -U dev -d wl_a -c \"select user_id, direction, updated_at from swipes order by updated_at desc limit 5\")",
       "Bash(curl -s -o /dev/null -w 'html:%{http_code}\\\\n' localhost:5211/)",
       "Bash(curl -s 'localhost:5211/v1/feed?types=movie&genres=1')",
-      "Bash(git -C .claude/worktrees/agent-a34e3f0b624a9dfbd diff -- packages/contract/src/index.ts)"
+      "Bash(git -C .claude/worktrees/agent-a34e3f0b624a9dfbd diff -- packages/contract/src/index.ts)",
+      "WebFetch(domain:developer.themoviedb.org)",
+      "Bash(git pull *)",
+      "Bash(node -e 'const t=require\\(\"./seed/titles.json\"\\);console.log\\(\"títulos na fixture:\",t.length\\);console.log\\(\"exemplos:\",t.slice\\(0,4\\).map\\(x=>x.title\\).join\\(\" | \"\\)\\)')"
     ],
     "defaultMode": "bypassPermissions"
   }
