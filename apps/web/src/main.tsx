@@ -304,7 +304,22 @@ function Root() {
   return (
     <div className="shell">
       <style>{`
-        .shell { display: grid; gap: 1.25rem; justify-items: center; }
+        /* Flex, não grid: o alinhamento vertical aqui é feito por margem auto,
+           e margem auto de item de grid centraliza dentro da própria faixa em
+           vez de disputar a folga da coluna inteira.
+
+           A folga sobra em janela alta de desktop. Quem a consome são as duas
+           margens auto abaixo: sem elas o shell inteiro flutuava no meio da
+           página (ver o comentário do body no index.html). */
+        .shell {
+          display: flex; flex-direction: column; align-items: center;
+          gap: 1.25rem;
+          /* o item de grid do body já estica; isto é o piso quando não estica */
+          min-height: 100%;
+        }
+        /* Rodapé no fim da página em toda tela. Sozinha, esta margem já põe o
+           conteúdo no topo: toda a folga vai para cima da atribuição. */
+        .shell .attribution { margin-top: auto; }
         .shell nav { display: flex; gap: 0.5rem; }
         /* Deslogada, a nav é só o botão de entrar, e ele tem que vir DEPOIS do
            que explica o app — senão a pessoa lê o call-to-action antes de
