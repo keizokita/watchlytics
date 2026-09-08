@@ -387,7 +387,7 @@ export function Library() {
  * screenCss.ts — a tela de amigos usa as mesmas classes e montava sem elas.
  */
 const CSS = SCREEN_CSS + `
-.lib-stats { border: 1px solid rgb(255 255 255 / 0.12); border-radius: 14px; padding: 1rem; }
+.lib-stats { border: 1px solid var(--line); border-radius: var(--r-panel); padding: 1rem; }
 .lib-stats h2 { margin: 0 0 0.75rem; font-size: 0.8rem; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted); }
 .lib-stats dl { margin: 0; display: grid; gap: 0.75rem;
@@ -402,14 +402,14 @@ const CSS = SCREEN_CSS + `
 .lib-rating .lib-clear { font-size: 0.75rem; color: var(--muted); padding-left: 0.5rem; }
 .lib-rating .lib-clear:disabled { opacity: 0.35; cursor: default; }
 
-.lib-account { border: 1px solid rgb(255 255 255 / 0.12); border-radius: 14px;
+.lib-account { border: 1px solid var(--line); border-radius: var(--r-panel);
   padding: 1rem; display: grid; gap: 0.75rem; }
 .lib-account h2 { margin: 0; font-size: 0.8rem; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted); }
 .lib-account-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .lib-account button:disabled { opacity: 0.4; cursor: default; }
 /* A cor do botão destrutivo é a do pass, e só ele é vermelho na tela. */
-.lib-danger { padding: 0.45rem 0.9rem; border-radius: 999px;
+.lib-danger { padding: 0.45rem 0.9rem; border-radius: var(--r-pill);
   border: 1px solid var(--pass); background: none; color: var(--pass);
   font: inherit; font-size: 0.85rem; cursor: pointer; }
 `;
