@@ -1,5 +1,5 @@
 import { swipeBatch, type SwipeInput } from "@watchlytics/contract";
-import { auth } from "./session.ts";
+import { authedFetch } from "./session.ts";
 
 /**
  * B6 — fila durável de swipes.
@@ -17,7 +17,7 @@ const FLUSH_MS = 3000;
 const MAX_BATCH = 50;
 
 let timer: ReturnType<typeof setTimeout> | null = null;
-let flushing = false;
+let flushing: Promise<void> | null = null;
 
 function read(): SwipeInput[] {
   try {
@@ -68,16 +68,27 @@ export function drop(titleId: string): boolean {
   return after.length !== before.length;
 }
 
-export async function flush(): Promise<void> {
-  if (flushing) return;
+/**
+ * Um envio de cada vez, e `await flush()` espera o que já estava no ar.
+ *
+ * Devolver a promessa corrente em vez de sair no `return` importa porque
+ * `enqueue` dispara `void flush()` sozinho ao encher o lote: quem chamar
+ * `flush()` logo depois receberia um await que não espera nada, e trataria
+ * "outro envio em curso" como "envio concluído".
+ */
+export function flush(): Promise<void> {
+  flushing ??= run().finally(() => void (flushing = null));
+  return flushing;
+}
+
+async function run(): Promise<void> {
   const batch = read().slice(0, MAX_BATCH);
   if (!batch.length) return;
 
-  flushing = true;
   try {
-    const res = await fetch("/v1/swipes", {
+    const res = await authedFetch("/v1/swipes", {
       method: "POST",
-      headers: { "content-type": "application/json", ...auth() },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify(batch),
     });
     if (!res.ok) throw new Error(`/v1/swipes respondeu ${res.status}`);
@@ -92,8 +103,6 @@ export async function flush(): Promise<void> {
   } catch (e) {
     console.warn("swipes seguem na fila, tentando de novo", e);
     schedule();
-  } finally {
-    flushing = false;
   }
 }
 

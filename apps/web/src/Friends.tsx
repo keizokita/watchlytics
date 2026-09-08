@@ -9,7 +9,7 @@ import {
   type MatchEntry,
   type PublicUser,
 } from "@watchlytics/contract";
-import { auth } from "./session.ts";
+import { authedFetch } from "./session.ts";
 import { SCREEN_CSS } from "./screenCss.ts";
 import { t } from "./strings.ts";
 
@@ -136,7 +136,7 @@ export function Friends() {
   };
 
   const pega = async (url: string) => {
-    const res = await fetch(url, { headers: auth() });
+    const res = await authedFetch(url);
     if (!res.ok) throw new Error(`${url} respondeu ${res.status}`);
     return res.json() as Promise<unknown>;
   };
@@ -157,7 +157,7 @@ export function Friends() {
    * contador em cima.
    */
   const loadAvisos = useCallback(async () => {
-    await fetch("/v1/notifications/read", { method: "POST", headers: auth() });
+    await authedFetch("/v1/notifications/read", { method: "POST" });
     dispatchEvent(new Event(ZEROU));
     setAvisos(notificationsResponse.parse(await pega("/v1/notifications")).items);
   }, []);
@@ -181,9 +181,9 @@ export function Friends() {
 
   const onRequest = (handle: string) =>
     run(async () => {
-      const res = await fetch("/v1/friends/requests", {
+      const res = await authedFetch("/v1/friends/requests", {
         method: "POST",
-        headers: { ...auth(), "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ handle }),
       });
       if (!res.ok) throw new Error(`POST /v1/friends/requests respondeu ${res.status}`);
@@ -194,9 +194,8 @@ export function Friends() {
 
   const onAccept = (userId: string) =>
     run(async () => {
-      const res = await fetch(`/v1/friends/requests/${userId}/accept`, {
+      const res = await authedFetch(`/v1/friends/requests/${userId}/accept`, {
         method: "POST",
-        headers: auth(),
       });
       if (!res.ok) throw new Error(`accept respondeu ${res.status}`);
       // O aceite cruza os catálogos (E4): há match novo e aviso novo agora.
@@ -383,7 +382,7 @@ export function NotificationsBadge() {
 
     const check = async () => {
       try {
-        const res = await fetch("/v1/notifications", { headers: auth() });
+        const res = await authedFetch("/v1/notifications");
         if (!res.ok) return; // deslogado ou api fora: badge some, não vira erro
         const { unread } = notificationsResponse.parse(await res.json());
         if (live) setUnread(unread);
