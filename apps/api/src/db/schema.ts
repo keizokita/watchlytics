@@ -120,6 +120,26 @@ export const titles = pgTable(
     voteCount: integer("vote_count"),
     raw: jsonb("raw"),
     syncedAt: timestamp("synced_at", { withTimezone: true }),
+    /**
+     * I1 — até 5 nomes do elenco principal; o card mostra 3. Guardar mais do
+     * que se mostra porque o caro é a passada de rede (uma requisição por
+     * título), não os bytes: mudar o card não obriga a refazer a passada.
+     *
+     * `cast_names` e não `cast`: CAST é palavra reservada em SQL. No contrato
+     * o campo se chama `cast`, que é o que o card quer dizer.
+     *
+     * Array e não tabela title_credits: o único consumidor é o card e ninguém
+     * consulta por ator. Tabela obrigaria join com agregação no feed, que hoje
+     * é select direto sobre titles.
+     */
+    castNames: text("cast_names").array().notNull().default([]),
+    /**
+     * Separado do syncedAt porque são passadas diferentes: /discover traz o
+     * título, /credits traz o elenco. NULL = nunca buscado (é a fila da segunda
+     * passada); preenchido com castNames vazio = buscado e não tem elenco, que
+     * é o que impede retentar os mesmos títulos para sempre.
+     */
+    creditsSyncedAt: timestamp("credits_synced_at", { withTimezone: true }),
   },
   (t) => [
     index("titles_genres_gin").using("gin", t.genreIds),
@@ -145,6 +165,23 @@ export const titleExternalIds = pgTable(
     unique("title_external_ids_one_per_provider").on(t.titleId, t.provider),
   ],
 );
+
+/**
+ * I2 — estado da ingestão. Duas linhas: `changes_cursor` (até onde o /changes
+ * diário já leu) e `initial_load` (onde a carga parou, para retomar em 2003 e
+ * não em 1970).
+ *
+ * jsonb e não uma coluna por caso: as duas formas não se parecem — uma é data,
+ * a outra é {ano, tipo, página} — e coluna dedicada por trilha traria de volta
+ * a migration por trilha, que é o que esta tabela evita.
+ */
+export const ingestState = pgTable("ingest_state", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
 
 // ─── decisão e catálogo pessoal ─────────────────────────────────────────────
 

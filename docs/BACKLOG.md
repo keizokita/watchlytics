@@ -182,7 +182,7 @@ anterior de agentes.
 | id | Tarefa | Quem | Por que é serial |
 |---|---|---|---|
 | I0.1 ✅ | Rodar a ingestão local e escolher `--min-votes` swipando | usuário | Nenhum agente consegue decidir a régua: só olhando o deck se sabe se o título é reconhecível |
-| I0.2 | **Uma** migration + **todas** as adições de contrato que as trilhas precisam | eu | `schema.ts` e `contract/index.ts` foram os pontos de contenção da última vez. Mudam uma vez, antes, e ficam CONGELADOS |
+| I0.2 ✅ | **Uma** migration + **todas** as adições de contrato que as trilhas precisam | eu | `schema.ts` e `contract/index.ts` foram os pontos de contenção da última vez. Mudam uma vez, antes, e ficam CONGELADOS |
 
 > **I0.1 fechou em 2026-09-08: régua 800** (anime 80, reality 50) — 7583 títulos
 > em produção, fixture apagada. A régua não foi escolhida pelo volume e sim pela
@@ -190,6 +190,14 @@ anterior de agentes.
 > e as FKs são `ON DELETE CASCADE` — levaria junto swipe, biblioteca e match de
 > quem já tivesse avaliado. Começar apertado é o único lado que se corrige sem
 > apagar dado de usuário.
+
+> **I0.2 fechou em 2026-09-08.** `drizzle/0003_furry_jack_flag.sql`:
+> `titles.cast_names text[]` e `titles.credits_synced_at` (I1),
+> tabela `ingest_state` (I2.1 e I2.3). No contrato, `cast` no `title`; e a linha
+> de `cast` no `toTitle` (`routes/feed.ts`) já entrou, para que a I1 não precise
+> tocar rota. **`schema.ts` e `contract/index.ts` estão congelados a partir
+> daqui.** I2.2 não pediu nada: `synced_at` já existia e o pull-through é por
+> título lido, não varredura.
 
 ### Regras de paralelização (aprendidas errando)
 

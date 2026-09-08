@@ -57,6 +57,7 @@ export const toTitle = (r: Row): Title => ({
   genreIds: r.genreIds,
   score: r.score,
   voteAverage: Number(r.voteAverage ?? 0),
+  cast: r.castNames,
 });
 
 // ─── cursor (A3) ────────────────────────────────────────────────────────────

@@ -39,7 +39,7 @@ só a mudança. Vale ler antes de propor refazer algo.
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
 repetir; o LIKE vira coleção com abas e estatísticas.
 
-**88 testes** (81 API + 7 fila), `npm run check` limpo nos três pacotes.
+**99 testes** (89 API + 10 fila), `npm run check` limpo nos três pacotes.
 
 ## Ambiente — o que custa caro redescobrir
 
@@ -173,9 +173,10 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
 
 ## Próximos passos sugeridos
 
-1. **I0.2 — congelar `schema.ts` e `contract/index.ts`.** Portão serial que
-   sobrou: uma migration com todas as adições que I1 e I2 precisam, antes de
-   spawnar qualquer agente. Foram os pontos de contenção da rodada anterior.
+1. **Spawnar I1 e I2 em paralelo.** Os dois portões seriais fecharam: régua
+   escolhida (800) e migration única aplicada (`0003`). As regras que valem —
+   worktree do `main` atual, banco próprio por agente, dono por arquivo,
+   `schema.ts` e `contract/index.ts` congelados — estão no BACKLOG §5.
 2. **Remover o shim `DEV_USER_ID`** do `auth.ts`. A condição que segurava isto
    caiu: um login real completou em produção, então o shim já não é o único
    caminho de entrada. O cliente saiu dele no S7+C1; falta o servidor.

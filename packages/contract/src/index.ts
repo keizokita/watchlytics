@@ -33,6 +33,8 @@ export const title = z.object({
   genreIds: z.array(genreId),
   score: z.number().int().min(0).max(100),
   voteAverage: z.number(),
+  /** I1 — elenco principal. Vazio quando o TMDB não deu nenhum: o card só omite a linha. */
+  cast: z.array(z.string()),
 });
 export type Title = z.infer<typeof title>;
 
