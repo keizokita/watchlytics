@@ -20,6 +20,9 @@ export const SCREEN_CSS = `
 .lib-tabs button[aria-selected="true"] { color: var(--fg); border-color: var(--fg); }
 .lib-tabs button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
 
+/* Erro com ação: o texto e o "tentar de novo" empilham, centralizados. */
+.lib .notice.error { display: grid; gap: 0.6rem; justify-items: center; }
+
 .lib-locked { margin: 0; color: var(--muted); font-size: 0.9rem; }
 .lib-hint { margin: 0; color: var(--muted); font-size: 0.85rem; }
 .lib-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }

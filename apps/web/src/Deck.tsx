@@ -98,6 +98,16 @@ export function Deck({
   // B3: o gesto nunca é o único caminho.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // O atalho é da página inteira, mas dentro de um campo as mesmas teclas
+      // já têm dono: seta anda com o caret e Backspace apaga. Sem esta guarda o
+      // `preventDefault` do undo impedia apagar um dígito do filtro de ano.
+      if (
+        e.target instanceof Element &&
+        e.target.closest("input, select, textarea, [contenteditable]")
+      ) {
+        return;
+      }
+
       if (e.key === "ArrowLeft") commit(-1);
       else if (e.key === "ArrowRight") commit(1);
       else if (e.key === "Backspace" && canUndo) {

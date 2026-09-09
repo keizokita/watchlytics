@@ -7,6 +7,7 @@ import {
   profileStats,
   STATS_MIN_WATCHED,
 } from "@watchlytics/contract";
+import { signAccess } from "../auth.ts";
 import { db, pg } from "../db/client.ts";
 import { libraryEntries, swipes, titles, users } from "../db/schema.ts";
 import { buildServer } from "../server.ts";
@@ -231,4 +232,43 @@ test("sem DEV_USER_ID o catálogo responde 401", async () => {
   } finally {
     process.env["DEV_USER_ID"] = saved;
   }
+});
+
+/**
+ * O Bearer manda mais que o shim.
+ *
+ * As quatro rotas daqui chamavam `requireUserId()` sem `req`, então caíam no
+ * usuário fixo do ambiente mesmo com um access válido no cabeçalho: em dev,
+ * quem logasse via o catálogo de outra pessoa. Este teste é o que falha se o
+ * `req` sumir de novo.
+ */
+test("com Bearer, o catálogo é de quem assinou o token, não do DEV_USER_ID", async () => {
+  const OUTRO = "00000000-0000-4000-8000-0000000000d2";
+  await db
+    .insert(users)
+    .values({ id: OUTRO, handle: "trilha-d2", displayName: "Trilha D2" })
+    .onConflictDoNothing();
+  await db.delete(libraryEntries).where(eq(libraryEntries.userId, OUTRO));
+
+  const como = { authorization: `Bearer ${signAccess(OUTRO)}` };
+  const dele = pool.at(-1)!.id;
+
+  const put = await app.inject({
+    method: "PUT",
+    url: `/v1/library/${dele}`,
+    headers: como,
+    payload: { status: "interested", rating: null },
+  });
+  assert.equal(put.statusCode, 204);
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/v1/library?status=interested",
+    headers: como,
+  });
+  const seus = libraryListResponse.parse(res.json()).items;
+  assert.ok(seus.some((e) => e.title.id === dele));
+
+  // E o shim continua sendo outra pessoa: o título não vazou para o USER.
+  assert.ok(!(await list("interested")).some((e) => e.title.id === dele));
 });

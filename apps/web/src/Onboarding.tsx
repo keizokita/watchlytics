@@ -7,6 +7,7 @@ import {
   type Title,
 } from "@watchlytics/contract";
 import { Deck } from "./Deck.tsx";
+import { mensagem } from "./errors.ts";
 import { t } from "./strings.ts";
 import { enqueue } from "./swipeQueue.ts";
 import { authedFetch } from "./session.ts";
@@ -44,7 +45,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       setState(data);
       setDone(ONBOARDING_SWIPES - data.remaining);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(mensagem(e));
     }
   }, [onDone]);
 
@@ -66,7 +67,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       if (!res.ok) throw new Error(`/v1/me respondeu ${res.status}`);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(mensagem(e));
     }
   };
 
@@ -87,7 +88,19 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     setDone((n) => n + 1);
   };
 
-  if (error) return <p className="notice deck-slot error">{t.error(error)}</p>;
+  if (error) {
+    return (
+      <div className="notice deck-slot error">
+        <p>{error}</p>
+        {/* `load` e não `save`: refazer a carga é o que devolve a tela ao
+            estado certo, inclusive quando quem falhou foi o PATCH dos gêneros
+            — a resposta é que diz se eles já foram gravados. */}
+        <button type="button" className="link" onClick={() => void load()}>
+          {t.retry}
+        </button>
+      </div>
+    );
+  }
   if (!state) return <p className="notice deck-slot loading">{t.loading}</p>;
 
   // Escolher ao menos um gênero é obrigatório: é o que distingue "ainda não

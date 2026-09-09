@@ -14,6 +14,7 @@ import {
 } from "@watchlytics/contract";
 import { authedFetch } from "./session.ts";
 import { SCREEN_CSS } from "./screenCss.ts";
+import { mensagem } from "./errors.ts";
 import { t } from "./strings.ts";
 
 /**
@@ -33,7 +34,7 @@ const TABS: readonly { id: Tab; label: string }[] = [
 ];
 
 async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
+  const res = await authedFetch(url);
   if (!res.ok) throw new Error(`${url} respondeu ${res.status}`);
   return res.json();
 }
@@ -140,7 +141,7 @@ function Account() {
     setBusy(true);
     setError(null);
     fn()
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => setError(mensagem(e)))
       .finally(() => setBusy(false));
   };
 
@@ -208,7 +209,7 @@ function Account() {
     <section className="lib-account">
       <h2>{t.account}</h2>
       <p className="lib-locked">{t.accountHint}</p>
-      {error && <p className="notice error">{t.error(error)}</p>}
+      {error && <p className="notice error">{error}</p>}
 
       {me && (
         <>
@@ -265,7 +266,7 @@ export function Library() {
       setStats(profileStats.parse(await getJson("/v1/me/stats")));
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(mensagem(e));
     } finally {
       setReady(true);
     }
@@ -281,13 +282,13 @@ export function Library() {
    */
   const save = useCallback(
     async (titleId: string, status: LibraryStatus, rating: number | null) => {
-      const res = await fetch(`/v1/library/${titleId}`, {
+      const res = await authedFetch(`/v1/library/${titleId}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ status, rating }),
       });
       if (!res.ok) {
-        setError(`PUT /v1/library respondeu ${res.status}`);
+        setError(mensagem(new Error(`PUT /v1/library respondeu ${res.status}`)));
         return;
       }
       // Sem mutação otimista: aqui não há gesto esperando a tela, e o item
@@ -328,7 +329,14 @@ export function Library() {
 
       {stats && <Stats stats={stats} />}
 
-      {error && <p className="notice error">{t.error(error)}</p>}
+      {error && (
+        <div className="notice error">
+          <p>{error}</p>
+          <button type="button" className="link" onClick={() => void load()}>
+            {t.retry}
+          </button>
+        </div>
+      )}
       {!ready && <p className="notice">{t.loading}</p>}
 
       {ready && !error && (
