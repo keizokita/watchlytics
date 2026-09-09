@@ -24,6 +24,9 @@
         --line: rgb(255 255 255 / 0.16);
         --r-pill: 999px;
         --r-card: 22px;
+        /* Painel de conteúdo (lista, estatísticas, conta): não é o card do
+           deck nem um controle. Existia como 14px repetido em três arquivos. */
+        --r-panel: 14px;
 
         /* Alvo de toque mínimo (44px, WCAG 2.5.8). Vale para botão, select e
            campo — é por isso que é token e não número solto. */
@@ -56,7 +59,13 @@
            e sem altura definida o grid não centraliza nada */
         min-height: 100dvh;
         display: grid;
-        place-items: center;
+        /* `justify-items` sozinho, não `place-items`: centraliza na horizontal
+           e deixa o .shell esticar na vertical. Centralizado nos dois eixos, o
+           shell inteiro flutuava e a nav mudava de lugar conforme a altura do
+           conteúdo — ficava a ~120px na Library e a ~550px em Friends vazia,
+           que é curta. Nav é a mesma chrome em toda tela; ela não pode andar.
+           Quem decide o alinhamento vertical agora é o .shell. */
+        justify-items: center;
         padding: 1.25rem;
         /* viewport-fit=cover no meta: em tela com recorte o rodapé de botões
            não pode ficar embaixo da barra do sistema */
@@ -136,9 +145,14 @@
         gap: 0.75rem;
         overflow: hidden;
         /* Duas pontas escuras, não uma: o topo carrega os chips e o rodapé
-           carrega o texto. Sem a parada de cima o chip ficava sobre a parte
-           clara do gradiente; sem a de baixo em 0.72 o --muted não fechava AA
-           contra os hues mais claros que `gradient(id)` sorteia. */
+           carrega o texto. Sem a parada de cima o chip fica sobre a parte clara
+           do fundo.
+
+           A de baixo em 0.72 foi calibrada contra `gradient(id)`, que tem teto
+           de claridade por construção. Com pôster de verdade a premissa caiu, e
+           por isso o texto do card é --fg e não --muted: escurecer mais o
+           degradê fecharia o mesmo número comendo a imagem, que é justamente o
+           que o card existe para mostrar. */
         background: linear-gradient(
           rgb(0 0 0 / 0.38),
           rgb(0 0 0 / 0) 28%,
@@ -177,15 +191,21 @@
         letter-spacing: -0.015em;
         text-wrap: balance;
       }
+      /* --fg, e não --muted como no resto do app: aqui o fundo é FOTOGRAFIA.
+         O cinza de serviço fechava AA contra o gradiente porque o gradiente tem
+         teto de claridade por construção (hsl a 30% e 12% de lightness); um
+         pôster não tem. Medido no card do Frozen II: --muted dava 3.14:1 sobre
+         a imagem, abaixo do piso de 4.5:1, e --fg dá 7.44:1 no mesmo pixel.
+         A hierarquia passa a vir do tamanho, que é o que sobrou de diferença. */
       .card-original {
         margin: 0;
-        color: var(--muted);
+        color: var(--fg);
         font-size: clamp(0.7rem, 4cqi, 0.9rem);
       }
       .card-meta {
         margin: 0.15rem 0 0.35rem;
         font-size: clamp(0.65rem, 3.6cqi, 0.8rem);
-        color: var(--muted);
+        color: var(--fg);
         /* ano + gêneros em uma linha só: com wrap, um título de quatro gêneros
            empurrava a sinopse para fora do card */
         white-space: nowrap;
@@ -287,6 +307,13 @@
         gap: 0.5rem;
         justify-content: center;
         align-items: center;
+        /* A segunda margem `auto` do shell, e a única que é de uma tela só.
+           Com ela, a folga de uma janela alta se divide em duas: metade entre
+           a nav e os filtros, metade antes do rodapé — o que centraliza o
+           grupo filtros+deck+botões sem soltar a nav do topo. As telas de
+           conteúdo não têm `.filters`, então lá toda a folga continua indo
+           para o rodapé e o conteúdo fica no topo, que é o certo para lista. */
+        margin-top: auto;
         /* 37rem cabe os quatro controles em uma linha no desktop; em 360px a
            quebra cai em duas linhas, que é o caso previsto na --deck-reserve */
         max-width: min(37rem, 94vw);

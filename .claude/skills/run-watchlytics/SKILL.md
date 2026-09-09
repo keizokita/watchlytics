@@ -65,7 +65,7 @@ derruba no fim.
 | comando | o que faz |
 |---|---|
 | `driver.mjs api` | Sobe o Fastify **em processo** e bate nas rotas com `app.inject()`. Sem porta, sem servidor. É o caminho para PR que mexe em `apps/api/src/`. |
-| `driver.mjs web` | Garante api:3000 + vite:5173 (subindo o que faltar), dirige o Chrome headless pelo deck, tira dois prints e confere os swipes no banco. |
+| `driver.mjs web` | Garante api:3000 + vite:5173 (subindo o que faltar), **planta uma sessão e cumpre o onboarding** do `DEV_USER_ID`, dirige o Chrome headless pelo deck, tira dois prints e confere os swipes no banco. Desfaz as duas coisas no fim. |
 | `driver.mjs all` | Os dois, nessa ordem. Padrão. |
 
 Flags do `web`: `--url` (padrão `http://localhost:5173`), `--wait <seletor>`
@@ -78,7 +78,7 @@ Prints → `/tmp/watchlytics-run/web.png` (deck inicial) e `web-depois.png`
 ── api ──
 ✔ GET /health
 ✔ GET /v1/feed devolve 20 — Breaking Bad
-✔ feed vem em score desc
+✔ feed puxa do topo do catálogo, não do meio — menor da página 63 · mediana 34
 ✔ POST /v1/swipes aceita
 ✔ reenvio é upsert, não duplicata — {"accepted":1,"skipped":0}
 ✔ título desconhecido é descartado
@@ -88,7 +88,7 @@ Prints → `/tmp/watchlytics-run/web.png` (deck inicial) e `web-depois.png`
 ── web ──
 ✔ deck renderizou — Breaking Bad
 ✔ 3 cards no DOM (profundidade) — 3
-✔ pôster é o gradiente determinístico — linear-gradient(160deg, rgb(37, 116, 83), …)
+✔ gradiente do id forra o card (B4) — linear-gradient(160deg, rgb(37, 46, 116), …)
 ✔ botões Pass e Like presentes — Pass,Undo,Like
 ✔ clique em Like avança o deck — Breaking Bad → Game of Thrones
 ✔ ArrowLeft (pass) avança o deck — Game of Thrones → Inception

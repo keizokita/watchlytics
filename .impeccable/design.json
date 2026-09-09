@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-08T00:00:00.000Z",
+  "title": "Design System: Watchlytics",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Quase-Preto Frio",
+        "canonical": "oklch(16.9% 0.008 274.4)",
+        "tonalRamp": ["oklch(15% 0.008 274.4)", "oklch(26% 0.008 274.4)", "oklch(38% 0.008 274.4)", "oklch(49% 0.008 274.4)", "oklch(61% 0.008 274.4)", "oklch(72% 0.008 274.4)", "oklch(84% 0.008 274.4)", "oklch(95% 0.008 274.4)"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel Frio",
+        "canonical": "oklch(96.5% 0.005 275.0)",
+        "tonalRamp": ["oklch(15% 0.005 275.0)", "oklch(26% 0.005 275.0)", "oklch(38% 0.005 275.0)", "oklch(49% 0.005 275.0)", "oklch(61% 0.005 275.0)", "oklch(72% 0.005 275.0)", "oklch(84% 0.005 275.0)", "oklch(95% 0.005 275.0)"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Cinza de Serviço",
+        "canonical": "oklch(70.5% 0.020 265.9)",
+        "tonalRamp": ["oklch(15% 0.020 265.9)", "oklch(26% 0.020 265.9)", "oklch(38% 0.020 265.9)", "oklch(49% 0.020 265.9)", "oklch(61% 0.020 265.9)", "oklch(72% 0.020 265.9)", "oklch(84% 0.020 265.9)", "oklch(95% 0.020 265.9)"]
+      },
+      "affirm": {
+        "role": "primary",
+        "displayName": "Verde Afirmação",
+        "canonical": "oklch(74.5% 0.152 160.4)",
+        "tonalRamp": ["oklch(15% 0.152 160.4)", "oklch(26% 0.152 160.4)", "oklch(38% 0.152 160.4)", "oklch(49% 0.152 160.4)", "oklch(61% 0.152 160.4)", "oklch(72% 0.152 160.4)", "oklch(84% 0.152 160.4)", "oklch(95% 0.152 160.4)"]
+      },
+      "refuse": {
+        "role": "secondary",
+        "displayName": "Vermelho Recusa",
+        "canonical": "oklch(66.8% 0.165 17.3)",
+        "tonalRamp": ["oklch(15% 0.165 17.3)", "oklch(26% 0.165 17.3)", "oklch(38% 0.165 17.3)", "oklch(49% 0.165 17.3)", "oklch(61% 0.165 17.3)", "oklch(72% 0.165 17.3)", "oklch(84% 0.165 17.3)", "oklch(95% 0.165 17.3)"]
+      },
+      "affirm-ink": {
+        "role": "neutral",
+        "displayName": "Verde-Tinta",
+        "canonical": "oklch(23.1% 0.039 169.1)",
+        "tonalRamp": ["oklch(15% 0.039 169.1)", "oklch(26% 0.039 169.1)", "oklch(38% 0.039 169.1)", "oklch(49% 0.039 169.1)", "oklch(61% 0.039 169.1)", "oklch(72% 0.039 169.1)", "oklch(84% 0.039 169.1)", "oklch(95% 0.039 169.1)"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Vidro",
+        "canonical": "rgb(255 255 255 / 0.06)"
+      },
+      "surface-hi": {
+        "role": "neutral",
+        "displayName": "Vidro Alto",
+        "canonical": "rgb(255 255 255 / 0.12)"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Fio",
+        "canonical": "rgb(255 255 255 / 0.16)"
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "O título do card do deck, e só ele. Escala por container query (cqi), não por viewport. Uma família própria está comprometida mas ainda não escolhida — hoje roda em system-ui." },
+      "headline": { "displayName": "Headline", "purpose": "O h1 de cada tela: onboarding, biblioteca, amigos, home deslogada." },
+      "title": { "displayName": "Title", "purpose": "Valor de estatística. O único lugar onde um número é grande." },
+      "body": { "displayName": "Body", "purpose": "Texto corrido, sinopse e controle. Sinopse cortada em 3 linhas fixas por line-clamp." },
+      "label": { "displayName": "Label", "purpose": "Rótulo de seção, contador do onboarding e chip de tipo do card. Caixa alta com tracking positivo." },
+      "meta": { "displayName": "Meta", "purpose": "Ano, gêneros, título original, dica sob controle e rótulo de estatística — sempre em Cinza de Serviço. O papel é definido pela cor, não pelo tamanho; quatro valores (0.75/0.8/0.85/0.9rem) estão em uso e devem convergir para 0.85rem." }
+    },
+    "shadows": [
+      { "name": "deck-focus", "value": "0 18px 45px -12px rgb(0 0 0 / 0.75), inset 0 0 0 1px rgb(255 255 255 / 0.09)", "purpose": "O card do topo do deck, e nada mais no sistema. O inset é um fio de luz: card escuro sobre fundo escuro perde o recorte sem ele." },
+      { "name": "deck-recess", "value": "0 10px 30px -14px rgb(0 0 0 / 0.6)", "purpose": "Os dois cards de trás, junto com filter: brightness(0.55) saturate(0.45)." },
+      { "name": "hairline", "value": "inset 0 0 0 1px rgb(255 255 255 / 0.16)", "purpose": "Substituto de sombra em todo o resto do sistema: painel de vazio, contorno de fantasma. Camada tonal e traço, nunca elevação." }
+    ],
+    "motion": [
+      { "name": "fly", "value": "260ms cubic-bezier(.2,.7,.3,1)", "purpose": "O card saindo da tela após a decisão, para ±1.4x a largura da viewport. Vira 0ms sob prefers-reduced-motion." },
+      { "name": "control", "value": "120ms", "purpose": "Transição de background-color, border-color, color e transform em botão." },
+      { "name": "press", "value": "scale(0.96)", "purpose": "Resposta tátil no :active de qualquer botão de ação. Cortada sob prefers-reduced-motion." },
+      { "name": "ghost", "value": "1.5s ease-in-out infinite (opacity 1 -> 0.4 -> 1)", "purpose": "Pulso do fantasma de carregamento, que tem a medida exata do card." },
+      { "name": "swipe-rotate", "value": "rotate(calc(x / 22 * 1deg))", "purpose": "Rotação proporcional ao deslocamento do gesto. O progresso chega ao CSS como um número com sinal em --swipe (±1 no limiar)." }
+    ],
+    "breakpoints": [
+      { "name": "filters-wrap", "value": "37rem", "purpose": "Acima disso os quatro filtros cabem em uma linha; abaixo quebram em duas. Implementado por flex-wrap + max-width, não por media query." },
+      { "name": "narrow", "value": "360px", "purpose": "Largura mínima considerada. É o caso de duas linhas de filtro previsto em --deck-reserve: 19.5rem." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão Like",
+      "kind": "button",
+      "refersTo": "button-like",
+      "description": "A afirmação no deck. Fio e texto verdes, fundo de vidro; o hover traz o fio a 100% e 16% de cor ao fundo.",
+      "html": "<button class='ds-btn ds-btn-like' type='button' aria-label='Interested (arrow right)'>Like</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 6.5rem; min-height: 2.75rem; padding: 0 1.2rem; border-radius: 999px; border: 1px solid rgb(255 255 255 / 0.16); background: rgb(255 255 255 / 0.06); color: #f2f3f7; font: inherit; font-weight: 600; cursor: pointer; transition: background-color 120ms, border-color 120ms, color 120ms, transform 120ms; } .ds-btn:active { transform: scale(0.96); } .ds-btn:focus-visible { outline: 2px solid #f2f3f7; outline-offset: 2px; } .ds-btn-like { color: #35c98b; border-color: color-mix(in srgb, #35c98b 38%, transparent); } .ds-btn-like:hover { border-color: #35c98b; background: color-mix(in srgb, #35c98b 16%, transparent); }"
+    },
+    {
+      "name": "Botão Pass",
+      "kind": "button",
+      "refersTo": "button-pass",
+      "description": "A recusa no deck. Espelho exato do Like na cor de recusa; a classe é por papel, nunca por posição.",
+      "html": "<button class='ds-btn ds-btn-pass' type='button' aria-label='Not interested (arrow left)'>Pass</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 6.5rem; min-height: 2.75rem; padding: 0 1.2rem; border-radius: 999px; border: 1px solid rgb(255 255 255 / 0.16); background: rgb(255 255 255 / 0.06); color: #f2f3f7; font: inherit; font-weight: 600; cursor: pointer; transition: background-color 120ms, border-color 120ms, color 120ms, transform 120ms; } .ds-btn:active { transform: scale(0.96); } .ds-btn:focus-visible { outline: 2px solid #f2f3f7; outline-offset: 2px; } .ds-btn-pass { color: #e8636f; border-color: color-mix(in srgb, #e8636f 38%, transparent); } .ds-btn-pass:hover { border-color: #e8636f; background: color-mix(in srgb, #e8636f 16%, transparent); }"
+    },
+    {
+      "name": "Botão Undo (terciário)",
+      "kind": "button",
+      "refersTo": "button-undo",
+      "description": "Sem fundo, sem fio, largura mínima zerada. Desfazer não pode competir com decidir.",
+      "html": "<button class='ds-btn-undo' type='button' aria-label='Undo last swipe (backspace)'>Undo</button>",
+      "css": ".ds-btn-undo { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 0.9rem; border-radius: 999px; border: 1px solid transparent; background: none; color: #9aa0ad; font: inherit; font-weight: 500; cursor: pointer; transition: background-color 120ms, color 120ms; } .ds-btn-undo:hover { color: #f2f3f7; background: rgb(255 255 255 / 0.06); } .ds-btn-undo:disabled { opacity: 0.35; cursor: default; } .ds-btn-undo:focus-visible { outline: 2px solid #f2f3f7; outline-offset: 2px; }"
+    },
+    {
+      "name": "Chip de Gênero",
+      "kind": "chip",
+      "refersTo": "chip-genre",
+      "description": "Onboarding. O estado real é aria-pressed; o visual é consequência dele, nunca uma segunda verdade. Selecionado = afirmação = verde.",
+      "html": "<div style='display:flex; gap:0.5rem; flex-wrap:wrap'><button class='ds-chip' type='button' aria-pressed='true'>Anime</button><button class='ds-chip' type='button' aria-pressed='false'>Crime</button><button class='ds-chip' type='button' aria-pressed='false'>Sci-Fi &amp; Fantasy</button></div>",
+      "css": ".ds-chip { min-height: 2.75rem; padding: 0 0.9rem; border-radius: 999px; border: 1px solid rgb(255 255 255 / 0.16); background: rgb(255 255 255 / 0.06); color: #f2f3f7; font: inherit; font-size: 0.9rem; cursor: pointer; transition: border-color 120ms, background-color 120ms, color 120ms; } .ds-chip[aria-pressed='true'] { border-color: #35c98b; color: #35c98b; background: color-mix(in srgb, #35c98b 12%, transparent); } .ds-chip:focus-visible { outline: 2px solid #f2f3f7; outline-offset: 2px; }"
+    },
+    {
+      "name": "Campo de Filtro",
+      "kind": "input",
+      "refersTo": "input-filter",
+      "description": "Select e input dividem a mesma pílula. O select tem teto de 9.5rem com reticências porque se dimensiona pela maior opção.",
+      "html": "<div style='display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center'><select class='ds-field ds-field-select'><option>Any genre</option><option>Action &amp; Adventure</option></select><input class='ds-field' type='search' placeholder='Search by handle'></div>",
+      "css": ".ds-field { min-height: 2.75rem; padding: 0 0.85rem; border-radius: 999px; border: 1px solid rgb(255 255 255 / 0.16); background: rgb(255 255 255 / 0.06); color: #f2f3f7; font: inherit; font-size: 0.875rem; cursor: pointer; transition: border-color 120ms; } .ds-field-select { max-width: 9.5rem; text-overflow: ellipsis; } .ds-field:hover { border-color: rgb(255 255 255 / 0.12); } .ds-field::placeholder { color: #9aa0ad; opacity: 1; } .ds-field:focus-visible { outline: 2px solid #f2f3f7; outline-offset: 2px; }"
+    },
+    {
+      "name": "Navegação",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Pílulas de texto. A ativa é marcada por aria-current='page'. O badge de contagem é a única superfície de fundo sólido verde do sistema.",
+      "html": "<nav class='ds-nav'><a href='#/' aria-current='page'>Deck</a><a href='#/library'>Library</a><a href='#/friends'>Friends<span class='ds-badge'>3</span></a></nav>",
+      "css": ".ds-nav { display: flex; gap: 0.5rem; } .ds-nav a { padding: 0.4rem 0.9rem; border-radius: 999px; text-decoration: none; color: #9aa0ad; font-size: 0.9rem; font-weight: 600; transition: color 120ms, background-color 120ms; } .ds-nav a:hover { color: #f2f3f7; } .ds-nav a[aria-current='page'] { color: #f2f3f7; background: rgb(255 255 255 / 0.06); } .ds-nav a:focus-visible { outline: 2px solid #f2f3f7; outline-offset: 2px; } .ds-badge { display: inline-block; min-width: 1.15rem; padding: 0 0.3rem; margin-left: 0.3rem; border-radius: 999px; background: #35c98b; color: #06231a; font-size: 0.72rem; font-weight: 700; text-align: center; line-height: 1.15rem; }"
+    },
+    {
+      "name": "Card do Deck",
+      "kind": "card",
+      "refersTo": null,
+      "description": "O componente-assinatura e o único elemento com sombra no sistema. Gradiente derivado do id do título, degradê preto de duas pontas, chips no topo, texto no rodapé, carimbo LIKE dirigido por --swipe.",
+      "html": "<div class='ds-deck'><div class='ds-deck-card' style='--swipe: 0.55'><span class='ds-stamp ds-stamp-like'>Like</span><article class='ds-card'><div class='ds-card-top'><span class='ds-pill'>Series</span><span class='ds-pill ds-score'>8.6</span></div><div><h2 class='ds-card-title'>Attack on Titan</h2><p class='ds-card-original'>Shingeki no Kyojin</p><p class='ds-card-meta'>2013 · Anime · Action &amp; Adventure</p><p class='ds-card-overview'>Séculos atrás, a humanidade foi quase exterminada por titãs. Os sobreviventes se refugiaram atrás de muralhas concêntricas.</p></div></article></div></div>",
+      "css": ".ds-deck { position: relative; width: min(22rem, 88vw); aspect-ratio: 2 / 3; } .ds-deck-card { position: absolute; inset: 0; border-radius: 22px; overflow: hidden; container-type: inline-size; background: linear-gradient(160deg, hsl(214 52% 30%), hsl(259 58% 12%)); box-shadow: 0 18px 45px -12px rgb(0 0 0 / 0.75), inset 0 0 0 1px rgb(255 255 255 / 0.09); } .ds-card { height: 100%; padding: clamp(0.7rem, 5.5cqi, 1.25rem); display: flex; flex-direction: column; justify-content: space-between; gap: 0.75rem; overflow: hidden; color: #f2f3f7; background: linear-gradient(rgb(0 0 0 / 0.38), rgb(0 0 0 / 0) 28%, rgb(0 0 0 / 0) 42%, rgb(0 0 0 / 0.72)); } .ds-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; } .ds-pill { padding: 0.3em 0.65em; border-radius: 999px; background: rgb(0 0 0 / 0.5); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2); font-size: clamp(0.6rem, 3.4cqi, 0.75rem); font-weight: 700; line-height: 1; white-space: nowrap; letter-spacing: 0.09em; text-transform: uppercase; } .ds-score { letter-spacing: 0.02em; text-transform: none; font-variant-numeric: tabular-nums; } .ds-card-title { margin: 0; font-size: clamp(1.05rem, 7.6cqi, 1.7rem); line-height: 1.12; letter-spacing: -0.015em; text-wrap: balance; } .ds-card-original { margin: 0; color: #9aa0ad; font-size: clamp(0.7rem, 4cqi, 0.9rem); } .ds-card-meta { margin: 0.15rem 0 0.35rem; font-size: clamp(0.65rem, 3.6cqi, 0.8rem); color: #9aa0ad; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-card-overview { margin: 0; font-size: clamp(0.72rem, 4.3cqi, 0.95rem); line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; } .ds-stamp { position: absolute; top: clamp(2.6rem, 16cqi, 3.6rem); padding: 0.35rem 0.9rem; border: 3px solid currentColor; border-radius: 12px; background: rgb(0 0 0 / 0.45); font-size: clamp(0.85rem, 6cqi, 1.3rem); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; z-index: 2; pointer-events: none; } .ds-stamp-like { left: clamp(0.8rem, 6cqi, 1.5rem); color: #35c98b; opacity: var(--swipe, 0); transform: rotate(-12deg) scale(clamp(0.82, calc(0.82 + 0.18 * var(--swipe, 0)), 1)); }"
+    },
+    {
+      "name": "Estado de Deck (vazio / carregando / erro)",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Os três estados ocupam a pegada exata do card, nunca menos. O fantasma tem a medida do deck para o card nascer no lugar dele em vez de empurrar a página.",
+      "html": "<div style='display:flex; gap:1.5rem; flex-wrap:wrap; align-items:flex-start'><div class='ds-slot ds-slot-empty'><p style='margin:0'>That's everything for now.</p><p class='ds-hint'>You've been through the whole catalog.</p></div><div class='ds-slot ds-slot-loading'></div><div class='ds-slot ds-slot-error'>error: feed respondeu 500</div></div>",
+      "css": ".ds-slot { display: grid; justify-items: center; align-content: center; gap: 0.85rem; width: min(18rem, 40vw); min-height: calc(min(18rem, 40vw) * 1.5); padding: 1.25rem; text-align: center; text-wrap: balance; font-size: 1.05rem; color: #f2f3f7; border-radius: 22px; } .ds-hint { margin: 0; font-size: 0.9rem; color: #9aa0ad; } .ds-slot-empty { background: rgb(255 255 255 / 0.02); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16); } .ds-slot-loading { background: rgb(255 255 255 / 0.06); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16); animation: ds-ghost 1.5s ease-in-out infinite; } @keyframes ds-ghost { 50% { opacity: 0.4; } } .ds-slot-error { color: #e8636f; border: 1px solid color-mix(in srgb, #e8636f 35%, transparent); background: color-mix(in srgb, #e8636f 8%, transparent); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "A Sala Escura",
+    "overview": "A luz está apagada de propósito. O fundo é quase-preto (#0e0f13), as superfícies são vidro a 6% de branco, e o texto secundário fica num cinza que existe para ser lido sem ser visto. Nada disso é economia de esforço: é o que faz o card do topo ser a única coisa iluminada da tela. O sistema investe toda a sua energia visual num objeto só — o título que está sendo decidido — e recua em todo o resto.\n\nDaí vem a regra de profundidade. O card do deck é o único elemento com sombra real; painéis, listas e controles são planos, separados por um fio de 1px translúcido e por camada tonal. Numa sala escura, um objeto com sombra é um objeto sob um foco — se tudo tem sombra, nada está iluminado.\n\nO gesto é emprestado do baralho, não do app de namoro: rotação proporcional ao deslocamento, disparo por distância ou velocidade, carimbo que cresce conforme a decisão se forma. Mas o produto não é o gesto — é a decisão. Por isso o par verde/vermelho carrega semântica em todo o sistema, e não apenas no deck, enquanto nenhuma terceira cor entra.",
+    "keyCharacteristics": [
+      "Escuro por declaração, não por preferência: color-scheme: dark fixo, sem tema claro.",
+      "Duas cores no mundo inteiro — afirmação e recusa. O resto é neutro.",
+      "Uma única sombra, e ela pertence ao card.",
+      "Tudo é pílula; o card é a única exceção de forma.",
+      "A tipografia escala pelo container, não pela viewport — o card encolhe e o texto acompanha.",
+      "Nenhuma imagem, nenhum ícone, nenhum asset: a cor do pôster é derivada do id."
+    ],
+    "rules": [
+      { "name": "A Regra das Duas Cores", "body": "O sistema tem exatamente duas cores cromáticas, e elas significam sim e não. Uma tela nova não ganha um azul de informação, um âmbar de aviso nem um roxo de marca. Se um elemento precisa de cor, primeiro pergunte se ele é uma afirmação ou uma recusa; se não for nenhuma das duas, ele é neutro.", "section": "colors" },
+      { "name": "A Regra do Verde Semântico", "body": "Verde não é a cor da marca — é a cor do \"sim\". Por isso ele pinta o chip de gênero selecionado e o badge de notificação sem contradição: selecionar é afirmar, e \"chegou algo\" é uma afirmação. O que ele nunca faz é decorar: um cabeçalho verde ou uma borda verde ornamental quebra a regra.", "section": "colors" },
+      { "name": "A Regra do Contraste Verificado", "body": "Toda cor de texto do sistema tem uma razão de contraste conferida contra a superfície em que de fato aparece — não contra o fundo da página. --pass foi clareado de #e0525f para #e8636f exatamente por essa conta. Uma cor nova entra com o número medido, ou não entra.", "section": "colors" },
+      { "name": "A Regra do Container", "body": "Dentro do card, tipografia mede-se em cqi, nunca em vw. O deck encolhe quando a tela é baixa (--deck-w é limitado pela altura disponível), e tipo preso à viewport transbordaria exatamente aí.", "section": "typography" },
+      { "name": "A Regra da Altura Fixa", "body": "O rodapé do card fica na mesma altura de um título para o outro — sinopse com clamp de 3 linhas, metadado em uma linha só com reticências. Sem isso a pilha pulsa a cada swipe, e o pulso lê como defeito.", "section": "typography" },
+      { "name": "A Regra da Reserva", "body": "Qualquer coisa nova que ocupe altura permanente acima ou abaixo do deck entra em --deck-reserve. A reserva é fixa porque CSS não mede quantas linhas os filtros ocuparam; esquecer de somar não quebra nada visível — só corta o deck em telas baixas.", "section": "layout" },
+      { "name": "A Regra do Clip no Eixo X", "body": "html, body { overflow-x: clip }. O card voa para ±1,4× a largura da tela e, mesmo absoluto, contaria para a área de rolagem. O eixo Y fica rolável de propósito: sem ele, em tela baixa os botões de decisão — o caminho não-gestual exigido pela acessibilidade — ficariam inalcançáveis.", "section": "layout" },
+      { "name": "A Regra do Foco Único", "body": "Sombra é privilégio do card do deck. Uma tela nova não ganha box-shadow — ganha --surface e --line. Se dois elementos têm sombra na mesma tela, nenhum dos dois está em foco.", "section": "elevation" },
+      { "name": "A Regra da Pílula", "body": "Se o usuário pode clicar, arrastar ou digitar nele, é pílula. Se ele lê e decide sobre aquilo, é card. Não há terceira categoria.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do usar --surface, --surface-hi e --line para qualquer superfície ou traço novo. Os três são um material só; escrever rgb(255 255 255 / 0.14) na mão cria um quarto que ninguém consegue mudar depois.",
+      "Do dar min-height: var(--tap) a tudo que recebe toque, inclusive <select> e <input>. O token existe porque é requisito WCAG 2.5.8, não porque 44px é bonito.",
+      "Do medir o contraste contra a superfície onde o texto de fato aparece. Teste de auditoria: um texto novo em Cinza de Serviço sobre --surface fecha 4,5:1? Se não fecha, ele é Papel Frio ou não existe.",
+      "Do manter paridade total entre gesto, botão e teclado em qualquer interação nova. Setas para decidir, Backspace para desfazer.",
+      "Do deixar prefers-reduced-motion cortar a física e manter o significado: os carimbos continuam aparecendo, só perdem o crescimento. Eles são o que diz para onde o card vai.",
+      "Do escalar tipografia e padding dentro do card por cqi, e o resto por clamp com vw.",
+      "Do somar em --deck-reserve qualquer elemento novo de altura permanente em volta do deck."
+    ],
+    "donts": [
+      "Don't introduzir uma terceira cor cromática. Verde é sim, vermelho é não, todo o resto é neutro — inclusive aviso, informação e sucesso não-acionável.",
+      "Don't adicionar box-shadow a nada que não seja o card do deck. Use camada tonal e o fio de 1px.",
+      "Don't usar canto retangular em controle. Se é clicável, é pílula.",
+      "Don't construir uma grade de pôsteres com carrosséis por categoria. É exatamente o catalogão de streaming que o produto existe para não ser: a grade não faz ninguém decidir.",
+      "Don't tratar a tela de estatísticas como dashboard. Sem cartela de KPI, sem gráfico de barras, sem densidade de analítico — é um resumo pessoal em <dl>, e o nome de trabalho \"Watchlytics\" não autoriza o contrário.",
+      "Don't deixar um estado de deck (vazio, carregando, erro) ocupar menos que a pegada do card. A página saltar 500px entre estados lê como bug.",
+      "Don't pintar estado com CSS que não derive do atributo ARIA. aria-pressed e aria-selected carregam o estado; o visual é consequência, não uma segunda fonte de verdade.",
+      "Don't usar vw para tipografia dentro do card, nem left/top para o gesto. cqi e translate3d, sempre."
+    ]
+  }
+}
