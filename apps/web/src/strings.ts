@@ -15,7 +15,15 @@ export const t = {
   emptyCatalog: "Catalog is empty — did the seed run?",
   exhausted: "That's everything for now.",
   exhaustedHint: "You've been through the whole catalog. More titles are coming.",
-  error: (m: string) => `error: ${m}`,
+  /**
+   * O que aparece na tela quando algo falha. O detalhe técnico não vem junto:
+   * ele é em português, nomeia rota e status, e vai para o console (errors.ts).
+   * A frase não manda fazer nada: quem carrega a ação é o botão `retry`.
+   */
+  errorGeneric: "Something went wrong.",
+  errorOffline: "You are offline. Check your connection.",
+  /** Só nas cargas automáticas: onde o erro veio de um botão, ele é o retry. */
+  retry: "Try again",
   movie: "Movie",
   series: "Series",
   /** O número sozinho no chip do card não diz de que escala ele é. */

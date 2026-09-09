@@ -11,6 +11,7 @@ import {
 } from "@watchlytics/contract";
 import { authedFetch } from "./session.ts";
 import { SCREEN_CSS } from "./screenCss.ts";
+import { mensagem } from "./errors.ts";
 import { t } from "./strings.ts";
 
 /**
@@ -135,7 +136,7 @@ export function Friends() {
     setBusy(true);
     setError(null);
     fn()
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => setError(mensagem(e)))
       .finally(() => setBusy(false));
   };
 
@@ -225,7 +226,19 @@ export function Friends() {
     ].map((u) => u.id),
   );
 
-  const carregando = <p className="notice">{t.loading}</p>;
+  /**
+   * `null` também é o estado depois de uma falha — a requisição não voltou e a
+   * lista continua sem resposta. Aí quem fala é o aviso de erro acima, não um
+   * "loading…" que nunca mais sai.
+   */
+  const carregando = error ? null : <p className="notice">{t.loading}</p>;
+
+  /** Tentar de novo é refazer a carga DESTA aba, não a da que estava antes. */
+  const recarregar = () => {
+    if (tab === "common") run(loadComuns);
+    else if (tab === "alerts") run(loadAvisos);
+    else run(load);
+  };
 
   return (
     <div className="lib">
@@ -248,7 +261,14 @@ export function Friends() {
         ))}
       </div>
 
-      {error && <p className="notice error">{t.error(error)}</p>}
+      {error && (
+        <div className="notice error">
+          <p>{error}</p>
+          <button type="button" className="link" onClick={recarregar}>
+            {t.retry}
+          </button>
+        </div>
+      )}
 
       {tab === "people" && (
         <>
