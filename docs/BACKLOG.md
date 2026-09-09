@@ -246,7 +246,7 @@ elenco desde o primeiro dia e nunca mostrou nenhum.
 
 | id | Tarefa | Pronto quando |
 |---|---|---|
-| I1.1 | Segunda passada de ingestão buscando `/{type}/{id}/credits` | Uma requisição por título, respeitando o mesmo rate limit; retomável |
+| I1.1 ✅ | Segunda passada de ingestão buscando `/{type}/{id}/credits` | Uma requisição por título, respeitando o mesmo rate limit; retomável — `ingest/credits.ts`, comando próprio, fila é a coluna `credits_synced_at` |
 | I1.2 | Até 3 nomes no card | Título sem elenco não quebra o card, só não mostra a linha |
 
 **Possui:** `apps/api/src/ingest/credits.ts` + teste · `apps/web/src/Card.tsx`
