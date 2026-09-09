@@ -33,7 +33,7 @@ const TABS: readonly { id: Tab; label: string }[] = [
 ];
 
 async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
+  const res = await authedFetch(url);
   if (!res.ok) throw new Error(`${url} respondeu ${res.status}`);
   return res.json();
 }
@@ -281,7 +281,7 @@ export function Library() {
    */
   const save = useCallback(
     async (titleId: string, status: LibraryStatus, rating: number | null) => {
-      const res = await fetch(`/v1/library/${titleId}`, {
+      const res = await authedFetch(`/v1/library/${titleId}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ status, rating }),
