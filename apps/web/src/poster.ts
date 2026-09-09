@@ -29,12 +29,15 @@ export function gradient(id: string): string {
  * fixture isso não aparecia, porque `posterUrl` era sempre nulo; com o TMDB ele
  * quase nunca é, e o caminho sem fundo virou o caminho normal.
  *
- * A url vai entre aspas: sem elas, um caractere de sintaxe no caminho quebraria
- * a declaração inteira e levaria o forro junto.
+ * A url vai entre aspas E com a aspa escapada: sem as aspas, um parêntese no
+ * caminho quebra a declaração; com elas mas sem o escape, uma aspa no caminho
+ * fecha a string mais cedo e faz a mesma coisa. Nos dois casos o que se perde é
+ * a declaração inteira — o forro junto com o pôster, que é exatamente o card
+ * preto que esta função existe para impedir. `%22` porque uma aspa literal em
+ * URL é para vir percent-encoded de qualquer forma.
  */
 export function cardBackground(item: Title): string {
   const fundo = gradient(item.id);
-  return item.posterUrl
-    ? `center / cover url("${item.posterUrl}"), ${fundo}`
-    : fundo;
+  if (!item.posterUrl) return fundo;
+  return `center / cover url("${item.posterUrl.replaceAll('"', "%22")}"), ${fundo}`;
 }
