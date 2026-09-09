@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Title } from "@watchlytics/contract";
-import { Card, gradient } from "./Card.tsx";
+import { Card } from "./Card.tsx";
+import { cardBackground } from "./poster.ts";
 import { t } from "./strings.ts";
 
 /** Distância a partir da qual o swipe conta mesmo devagar. */
@@ -18,6 +19,20 @@ const MAX_DRIFT_Y = 40;
 
 /** Só 3 no DOM: os de baixo existem para dar profundidade, nada mais. */
 const VISIBLE = 3;
+
+/** B4 — quantas imagens à frente entram no cache antes de virarem card. */
+const PRELOAD = 5;
+
+/**
+ * Pôsteres já pedidos nesta sessão. A fila muda a cada swipe e o efeito de
+ * pré-carga roda de novo; sem esta memória ele repediria as mesmas cinco.
+ *
+ * ponytail: Set de string, não de Image. Guardar o elemento seguraria o bitmap
+ * decodificado de tudo que já passou — quem tem que lembrar da imagem é o cache
+ * do navegador; aqui só se lembra de já ter pedido. Cresce com os títulos vistos
+ * numa sessão, o que é ordens de grandeza menos que o catálogo.
+ */
+const pedidas = new Set<string>();
 
 type Direction = 1 | -1;
 
@@ -45,6 +60,23 @@ export function Deck({
       "(prefers-reduced-motion: reduce)",
     ).matches;
   }, []);
+
+  /**
+   * B4 — as próximas cinco entram no cache antes de existirem como card.
+   *
+   * Só a partir de VISIBLE: as três que estão no DOM já têm o pôster no
+   * `background`, e o navegador começou a baixá-las sozinho. Sem isto o
+   * download da quarta em diante só começava quando ela subia para o topo, e
+   * até chegar o que aparecia era o forro (Card.tsx, cardBackground).
+   */
+  useEffect(() => {
+    for (const item of items.slice(VISIBLE, VISIBLE + PRELOAD)) {
+      if (item.posterUrl && !pedidas.has(item.posterUrl)) {
+        pedidas.add(item.posterUrl);
+        new Image().src = item.posterUrl;
+      }
+    }
+  }, [items]);
 
   const top = items[0];
 
@@ -145,9 +177,7 @@ export function Deck({
                 aria-hidden={!isTop}
                 style={
                   {
-                    background: item.posterUrl
-                      ? `center / cover url(${item.posterUrl})`
-                      : gradient(item.id),
+                    background: cardBackground(item),
                     transform: isTop
                       ? `translate3d(${x}px, ${y}px, 0) rotate(${x / 22}deg)`
                       : // Para CIMA, não para baixo: o deslocamento precisa

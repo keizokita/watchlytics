@@ -24,13 +24,13 @@ HTML renderizado no servidor. Toda decisão de arquitetura protege esse caminho.
 O `git log` é documentação de verdade aqui: cada commit explica a decisão, não
 só a mudança. Vale ler antes de propor refazer algo.
 
-## Estado: 38 de 39 tarefas
+## Estado: 39 de 39 tarefas (+ trilhas de ingestão: 1 de 7)
 
 | Trilha | | |
 |---|---|---|
 | **S** esqueleto | 7/7 | completa — em produção, com login real atravessado |
 | **A** feed | 8/8 | backend e UI de filtro completos |
-| **B** swipe | 6/7 | B4 (pré-carga de imagem) despausada em 2026-09-08: já há pôster |
+| **B** swipe | 7/7 | completa — B4 fechado em `b4/poster-com-fallback` |
 | **C** identidade | 6/6 | completa e exercitada contra o Google real em produção |
 | **D** catálogo | 5/5 | completa |
 | **E** social | 6/6 | completa |
@@ -39,7 +39,10 @@ só a mudança. Vale ler antes de propor refazer algo.
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
 repetir; o LIKE vira coleção com abas e estatísticas.
 
-**88 testes** (81 API + 7 fila), `npm run check` limpo nos três pacotes.
+**106 testes** (89 API + 17 web), `npm run check` limpo nos três pacotes e as
+18 asserções do `driver.mjs all` verdes (2026-09-08).
+A trilha **I** (catálogo real, BACKLOG §5) tem só I0.1 fechada; I0.2 é o portão
+serial que segura I1 e I2.
 
 ## Ambiente — o que custa caro redescobrir
 
@@ -148,8 +151,11 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
   permanente.
 - **A fixture esgotava numa sessão** — 94 títulos com o onboarding do D4
   consumindo 20 na porta de entrada. Resolvido em 2026-09-08: 7583 títulos do
-  TMDB, ~378 decks de 20. O banco de desenvolvimento e o do CI continuam na
-  fixture, e é ela que os testes esperam.
+  TMDB, ~378 decks de 20. O do CI e o `watchlytics_test` continuam na fixture, e
+  é ela que os testes esperam. O banco de **desenvolvimento** tem os dois:
+  9924 títulos, dos quais os 94 da fixture não têm `poster_url` e têm o maior
+  `score` — ou seja, o topo do deck local é justamente o que não exercita o
+  pôster (e Inception, Interstellar e outros aparecem duplicados).
 - **O shim escondeu um 401 até a produção.** Com login válido, `/v1/feed`
   respondia 401 no ar porque o front nunca mandava `Authorization`; em dev o
   `DEV_USER_ID` atendia a requisição sem header e o bug não aparecia. Foi o
@@ -181,5 +187,5 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
    caminho de entrada. O cliente saiu dele no S7+C1; falta o servidor.
 3. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
-4. **B4 — pré-carga das 5 próximas imagens.** Despausada: agora há pôster, e
-   sem pré-carga o flash aparece justamente na homologação.
+4. **Trilha I — elenco no card (I1.1 → I1.2).** Com as 39 fechadas, é o que
+   sobra de conteúdo antes do beta; I0.2 já congelou o contrato que ela usa.

@@ -21,6 +21,9 @@ const SHOTS = join(tmpdir(), "watchlytics-run");
 const API = "http://localhost:3000";
 const WEB = "http://localhost:5173";
 
+/** Espelha o VISIBLE do Deck.tsx: os cards que pedem pôster por conta própria. */
+const VISIVEIS_NO_DOM = 3;
+
 const arg = (flag, fallback) => {
   const i = process.argv.indexOf(flag);
   return i === -1 ? fallback : process.argv[i + 1];
@@ -87,10 +90,20 @@ async function cmdApi() {
     const items = feed.json().items;
     ok("GET /v1/feed devolve 20", items.length === 20, items[0]?.title);
 
+    // NÃO "score desc": desde o A4 o feed ordena por `final` = score × boost de
+    // gênero + ruído (feed.ts:267), e o ruído é requisito — deck determinístico
+    // parece quebrado (PLAN §5.2). O `final` não viaja no contrato, então de
+    // fora o que dá para afirmar é o que a ordenação promete de verdade: a
+    // página sai do topo do catálogo, não do meio. Passava por acidente com a
+    // fixture de 94; com 9,9k títulos o ruído reordena sempre.
+    const [{ mediana }] = await pg`
+      select percentile_cont(0.5) within group (order by score) as mediana
+      from titles`;
     const scores = items.map((i) => i.score);
     ok(
-      "feed vem em score desc",
-      String(scores) === String([...scores].sort((a, b) => b - a)),
+      "feed puxa do topo do catálogo, não do meio",
+      scores.every((s) => s > Number(mediana)),
+      `menor da página ${Math.min(...scores)} · mediana ${Number(mediana)}`,
     );
 
     const ts = new Date().toISOString();
@@ -309,7 +322,7 @@ async function screenshot(page, out) {
  * updated_at evita ter que descobrir o uuid do card pelo DOM, já que Deck.tsx
  * usa o id como `key` e o React não põe isso no HTML.
  */
-async function checkSwipesGravados(desde, esperados) {
+async function checkSwipesGravados(desde, esperados, ignorar = []) {
   const userId = process.env["DEV_USER_ID"];
   if (!userId) return ok("DEV_USER_ID definida para conferir os swipes", false);
 
@@ -317,9 +330,17 @@ async function checkSwipesGravados(desde, esperados) {
   // cmdApi já chamou pg.end() nele. Em `all`, reusar dá CONNECTION_ENDED.
   const postgres = (await import("postgres")).default;
   const sql = postgres(process.env["DATABASE_URL"]);
-  const janela = () => sql`
-    select direction from swipes
-    where user_id = ${userId} and updated_at >= ${desde}`;
+  // Os swipes emprestados para abrir o onboarding caem na MESMA janela, e são
+  // dezoito contra dois: sem tirá-los, o `until` volta satisfeito no primeiro
+  // poll e a contagem nunca bate. Por id, não por relógio — a folga de um
+  // segundo da janela é justamente o que não dá para arbitrar aqui.
+  const emprestado = new Set(ignorar);
+  const janela = async () =>
+    (
+      await sql`
+        select title_id, direction from swipes
+        where user_id = ${userId} and updated_at >= ${desde}`
+    ).filter((r) => !emprestado.has(r.title_id));
   try {
     let rows = [];
     try {
@@ -365,6 +386,9 @@ async function cmdWeb() {
   const out = arg("--out", join(SHOTS, "web.png"));
   const started = [];
   const log = [];
+  let sessao = null;
+  /** Swipes que este run inseriu só para abrir o portão do onboarding. */
+  let emprestados = [];
   // Um segundo de folga: o relógio do Postgres não é o mesmo do Node.
   const desde = new Date(Date.now() - 1000);
 
@@ -391,6 +415,13 @@ async function cmdWeb() {
 
     const page = await openChrome();
     try {
+      // Sem isto o shell pinta a tela de entrada e o deck nunca monta: desde o
+      // C2/C3 o Root só monta o app com sessão, e o shim do DEV_USER_ID não
+      // vale para o `POST /v1/auth/refresh` que o Login.tsx usa para resolvê-la.
+      await page.cmd("Network.enable");
+      sessao = await abrirSessao(page);
+      emprestados = await cumprirOnboarding();
+
       await page.cmd("Page.navigate", { url });
       await waitFor(page, selector);
 
@@ -399,12 +430,50 @@ async function cmdWeb() {
         `(() => { const top = document.querySelector('.deck .deck-card:last-child');
           return { cards: document.querySelectorAll('.deck-card').length,
                    botoes: [...document.querySelectorAll('.actions button')].map(b => b.innerText),
-                   fundo: getComputedStyle(top).backgroundImage.slice(0, 60) }; })()`,
+                   fundo: getComputedStyle(top).backgroundImage }; })()`,
       );
       const first = await topTitle(page);
       ok("deck renderizou", Boolean(first), first);
       ok("3 cards no DOM (profundidade)", deck?.cards === 3, String(deck?.cards));
-      ok("pôster é o gradiente determinístico", Boolean(deck?.fundo.startsWith("linear-gradient")), deck?.fundo);
+      // B4: o gradiente do id é FORRO, não alternativa — as duas camadas, nesta
+      // ordem. Só "inclui linear-gradient" era verde no card SEM pôster nenhum,
+      // que é o único caso que o B4 não precisa consertar; a ordem é o que pega
+      // a regressão se alguém voltar ao ternário.
+      ok(
+        "pôster na frente, gradiente do id atrás (B4)",
+        /^url\(.+\)\s*,\s*linear-gradient\(/.test(deck?.fundo ?? ""),
+        deck?.fundo.slice(0, 80),
+      );
+      // O forro só evita o card preto; quem mata o flash é a pré-carga do
+      // Deck.tsx, e sem esta linha apagar o efeito continuaria tudo verde.
+      // Resource timing em vez de Network.requestWillBeSent: o dispatcher do
+      // openChrome não coleciona requisição, e aqui não precisa colecionar.
+      // ...e resource timing só lista o que TERMINOU de carregar. Lido na hora,
+      // milissegundos depois de o deck montar, o número é zero mesmo com a
+      // pré-carga certa — a asserção reprovaria o código bom. Espera, como o
+      // checkSwipesGravados faz com o flush da fila.
+      const conta = () =>
+        evaluate(
+          page,
+          `performance.getEntriesByType("resource")
+             .filter((r) => r.name.startsWith("https://image.tmdb.org/")).length`,
+        );
+      let pedidos = 0;
+      try {
+        pedidos = await until(
+          conta,
+          (n) => n > VISIVEIS_NO_DOM,
+          "a pré-carga pedir além dos cards que estão no DOM",
+          15_000,
+        );
+      } catch {
+        pedidos = await conta();
+      }
+      ok(
+        "pré-carga passou dos cards do DOM (B4)",
+        pedidos > VISIVEIS_NO_DOM,
+        `${pedidos} pôsteres pedidos, ${deck?.cards} cards no DOM`,
+      );
       // Contém, não igual: B7 enfiou um Undo no meio e vai vir mais coisa.
       const botoes = deck?.botoes ?? [];
       ok(
@@ -443,11 +512,12 @@ async function cmdWeb() {
       const real = page.errors.filter((e) => !/favicon/i.test(e));
       ok("console sem erro", real.length === 0, real.join(" | "));
 
-      await checkSwipesGravados(desde, 2);
+      await checkSwipesGravados(desde, 2, emprestados);
     } finally {
       page.close();
     }
   } finally {
+    await devolver(sessao, emprestados);
     for (const c of started) {
       try {
         process.kill(-c.pid, "SIGTERM");
@@ -497,6 +567,41 @@ async function abrirSessao(page) {
   return id;
 }
 
+/**
+ * Passa o usuário de dev pelo portão do onboarding (D4).
+ *
+ * `remaining = ONBOARDING_SWIPES - swipes do usuário` (routes/onboarding.ts:97),
+ * e enquanto sobra o Home monta a tela de gêneros, não o deck. Um DEV_USER_ID
+ * limpo deixava o cmdWeb esperando `.deck-card` para sempre.
+ *
+ * Completa pelos títulos MENOS populares de propósito: os swipes daqui somem no
+ * fim, mas enquanto existem eles saem do feed, e comer o topo do catálogo
+ * mudaria justamente o card que as asserções vão olhar.
+ */
+async function cumprirOnboarding() {
+  const userId = process.env["DEV_USER_ID"];
+  if (!userId) return [];
+  const { ONBOARDING_SWIPES } = await import("@watchlytics/contract");
+
+  return comBanco(async (sql) => {
+    const [{ n }] = await sql`
+      select count(*)::int as n from swipes where user_id = ${userId}`;
+    const faltam = ONBOARDING_SWIPES - n;
+    if (faltam <= 0) return [];
+
+    const rows = await sql`
+      insert into swipes (user_id, title_id, direction)
+      select ${userId}, t.id, 1 from titles t
+      where not exists (
+        select 1 from swipes s where s.user_id = ${userId} and s.title_id = t.id
+      )
+      order by t.score asc
+      limit ${faltam}
+      returning title_id`;
+    return rows.map((r) => r.title_id);
+  });
+}
+
 /** Conexão própria: db/client.ts é singleton e o cmdApi já deu pg.end() nele. */
 async function comBanco(fn) {
   const postgres = (await import("postgres")).default;
@@ -506,6 +611,26 @@ async function comBanco(fn) {
   } finally {
     await sql.end();
   }
+}
+
+/**
+ * Devolve ao banco o que o run pegou emprestado.
+ *
+ * A sessão porque vale 30 dias, e os swipes porque saem do feed enquanto
+ * existem — com execuções repetidas o deck de quem está com o app aberto ia
+ * encolhendo sem ninguém ter swipado.
+ */
+async function devolver(sessao, emprestados) {
+  if (!sessao && emprestados.length === 0) return;
+  await comBanco(async (sql) => {
+    if (sessao) await sql`delete from sessions where id = ${sessao}`;
+    if (emprestados.length > 0) {
+      await sql`
+        delete from swipes
+        where user_id = ${process.env["DEV_USER_ID"]}
+          and title_id in ${sql(emprestados)}`;
+    }
+  });
 }
 
 /**
@@ -521,6 +646,7 @@ async function cmdShot() {
   const started = [];
   const log = [];
   let sessao = null;
+  let emprestados = [];
 
   const up = async (u) => {
     try {
@@ -546,7 +672,12 @@ async function cmdShot() {
     const page = await openChrome();
     try {
       await page.cmd("Network.enable");
-      if (process.argv.includes("--sessao")) sessao = await abrirSessao(page);
+      if (process.argv.includes("--sessao")) {
+        sessao = await abrirSessao(page);
+        // Mesmo portão do cmdWeb: sem os 20 swipes o Home monta a tela de
+        // gêneros, e um `--wait .deck-card` espera para sempre.
+        emprestados = await cumprirOnboarding();
+      }
       await page.cmd("Page.navigate", { url });
       await waitFor(page, selector);
       await screenshot(page, out);
@@ -556,8 +687,7 @@ async function cmdShot() {
       page.close();
     }
   } finally {
-    // Sessão descartável não pode sobreviver ao run: são 30 dias de validade.
-    if (sessao) await comBanco((sql) => sql`delete from sessions where id = ${sessao}`);
+    await devolver(sessao, emprestados);
     for (const c of started) {
       try {
         process.kill(-c.pid, "SIGTERM");

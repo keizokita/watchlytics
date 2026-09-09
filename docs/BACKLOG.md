@@ -81,7 +81,7 @@ B trabalha contra mock do contrato e não espera A.
 | B1 | Pilha de 3 cards, `translate3d` | Só 3 cards no DOM, verificado no inspector | ✅ |
 | B2 | Gesto Pointer Events, disparo por distância **ou** velocidade | Flick curto e rápido conta | ✅ |
 | B3 | Botões + setas do teclado + `prefers-reduced-motion` + `aria-live` | Fluxo completo sem tocar na tela | ✅ |
-| B4 | Pré-carregamento das 5 próximas imagens | Sem flash ao trocar de card | aberta — a pausa caiu em 2026-09-08: o catálogo do TMDB traz `poster_url` e o `Deck.tsx:148` já o pinta |
+| B4 | Pré-carregamento das 5 próximas imagens | Sem flash ao trocar de card | ✅ pré-carga das 5 seguintes com `new Image()` **e** o gradiente do id virou forro atrás do pôster (`poster.ts`) — sem ele o card ficava preto enquanto a imagem não chegava, e para sempre se falhasse |
 | B5 | Mutação otimista + `POST /v1/swipes` em lote | Card sai da tela antes da resposta | ✅ |
 | B6 | Buffer offline em `localStorage`, flush a cada 5 ou 3s | Modo avião: 10 swipes, volta a rede, os 10 chegam | ✅ |
 | B7 | Undo de 1 | Desfaz sem duplicar swipe no servidor | ✅ |

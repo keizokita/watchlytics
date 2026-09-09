@@ -145,9 +145,14 @@
         gap: 0.75rem;
         overflow: hidden;
         /* Duas pontas escuras, não uma: o topo carrega os chips e o rodapé
-           carrega o texto. Sem a parada de cima o chip ficava sobre a parte
-           clara do gradiente; sem a de baixo em 0.72 o --muted não fechava AA
-           contra os hues mais claros que `gradient(id)` sorteia. */
+           carrega o texto. Sem a parada de cima o chip fica sobre a parte clara
+           do fundo.
+
+           A de baixo em 0.72 foi calibrada contra `gradient(id)`, que tem teto
+           de claridade por construção. Com pôster de verdade a premissa caiu, e
+           por isso o texto do card é --fg e não --muted: escurecer mais o
+           degradê fecharia o mesmo número comendo a imagem, que é justamente o
+           que o card existe para mostrar. */
         background: linear-gradient(
           rgb(0 0 0 / 0.38),
           rgb(0 0 0 / 0) 28%,
@@ -186,15 +191,21 @@
         letter-spacing: -0.015em;
         text-wrap: balance;
       }
+      /* --fg, e não --muted como no resto do app: aqui o fundo é FOTOGRAFIA.
+         O cinza de serviço fechava AA contra o gradiente porque o gradiente tem
+         teto de claridade por construção (hsl a 30% e 12% de lightness); um
+         pôster não tem. Medido no card do Frozen II: --muted dava 3.14:1 sobre
+         a imagem, abaixo do piso de 4.5:1, e --fg dá 7.44:1 no mesmo pixel.
+         A hierarquia passa a vir do tamanho, que é o que sobrou de diferença. */
       .card-original {
         margin: 0;
-        color: var(--muted);
+        color: var(--fg);
         font-size: clamp(0.7rem, 4cqi, 0.9rem);
       }
       .card-meta {
         margin: 0.15rem 0 0.35rem;
         font-size: clamp(0.65rem, 3.6cqi, 0.8rem);
-        color: var(--muted);
+        color: var(--fg);
         /* ano + gêneros em uma linha só: com wrap, um título de quatro gêneros
            empurrava a sinopse para fora do card */
         white-space: nowrap;
