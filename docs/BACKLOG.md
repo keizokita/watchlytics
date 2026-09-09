@@ -182,7 +182,7 @@ anterior de agentes.
 | id | Tarefa | Quem | Por que é serial |
 |---|---|---|---|
 | I0.1 ✅ | Rodar a ingestão local e escolher `--min-votes` swipando | usuário | Nenhum agente consegue decidir a régua: só olhando o deck se sabe se o título é reconhecível |
-| I0.2 | **Uma** migration + **todas** as adições de contrato que as trilhas precisam | eu | `schema.ts` e `contract/index.ts` foram os pontos de contenção da última vez. Mudam uma vez, antes, e ficam CONGELADOS |
+| I0.2 ✅ | **Uma** migration + **todas** as adições de contrato que as trilhas precisam | eu | `schema.ts` e `contract/index.ts` foram os pontos de contenção da última vez. Mudam uma vez, antes, e ficam CONGELADOS |
 
 > **I0.1 fechou em 2026-09-08: régua 800** (anime 80, reality 50) — 7583 títulos
 > em produção, fixture apagada. A régua não foi escolhida pelo volume e sim pela
@@ -190,6 +190,28 @@ anterior de agentes.
 > e as FKs são `ON DELETE CASCADE` — levaria junto swipe, biblioteca e match de
 > quem já tivesse avaliado. Começar apertado é o único lado que se corrige sem
 > apagar dado de usuário.
+
+> **I0.2 fechou em 2026-09-09.** Uma migration (`0003_high_purple_man.sql`) e um
+> campo de contrato. Em `titles`: `cast_names text[]` com default `'{}'` e
+> `credits_synced_at`, que é o que torna a segunda passada da I1.1 retomável —
+> NULL significa *nunca buscado*, diferente de *buscado e sem elenco*. Mais o
+> índice parcial `titles_sem_elenco`, que é a fila da carga e encolhe conforme
+> ela anda. Nova tabela `ingest_state (key, value jsonb, updated_at)`: duas
+> chaves, `changes_cursor` (I2.1) e `backfill_cursor` (I2.3) — nada disso se
+> deriva de `titles`, porque uma varredura sem mudança nenhuma também precisa
+> avançar. No contrato, um campo só: `castNames: string[]`, array vazio e nunca
+> null. `toTitle` (feed.ts) é o único lugar que monta `Title`, e a `library.ts`
+> o importa — as duas rotas passaram a devolver elenco numa linha.
+>
+> **Fora do congelamento, de propósito:** nada de AniList (estúdio, fonte,
+> temporada). O I3 continua sem consumidor — coluna para dado que nenhuma tela
+> mostra é construir adiantado, que é o que este projeto vinha evitando.
+>
+> Três objetos já existiam nos bancos de dev e de teste, criados por um `push`
+> fora do git e sem migration: as duas colunas e a `ingest_state` — esta última
+> com exatamente as mesmas três colunas que a migration cria. Foram dropadas
+> (vazias) e recriadas pela migration, senão o `migrate` de qualquer clone novo
+> quebraria em `42P07`.
 
 ### Regras de paralelização (aprendidas errando)
 

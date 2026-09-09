@@ -120,9 +120,37 @@ export const titles = pgTable(
     voteCount: integer("vote_count"),
     raw: jsonb("raw"),
     syncedAt: timestamp("synced_at", { withTimezone: true }),
+    /**
+     * I1 — elenco principal. A ingestão guarda **5**, o card mostra 3.
+     *
+     * Guardar mais do que se mostra porque o caro é a passada de rede — uma
+     * requisição por título, 9,8 mil títulos —, não os bytes. Se o card mudar
+     * de ideia e quiser 4 ou 5, é mudança de front, não uma segunda varredura
+     * inteira do catálogo.
+     *
+     * Array na própria linha, não tabela de pessoas: o card mostra nome, nunca
+     * navega para a pessoa, e ninguém filtra por ator.
+     *
+     * ponytail: sem `people`/`title_credits`. O dia em que existir tela de ator
+     * ou filtro por elenco, isto vira tabela e o array sai — a coluna é o teto.
+     */
+    castNames: text("cast_names").array().notNull().default([]),
+    /**
+     * I1.1 — o que torna a segunda passada retomável. NULL = nunca buscado,
+     * que é diferente de buscado e sem elenco (array vazio e data preenchida).
+     */
+    creditsSyncedAt: timestamp("credits_synced_at", { withTimezone: true }),
   },
   (t) => [
     index("titles_genres_gin").using("gin", t.genreIds),
+    /**
+     * A fila da I1.1: o que falta buscar, mais popular primeiro. Parcial porque
+     * o índice ENCOLHE conforme a carga anda — no fim da passada ele é vazio, e
+     * não uma cópia da tabela inteira que ninguém mais lê.
+     */
+    index("titles_sem_elenco")
+      .on(sql`${t.score} DESC`)
+      .where(sql`${t.creditsSyncedAt} IS NULL`),
     index("titles_score")
       .on(sql`${t.score} DESC`)
       .where(sql`${t.score} > 10`),
@@ -302,3 +330,25 @@ export const consents = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.kind, t.version] })],
 );
 
+// ─── ingestão (I2) ──────────────────────────────────────────────────────────
+
+/**
+ * O que a carga do catálogo precisa lembrar entre execuções.
+ *
+ * Duas chaves, não duas tabelas: `changes_cursor` (I2.1, até onde o /changes do
+ * TMDB já foi lido) e `backfill_cursor` (I2.3, onde a carga inicial parou). Nada
+ * disto se deriva de `titles` — uma varredura que não achou mudança nenhuma
+ * também precisa avançar, e `max(release_year)` não diz em que ano a carga
+ * morreu.
+ *
+ * ponytail: jsonb e chave livre em vez de colunas tipadas. É estado de worker,
+ * lido e escrito por um dono só; schema rígido aqui só criaria migration a cada
+ * campo novo — que é exatamente o que o congelamento do I0.2 quer evitar.
+ */
+export const ingestState = pgTable("ingest_state", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
