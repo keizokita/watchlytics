@@ -74,8 +74,6 @@
         color: var(--fg);
         font: 16px/1.5 system-ui, sans-serif;
         overscroll-behavior: none;
-        -webkit-user-select: none;
-        user-select: none;
       }
 
       /* Foco visível em tudo que recebe foco, uma regra só. `:where` mantém a
@@ -88,7 +86,16 @@
 
       /* ─── deck ─────────────────────────────────────────────────────────── */
 
-      .deck-wrap { display: grid; gap: 1.25rem; justify-items: center; }
+      /* Arrastar um card não pode virar seleção de texto. Estava no `body`, o
+         que custava caro longe daqui: o app manda procurar amigo POR HANDLE e
+         a pessoa não conseguia copiar o handle da lista, nem o título de um
+         filme, nem a própria estatística. O gesto mora no deck; a restrição
+         também. */
+      .deck-wrap {
+        display: grid; gap: 1.25rem; justify-items: center;
+        -webkit-user-select: none;
+        user-select: none;
+      }
 
       .deck {
         position: relative;
@@ -530,7 +537,10 @@
       .notice-hint { font-size: 0.9rem; }
 
       /* D5 — o toggle do perfil público mora na seção de conta */
-      .lib-public { display: flex; gap: 0.5rem; align-items: center; justify-content: center; }
+      /* O <input> nativo tem ~13px, mas o alvo é a <label> inteira: quem
+         clica no texto marca a caixa. É a label que precisa da altura. */
+      .lib-public { display: flex; gap: 0.5rem; align-items: center;
+        justify-content: center; min-height: var(--tap); }
 
       .sr-only {
         position: absolute;

@@ -13,6 +13,7 @@ import { Login, useSession } from "./Login.tsx";
 import { authedFetch } from "./session.ts";
 import { Onboarding } from "./Onboarding.tsx";
 import { drop, enqueue, startFlushing } from "./swipeQueue.ts";
+import { mensagem } from "./errors.ts";
 import { t } from "./strings.ts";
 
 /** Busca mais cards quando restam estes: o swipe não pode esperar rede. */
@@ -84,7 +85,7 @@ function App() {
       setError(null);
     } catch (e) {
       if (mine === gen.current) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(mensagem(e));
       }
     } finally {
       if (mine === gen.current) {
@@ -205,7 +206,12 @@ function App() {
       {relaxed.includes("dislikes") && <p className="notice">{t.recycled}</p>}
 
       {error ? (
-        <p className="notice deck-slot error">{t.error(error)}</p>
+        <div className="notice deck-slot error">
+          <p>{error}</p>
+          <button type="button" className="link" onClick={() => void more()}>
+            {t.retry}
+          </button>
+        </div>
       ) : !ready ? (
         <p className="notice deck-slot loading">{t.loading}</p>
       ) : queue.length === 0 ? (
