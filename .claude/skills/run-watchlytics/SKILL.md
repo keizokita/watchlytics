@@ -77,8 +77,8 @@ Prints → `/tmp/watchlytics-run/web.png` (deck inicial) e `web-depois.png`
 ```
 ── api ──
 ✔ GET /health
-✔ GET /v1/feed devolve 20 — Breaking Bad
-✔ feed puxa do topo do catálogo, não do meio — menor da página 63 · mediana 34
+✔ GET /v1/feed devolve 20 — Shrek
+✔ feed puxa do topo do catálogo, não do meio — menor da página 61 · mediana 34
 ✔ POST /v1/swipes aceita
 ✔ reenvio é upsert, não duplicata — {"accepted":1,"skipped":0}
 ✔ título desconhecido é descartado
@@ -86,14 +86,15 @@ Prints → `/tmp/watchlytics-run/web.png` (deck inicial) e `web-depois.png`
 ✔ like sai do feed
 ✔ sem DEV_USER_ID a rota responde 401
 ── web ──
-✔ deck renderizou — Breaking Bad
+✔ deck renderizou — Despicable Me
 ✔ 3 cards no DOM (profundidade) — 3
-✔ gradiente do id forra o card (B4) — linear-gradient(160deg, rgb(37, 46, 116), …)
+✔ pôster na frente, gradiente do id atrás (B4) — url("https://image.tmdb.org/t/p/w500/b1BT30….jpg"), linear-g
+✔ pré-carga passou dos cards do DOM (B4) — 8 pôsteres pedidos, 3 cards no DOM
 ✔ botões Pass e Like presentes — Pass,Undo,Like
-✔ clique em Like avança o deck — Breaking Bad → Game of Thrones
-✔ ArrowLeft (pass) avança o deck — Game of Thrones → Inception
+✔ clique em Like avança o deck — Despicable Me → The Super Mario Bros. Movie
+✔ ArrowLeft (pass) avança o deck — The Super Mario Bros. Movie → Inside Out
 ✔ console sem erro
-✔ o navegador gravou 2 swipes — 1,-1
+✔ o navegador gravou 2 swipes — 2 além dos 20 do onboarding
 ```
 
 O último ✔ é o que fecha o circuito: clique no DOM → `POST /v1/swipes` →

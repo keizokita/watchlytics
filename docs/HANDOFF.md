@@ -152,10 +152,12 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
 - **A fixture esgotava numa sessão** — 94 títulos com o onboarding do D4
   consumindo 20 na porta de entrada. Resolvido em 2026-09-08: 7583 títulos do
   TMDB, ~378 decks de 20. O do CI e o `watchlytics_test` continuam na fixture, e
-  é ela que os testes esperam. O banco de **desenvolvimento** tem os dois:
-  9924 títulos, dos quais os 94 da fixture não têm `poster_url` e têm o maior
-  `score` — ou seja, o topo do deck local é justamente o que não exercita o
-  pôster (e Inception, Interstellar e outros aparecem duplicados).
+  é ela que os testes esperam. O banco de **desenvolvimento** também já saiu
+  dela: medido em 2026-09-08, são **9830 títulos e 9830 com `poster_url`** — ou
+  seja, nenhuma linha sem pôster, e o deck local exercita o caminho da imagem em
+  todo card. Há duplicatas, mas de título repetido no próprio catálogo do TMDB
+  (`Return` ×7, `Pinocchio` ×4, `Teenage Mutant Ninja Turtles` ×4), não de
+  fixture convivendo com ingestão.
 - **O shim escondeu um 401 até a produção.** Com login válido, `/v1/feed`
   respondia 401 no ar porque o front nunca mandava `Authorization`; em dev o
   `DEV_USER_ID` atendia a requisição sem header e o bug não aparecia. Foi o

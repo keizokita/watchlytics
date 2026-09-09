@@ -189,7 +189,10 @@ Uma paleta de dois gestos sobre um neutro frio: tudo que não é decisão é cin
 - **Papel Frio** (`#f2f3f7`): texto primário, foco visível, e o estado ativo de
   qualquer controle. Nunca branco puro.
 - **Cinza de Serviço** (`#9aa0ad`): metadado, dica, rótulo de seção, link de nav
-  inativo. É o cinza que fecha AA sobre o fundo e nada além disso.
+  inativo. É o cinza que fecha AA sobre o fundo e nada além disso — e "o fundo"
+  é literal: **dentro do card do deck ele não entra**, porque lá o fundo é
+  fotografia. Medido no pôster do Frozen II, ele dá 3,14:1 contra a imagem, e o
+  Papel Frio dá 7,44:1 no mesmo pixel.
 - **Vidro** (`rgb(255 255 255 / 0.06)`), **Vidro Alto** (`0.12`) e
   **Fio** (`0.16`): não são três cinzas, são um só material em três
   intensidades — superfície em repouso, superfície em hover, e o traço que
@@ -216,6 +219,12 @@ regra.
 de contraste conferida contra a superfície em que de fato aparece — não contra o
 fundo da página. `--pass` foi clareado exatamente por essa conta. Uma cor nova
 entra com o número medido, ou não entra.
+
+**A Regra da Foto Sem Teto.** Dentro do card, todo texto é Papel Frio. O degradê
+de duas pontas foi calibrado contra `gradient(id)`, que tem claridade limitada
+por construção (`hsl` a 30% e 12% de lightness); uma fotografia não tem esse
+teto, e nenhum degradê que ainda deixe ver o pôster garante contraste contra ela.
+A defesa é a cor do texto, não a do fundo.
 
 ## Typography
 
@@ -252,9 +261,9 @@ somar personalidade a esse esqueleto, não substituí-lo.
   ele por bons motivos: o contador do onboarding (`0.85rem`, `+0.06em`) e o chip
   de tipo do card (`clamp(0.6rem, 3.4cqi, 0.75rem)`, `+0.09em`), que escala por
   container como todo o resto do card.
-- **Meta** (400, `0.85rem` nominal, sempre em Cinza de Serviço): ano, gêneros,
-  título original, dica sob um controle, rótulo de estatística. O degrau que
-  define este papel é o de **cor**, não o de tamanho — e é por isso que o
+- **Meta** (400, `0.85rem` nominal, em Cinza de Serviço **fora do card**): ano,
+  gêneros, título original, dica sob um controle, rótulo de estatística. O degrau
+  que define este papel é o de **cor**, não o de tamanho — e é por isso que o
   tamanho derivou: existem hoje quatro valores em uso (`0.75`, `0.8`, `0.85`,
   `0.9rem`) para o mesmo papel, escolhidos caso a caso. `0.85rem` é o nominal;
   texto novo de metadado usa ele, e os outros três convergem quando alguém

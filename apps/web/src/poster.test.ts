@@ -56,6 +56,15 @@ test("a url vai entre aspas: caminho com parêntese não quebra a declaração",
   assert.ok(css.includes('url("https://x/a(1).jpg")'));
 });
 
+test("aspa no caminho não fecha a string e não leva o forro junto", () => {
+  const css = cardBackground(titulo({ posterUrl: 'https://x/a".jpg' }));
+  // Uma aspa crua aqui terminaria o url() e invalidaria a declaração inteira,
+  // derrubando o gradiente — o card preto que o forro existe para evitar.
+  assert.ok(css.includes('url("https://x/a%22.jpg")'));
+  assert.equal(css.split('"').length - 1, 2, "só o par de aspas do url()");
+  assert.ok(css.includes("linear-gradient"), "o forro sobrevive");
+});
+
 test("o gradiente é determinístico e depende do id", () => {
   assert.equal(gradient("abc"), gradient("abc"));
   assert.notEqual(gradient("abc"), gradient("abd"));

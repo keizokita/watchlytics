@@ -184,6 +184,16 @@ async function openChrome() {
   let nextId = 0;
   const pending = new Map();
   const errors = [];
+  /**
+   * URLs pedidas, acumuladas pelo CDP.
+   *
+   * Não dá para usar `performance.getEntriesByType("resource")`: aquela lista é
+   * do DOCUMENTO, e o vite força um page reload na primeira execução depois de
+   * um arquivo mudar — o que zerava a timeline no meio da medição e reprovava
+   * código bom, com um zero redondo. Aqui os eventos vão se somando e o reload
+   * não apaga nada. Exige `Network.enable` antes do navigate.
+   */
+  const requests = [];
 
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
@@ -193,10 +203,19 @@ async function openChrome() {
       msg.error ? p.reject(new Error(JSON.stringify(msg.error))) : p.resolve(msg.result);
       return;
     }
+    if (msg.method === "Network.requestWillBeSent") {
+      requests.push(msg.params.request.url);
+    }
     if (msg.method === "Runtime.exceptionThrown") {
       errors.push(msg.params.exceptionDetails.exception?.description ?? "exception");
     }
-    if (msg.method === "Runtime.consoleAPICalled" && msg.params.type === "error") {
+    // `warning` junto de `error`: a falha de flush da fila de swipes é um
+    // console.warn (swipeQueue.ts:104), e só com `error` ela saía verde aqui
+    // enquanto a asserção seguinte reprovava sem dizer a causa.
+    if (
+      msg.method === "Runtime.consoleAPICalled" &&
+      (msg.params.type === "error" || msg.params.type === "warning")
+    ) {
       errors.push(msg.params.args.map((a) => a.value ?? a.description).join(" "));
     }
     if (msg.method === "Log.entryAdded" && msg.params.entry.level === "error") {
@@ -218,6 +237,7 @@ async function openChrome() {
 
   const page = {
     errors,
+    requests,
     cmd: (method, params) => send(method, params, sessionId),
     close: () => {
       ws.close();
@@ -310,59 +330,50 @@ async function screenshot(page, out) {
 // ─── web: api + vite + chrome ───────────────────────────────────────────────
 
 /**
- * Confere que o swipe do navegador chegou no banco, e APAGA o que este run
- * gravou.
+ * Confere que o swipe do navegador chegou no banco.
  *
  * Espera em vez de checar na hora: swipeQueue.ts (B6) põe o swipe em
  * localStorage e só faz POST 3s depois (FLUSH_MS) ou aos 5 pendentes. Checar
  * logo após o clique dá zero linha.
  *
- * Apagar importa: sem isso cada execução come dois títulos do feed do usuário
- * de dev — com 94 na fixture o deck acabaria em ~47 runs. A janela por
- * updated_at evita ter que descobrir o uuid do card pelo DOM, já que Deck.tsx
- * usa o id como `key` e o React não põe isso no HTML.
+ * Conta TUDO do usuário do run, não uma janela de tempo: ele nasceu neste run,
+ * então o que existe é o onboarding (`base`) mais o que o navegador gravou. Sem
+ * relógio não há folga de um segundo para arbitrar, e sem janela não há como
+ * apagar por engano o que outra pessoa swipou. Não apaga nada — quem limpa é o
+ * `devolver`, que leva o usuário inteiro.
  */
-async function checkSwipesGravados(desde, esperados, ignorar = []) {
-  const userId = process.env["DEV_USER_ID"];
-  if (!userId) return ok("DEV_USER_ID definida para conferir os swipes", false);
-
+async function checkSwipesGravados(userId, base, esperados) {
   // Conexão própria, NÃO a de db/client.ts: aquele módulo é um singleton e o
-  // cmdApi já chamou pg.end() nele. Em `all`, reusar dá CONNECTION_ENDED.
+  // cmdApi já chamou pg.end() nele. Em `all`, reusar dá CONNECTION_ENDED. Uma
+  // só para o polling inteiro — abrir por tentativa seriam ~150 conexões.
   const postgres = (await import("postgres")).default;
   const sql = postgres(process.env["DATABASE_URL"]);
-  // Os swipes emprestados para abrir o onboarding caem na MESMA janela, e são
-  // dezoito contra dois: sem tirá-los, o `until` volta satisfeito no primeiro
-  // poll e a contagem nunca bate. Por id, não por relógio — a folga de um
-  // segundo da janela é justamente o que não dá para arbitrar aqui.
-  const emprestado = new Set(ignorar);
-  const janela = async () =>
-    (
-      await sql`
-        select title_id, direction from swipes
-        where user_id = ${userId} and updated_at >= ${desde}`
-    ).filter((r) => !emprestado.has(r.title_id));
+  const todos = () => sql`select direction from swipes where user_id = ${userId}`;
   try {
     let rows = [];
     try {
       rows = await until(
-        janela,
-        (r) => r.length >= esperados,
+        todos,
+        (r) => r.length >= base + esperados,
         `a fila do navegador dar flush de ${esperados} swipes`,
         15_000,
       );
     } catch {
-      rows = await janela();
+      rows = await todos();
     }
+    const doNavegador = rows.length - base;
     ok(
       `o navegador gravou ${esperados} swipes`,
-      rows.length === esperados,
-      rows.map((r) => r.direction).join(",") || "nenhum — a fila deu flush?",
+      doNavegador === esperados,
+      doNavegador > 0
+        ? `${doNavegador} além dos ${base} do onboarding`
+        : "nenhum — a fila deu flush?",
     );
-    await sql`delete from swipes where user_id = ${userId} and updated_at >= ${desde}`;
   } finally {
     await sql.end();
   }
 }
+
 
 /**
  * detached + kill(-pid): o `npm run dev:*` é um wrapper que não repassa
@@ -386,11 +397,10 @@ async function cmdWeb() {
   const out = arg("--out", join(SHOTS, "web.png"));
   const started = [];
   const log = [];
-  let sessao = null;
-  /** Swipes que este run inseriu só para abrir o portão do onboarding. */
-  let emprestados = [];
-  // Um segundo de folga: o relógio do Postgres não é o mesmo do Node.
-  const desde = new Date(Date.now() - 1000);
+  /** Usuário descartável do run; `devolver` o apaga com tudo que ele criou. */
+  let usuario = null;
+  /** Quantos swipes o onboarding custou — a linha de base da checagem final. */
+  let base = 0;
 
   const up = async (u) => {
     try {
@@ -419,8 +429,8 @@ async function cmdWeb() {
       // C2/C3 o Root só monta o app com sessão, e o shim do DEV_USER_ID não
       // vale para o `POST /v1/auth/refresh` que o Login.tsx usa para resolvê-la.
       await page.cmd("Network.enable");
-      sessao = await abrirSessao(page);
-      emprestados = await cumprirOnboarding();
+      usuario = await abrirSessao(page);
+      base = await cumprirOnboarding(usuario);
 
       await page.cmd("Page.navigate", { url });
       await waitFor(page, selector);
@@ -446,18 +456,18 @@ async function cmdWeb() {
       );
       // O forro só evita o card preto; quem mata o flash é a pré-carga do
       // Deck.tsx, e sem esta linha apagar o efeito continuaria tudo verde.
-      // Resource timing em vez de Network.requestWillBeSent: o dispatcher do
-      // openChrome não coleciona requisição, e aqui não precisa colecionar.
-      // ...e resource timing só lista o que TERMINOU de carregar. Lido na hora,
-      // milissegundos depois de o deck montar, o número é zero mesmo com a
-      // pré-carga certa — a asserção reprovaria o código bom. Espera, como o
-      // checkSwipesGravados faz com o flush da fila.
+      //
+      // A contagem sai do `page.requests` do CDP, e NÃO de
+      // `performance.getEntriesByType("resource")`: aquela lista pertence ao
+      // documento, e o vite força um page reload na primeira execução depois
+      // de um arquivo mudar — a timeline zerava no meio da medição e a
+      // asserção reprovava código bom, com um zero redondo. Ver o comentário
+      // do `requests` no openChrome.
+      // Espera porque o pedido não é síncrono com a montagem do card: os três
+      // do DOM saem pelo CSS e os outros pelo efeito de pré-carga, um tick
+      // depois. Três é o piso — passar disso só acontece se a pré-carga rodou.
       const conta = () =>
-        evaluate(
-          page,
-          `performance.getEntriesByType("resource")
-             .filter((r) => r.name.startsWith("https://image.tmdb.org/")).length`,
-        );
+        page.requests.filter((u) => u.startsWith("https://image.tmdb.org/")).length;
       let pedidos = 0;
       try {
         pedidos = await until(
@@ -467,7 +477,7 @@ async function cmdWeb() {
           15_000,
         );
       } catch {
-        pedidos = await conta();
+        pedidos = conta();
       }
       ok(
         "pré-carga passou dos cards do DOM (B4)",
@@ -512,12 +522,12 @@ async function cmdWeb() {
       const real = page.errors.filter((e) => !/favicon/i.test(e));
       ok("console sem erro", real.length === 0, real.join(" | "));
 
-      await checkSwipesGravados(desde, 2, emprestados);
+      await checkSwipesGravados(usuario, base, 2);
     } finally {
       page.close();
     }
   } finally {
-    await devolver(sessao, emprestados);
+    await devolver(usuario);
     for (const c of started) {
       try {
         process.kill(-c.pid, "SIGTERM");
@@ -528,35 +538,43 @@ async function cmdWeb() {
 }
 
 /**
- * Sessão de verdade para o headless ver as telas autenticadas.
+ * Usuário descartável com sessão, para o headless entrar no app.
  *
- * O shim do DEV_USER_ID não resolve isto: ele vale para `requireUserId`, e o
- * shell do web decide o que montar pelo `resume()` do Login.tsx, que chama
- * `POST /v1/auth/refresh` — rota que lê o cookie httpOnly e não passa pelo
- * shim. Sem cookie, `resume()` devolve null e a tela é sempre a de entrada.
+ * O shim do DEV_USER_ID não resolve o portão de entrada: o shell decide o que
+ * montar pelo `resume()` do Login.tsx, que chama `POST /v1/auth/refresh` — rota
+ * que lê o cookie httpOnly e não passa pelo shim.
  *
- * Grava a linha de `sessions` com a mesma primitiva da api (`newRefreshToken`,
- * importada e não copiada, senão o formato do token derivaria em silêncio) e
- * planta o cookie pelo CDP, que enxerga httpOnly. `Path=/v1/auth` é o mesmo do
- * routes/auth.ts.
+ * E o usuário é DESCARTÁVEL, não o do .env, porque o run precisa ESCREVER: os
+ * 20 swipes que abrem o onboarding, mais os do próprio teste. Escrevendo no
+ * usuário compartilhado, um Ctrl-C no meio deixava 20 LIKEs para sempre — e o
+ * feed exclui LIKE incondicionalmente, então aqueles títulos sumiam do deck
+ * local sem ninguém ter swipado. A execução seguinte também não consertava:
+ * com 20 swipes já presentes ela não emprestava nada, e perdia junto a lista
+ * do que limpar.
+ *
+ * Funciona porque a api resolve o usuário pelo Bearer da sessão, não pelo shim:
+ * o DEV_USER_ID do processo da api nunca entra nesta conta. E a limpeza vira
+ * uma linha só — `delete from users` cascateia sessão e swipes.
  */
 async function abrirSessao(page) {
-  const userId = process.env["DEV_USER_ID"];
-  if (!userId) throw new Error("--sessao precisa de DEV_USER_ID em apps/api/.env");
-
   const { newRefreshToken, REFRESH_TTL_S } = await import(
     join(ROOT, "apps/api/src/auth.ts")
   );
-  const id = crypto.randomUUID();
-  const { token, hash } = newRefreshToken(id);
+  const userId = crypto.randomUUID();
+  const sessionId = crypto.randomUUID();
+  const { token, hash } = newRefreshToken(sessionId);
 
-  await comBanco(
-    (sql) => sql`
+  await comBanco(async (sql) => {
+    await sql`
+      insert into users (id, handle, display_name)
+      values (${userId}, ${`driver-${userId.slice(0, 8)}`}, 'Driver')`;
+    await sql`
       insert into sessions (id, user_id, refresh_token_hash, expires_at, user_agent)
-      values (${id}, ${userId}, ${hash},
-              ${new Date(Date.now() + REFRESH_TTL_S * 1000)}, 'driver.mjs shot')`,
-  );
+      values (${sessionId}, ${userId}, ${hash},
+              ${new Date(Date.now() + REFRESH_TTL_S * 1000)}, 'driver.mjs')`;
+  });
 
+  // Path=/v1/auth é o mesmo do routes/auth.ts: o cookie não vai em mais nada.
   await page.cmd("Network.setCookie", {
     name: "wl_refresh",
     value: token,
@@ -564,43 +582,31 @@ async function abrirSessao(page) {
     path: "/v1/auth",
     httpOnly: true,
   });
-  return id;
+  return userId;
 }
+
 
 /**
- * Passa o usuário de dev pelo portão do onboarding (D4).
+ * Passa o usuário do run pelo portão do onboarding (D4).
  *
  * `remaining = ONBOARDING_SWIPES - swipes do usuário` (routes/onboarding.ts:97),
- * e enquanto sobra o Home monta a tela de gêneros, não o deck. Um DEV_USER_ID
- * limpo deixava o cmdWeb esperando `.deck-card` para sempre.
+ * e enquanto sobra o Home monta a tela de gêneros, não o deck.
  *
- * Completa pelos títulos MENOS populares de propósito: os swipes daqui somem no
- * fim, mas enquanto existem eles saem do feed, e comer o topo do catálogo
- * mudaria justamente o card que as asserções vão olhar.
+ * Pelos títulos MENOS populares de propósito: LIKE sai do feed, e gastar o topo
+ * do catálogo mudaria justamente o card que as asserções vão olhar.
  */
-async function cumprirOnboarding() {
-  const userId = process.env["DEV_USER_ID"];
-  if (!userId) return [];
+async function cumprirOnboarding(userId) {
   const { ONBOARDING_SWIPES } = await import("@watchlytics/contract");
-
-  return comBanco(async (sql) => {
-    const [{ n }] = await sql`
-      select count(*)::int as n from swipes where user_id = ${userId}`;
-    const faltam = ONBOARDING_SWIPES - n;
-    if (faltam <= 0) return [];
-
-    const rows = await sql`
+  await comBanco(
+    (sql) => sql`
       insert into swipes (user_id, title_id, direction)
       select ${userId}, t.id, 1 from titles t
-      where not exists (
-        select 1 from swipes s where s.user_id = ${userId} and s.title_id = t.id
-      )
       order by t.score asc
-      limit ${faltam}
-      returning title_id`;
-    return rows.map((r) => r.title_id);
-  });
+      limit ${ONBOARDING_SWIPES}`,
+  );
+  return ONBOARDING_SWIPES;
 }
+
 
 /** Conexão própria: db/client.ts é singleton e o cmdApi já deu pg.end() nele. */
 async function comBanco(fn) {
@@ -614,24 +620,14 @@ async function comBanco(fn) {
 }
 
 /**
- * Devolve ao banco o que o run pegou emprestado.
- *
- * A sessão porque vale 30 dias, e os swipes porque saem do feed enquanto
- * existem — com execuções repetidas o deck de quem está com o app aberto ia
- * encolhendo sem ninguém ter swipado.
+ * Some com o usuário do run. Sessão e swipes vão junto por ON DELETE CASCADE,
+ * então não há lista para manter nem janela de tempo para acertar.
  */
-async function devolver(sessao, emprestados) {
-  if (!sessao && emprestados.length === 0) return;
-  await comBanco(async (sql) => {
-    if (sessao) await sql`delete from sessions where id = ${sessao}`;
-    if (emprestados.length > 0) {
-      await sql`
-        delete from swipes
-        where user_id = ${process.env["DEV_USER_ID"]}
-          and title_id in ${sql(emprestados)}`;
-    }
-  });
+async function devolver(userId) {
+  if (!userId) return;
+  await comBanco((sql) => sql`delete from users where id = ${userId}`);
 }
+
 
 /**
  * Print de uma tela qualquer, sem asserção nenhuma sobre o conteúdo.
@@ -645,8 +641,7 @@ async function cmdShot() {
   const out = arg("--out", join(SHOTS, "shot.png"));
   const started = [];
   const log = [];
-  let sessao = null;
-  let emprestados = [];
+  let usuario = null;
 
   const up = async (u) => {
     try {
@@ -673,10 +668,10 @@ async function cmdShot() {
     try {
       await page.cmd("Network.enable");
       if (process.argv.includes("--sessao")) {
-        sessao = await abrirSessao(page);
+        usuario = await abrirSessao(page);
         // Mesmo portão do cmdWeb: sem os 20 swipes o Home monta a tela de
         // gêneros, e um `--wait .deck-card` espera para sempre.
-        emprestados = await cumprirOnboarding();
+        await cumprirOnboarding(usuario);
       }
       await page.cmd("Page.navigate", { url });
       await waitFor(page, selector);
@@ -687,7 +682,7 @@ async function cmdShot() {
       page.close();
     }
   } finally {
-    await devolver(sessao, emprestados);
+    await devolver(usuario);
     for (const c of started) {
       try {
         process.kill(-c.pid, "SIGTERM");
