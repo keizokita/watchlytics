@@ -21,8 +21,6 @@ import { t } from "./strings.ts";
  * rotas e ninguém procura "matches" num lugar diferente de "amigos".
  */
 
-const vazio: FriendsResponse = { friends: [], incoming: [], outgoing: [] };
-
 type Tab = "people" | "common" | "alerts";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -120,10 +118,16 @@ export function Friends() {
   }, []);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<PublicUser[] | null>(null);
-  const [lists, setLists] = useState<FriendsResponse>(vazio);
-  const [comuns, setComuns] = useState<MatchEntry[]>([]);
+  /**
+   * `null` é "ainda não respondeu", e não "está vazio" — a mesma distinção
+   * que `results` já fazia. Com `[]` de partida, abrir a aba mostrava "nothing
+   * in common yet" e "no friends yet" durante a requisição: a tela afirmava
+   * sobre a conta da pessoa antes de ter lido qualquer coisa.
+   */
+  const [lists, setLists] = useState<FriendsResponse | null>(null);
+  const [comuns, setComuns] = useState<MatchEntry[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
-  const [avisos, setAvisos] = useState<Aviso[]>([]);
+  const [avisos, setAvisos] = useState<Aviso[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -208,14 +212,20 @@ export function Friends() {
       const page = matchesResponse.parse(
         await pega(`/v1/matches?cursor=${encodeURIComponent(cursor!)}`),
       );
-      setComuns((atual) => [...atual, ...page.items]);
+      setComuns((atual) => [...(atual ?? []), ...page.items]);
       setCursor(page.nextCursor);
     });
 
   /** Já pedido ou já amigo: o botão de adicionar não faria nada de novo. */
   const known = new Set(
-    [...lists.friends, ...lists.incoming, ...lists.outgoing].map((u) => u.id),
+    [
+      ...(lists?.friends ?? []),
+      ...(lists?.incoming ?? []),
+      ...(lists?.outgoing ?? []),
+    ].map((u) => u.id),
   );
+
+  const carregando = <p className="notice">{t.loading}</p>;
 
   return (
     <div className="lib">
@@ -285,53 +295,61 @@ export function Friends() {
             </section>
           )}
 
-          {lists.incoming.length > 0 && (
-            <section>
-              <h2>{t.friendIncoming}</h2>
-              <ul className="lib-list">
-                {lists.incoming.map((u) => (
-                  <Pessoa
-                    key={u.id}
-                    user={u}
-                    action={{
-                      label: t.friendAccept,
-                      onClick: () => onAccept(u.id),
-                      disabled: busy,
-                    }}
-                  />
-                ))}
-              </ul>
-            </section>
-          )}
+          {lists === null ? (
+            carregando
+          ) : (
+            <>
+              {lists.incoming.length > 0 && (
+                <section>
+                  <h2>{t.friendIncoming}</h2>
+                  <ul className="lib-list">
+                    {lists.incoming.map((u) => (
+                      <Pessoa
+                        key={u.id}
+                        user={u}
+                        action={{
+                          label: t.friendAccept,
+                          onClick: () => onAccept(u.id),
+                          disabled: busy,
+                        }}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              )}
 
-          <section>
-            <h2>{t.friendYours}</h2>
-            {lists.friends.length === 0 ? (
-              <p className="lib-locked">{t.friendNone}</p>
-            ) : (
-              <ul className="lib-list">
-                {lists.friends.map((u) => (
-                  <Pessoa key={u.id} user={u} />
-                ))}
-              </ul>
-            )}
-          </section>
+              <section>
+                <h2>{t.friendYours}</h2>
+                {lists.friends.length === 0 ? (
+                  <p className="lib-locked">{t.friendNone}</p>
+                ) : (
+                  <ul className="lib-list">
+                    {lists.friends.map((u) => (
+                      <Pessoa key={u.id} user={u} />
+                    ))}
+                  </ul>
+                )}
+              </section>
 
-          {lists.outgoing.length > 0 && (
-            <section>
-              <h2>{t.friendOutgoing}</h2>
-              <ul className="lib-list">
-                {lists.outgoing.map((u) => (
-                  <Pessoa key={u.id} user={u} />
-                ))}
-              </ul>
-            </section>
+              {lists.outgoing.length > 0 && (
+                <section>
+                  <h2>{t.friendOutgoing}</h2>
+                  <ul className="lib-list">
+                    {lists.outgoing.map((u) => (
+                      <Pessoa key={u.id} user={u} />
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </>
           )}
         </>
       )}
 
       {tab === "common" &&
-        (comuns.length === 0 ? (
+        (comuns === null ? (
+          carregando
+        ) : comuns.length === 0 ? (
           <p className="lib-locked">{t.commonNone}</p>
         ) : (
           <>
@@ -349,7 +367,9 @@ export function Friends() {
         ))}
 
       {tab === "alerts" &&
-        (avisos.length === 0 ? (
+        (avisos === null ? (
+          carregando
+        ) : avisos.length === 0 ? (
           <p className="lib-locked">{t.alertsNone}</p>
         ) : (
           <ul className="lib-list">
