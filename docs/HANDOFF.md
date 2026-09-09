@@ -24,7 +24,7 @@ HTML renderizado no servidor. Toda decisão de arquitetura protege esse caminho.
 O `git log` é documentação de verdade aqui: cada commit explica a decisão, não
 só a mudança. Vale ler antes de propor refazer algo.
 
-## Estado: 39 de 39 tarefas (+ trilhas de ingestão: 2 de 7)
+## Estado: 39 de 39 tarefas (+ trilhas de ingestão: 3 de 7)
 
 | Trilha | | |
 |---|---|---|
