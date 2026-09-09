@@ -203,6 +203,15 @@ anterior de agentes.
 > null. `toTitle` (feed.ts) é o único lugar que monta `Title`, e a `library.ts`
 > o importa — as duas rotas passaram a devolver elenco numa linha.
 >
+> Junto veio `ingest/http.ts`: o cliente do TMDB com pausa, recuo e leitura do
+> `Retry-After` era a função privada `get()` dentro do `run.ts`. A I1.1 tem que
+> respeitar "o mesmo rate limit" e não pode tocar em `run.ts` — o critério dela
+> era inalcançável sem duplicar o recuo ou criar cola sem dono, que foi o erro
+> do `swipes.ts` na rodada anterior. Mover foi de comportamento neutro, com uma
+> exceção deliberada: o `TMDB_READ_TOKEN` passou a ser lido por chamada e não no
+> import, senão qualquer teste que importasse o módulo morreria ao carregar.
+> `http.test.ts` cobre exatamente essa troca.
+>
 > **Fora do congelamento, de propósito:** nada de AniList (estúdio, fonte,
 > temporada). O I3 continua sem consumidor — coluna para dado que nenhuma tela
 > mostra é construir adiantado, que é o que este projeto vinha evitando.
@@ -223,8 +232,9 @@ anterior de agentes.
 3. **Todo arquivo tem dono, inclusive os de cola.** Da última vez `swipes.ts`
    ficou sem dono e a tarefa que precisava dele contornou de um jeito que teve
    que ser refeito na integração.
-4. **`schema.ts` e `contract/index.ts` estão congelados** após I0.2. Precisou de
-   coluna? Fala antes; não edita.
+4. **`schema.ts`, `contract/index.ts` e `ingest/http.ts` estão congelados** após
+   I0.2. Precisou de coluna, de campo ou de outro comportamento de rede? Fala
+   antes; não edita.
 5. **Commite antes de terminar.** Um agente morreu por limite de sessão com todo
    o trabalho fora do git.
 6. **Arquivo de teste cria usuário próprio.** Ver `library.test.ts`.
@@ -240,7 +250,11 @@ elenco desde o primeiro dia e nunca mostrou nenhum.
 | I1.2 | Até 3 nomes no card | Título sem elenco não quebra o card, só não mostra a linha |
 
 **Possui:** `apps/api/src/ingest/credits.ts` + teste · `apps/web/src/Card.tsx`
-**Não toca:** `ingest/run.ts`, `ingest/tmdb.ts`, nada de rota.
+**Não toca:** `ingest/run.ts`, `ingest/tmdb.ts`, `ingest/http.ts`, nada de rota.
+**Usa:** `get()` de `ingest/http.ts` — é ele que dá o "mesmo rate limit" do
+critério. Era privado dentro do `run.ts` e saiu de lá no I0.2 justamente porque
+esta tarefa não pode tocar naquele arquivo. **Não copie o recuo:** um 429
+aprendido numa cópia não ensina nada à outra.
 **Atenção:** `/discover` não aceita `append_to_response`, então elenco é
 necessariamente uma segunda passada. Decida se roda junto da carga ou como
 comando separado, e diga por quê.

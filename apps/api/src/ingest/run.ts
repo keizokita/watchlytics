@@ -2,7 +2,8 @@ import { and, eq, sql } from "drizzle-orm";
 import type { TitleType } from "@watchlytics/contract";
 import { db, pg } from "../db/client.ts";
 import { titleExternalIds, titles } from "../db/schema.ts";
-import { discoverUrl, normalize, type TmdbItem } from "./tmdb.ts";
+import { get } from "./http.ts";
+import { discoverUrl, normalize } from "./tmdb.ts";
 
 /**
  * Ingestão do catálogo do TMDB.
@@ -42,45 +43,6 @@ const MIN_VOTES_ANIME = arg("min-votes-anime", 80);
  */
 const MIN_VOTES_REALITY = arg("min-votes-reality", 50);
 const DRY = flag("dry-run");
-
-const token = process.env["TMDB_READ_TOKEN"];
-if (!token) {
-  throw new Error(
-    "TMDB_READ_TOKEN ausente. Gere em themoviedb.org/settings/api (Read Access Token v4) e ponha em apps/api/.env",
-  );
-}
-
-/**
- * Bearer, não `?api_key=`: chave em query string vaza em log de servidor, em
- * proxy e no header Referer. Header não.
- */
-const headers = { Authorization: `Bearer ${token}`, accept: "application/json" };
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/** Uma requisição por vez com pausa: nunca chegamos perto do teto do TMDB. */
-let lastCall = 0;
-async function get(url: string, attempt = 0): Promise<{ results?: TmdbItem[]; total_pages?: number }> {
-  const since = Date.now() - lastCall;
-  if (since < 60) await sleep(60 - since);
-  lastCall = Date.now();
-
-  const res = await fetch(url, { headers });
-
-  if (res.status === 429) {
-    // Respeita o Retry-After quando vem; senão recua exponencialmente.
-    const wait = Number(res.headers.get("retry-after") ?? 0) * 1000 || 2 ** attempt * 1000;
-    if (attempt > 5) throw new Error("429 persistente no TMDB");
-    await sleep(wait);
-    return get(url, attempt + 1);
-  }
-  if (res.status >= 500 && attempt < 5) {
-    await sleep(2 ** attempt * 500);
-    return get(url, attempt + 1);
-  }
-  if (!res.ok) throw new Error(`TMDB ${res.status} em ${url.split("?")[0]}`);
-  return res.json() as Promise<{ results?: TmdbItem[]; total_pages?: number }>;
-}
 
 let inserted = 0;
 let updated = 0;
