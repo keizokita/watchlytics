@@ -456,7 +456,8 @@ export function NotificationsBadge() {
 const CSS = SCREEN_CSS + `
 .friend-search { display: flex; gap: 0.5rem; }
 .friend-search input {
-  flex: 1; padding: 0.55rem 0.9rem; border-radius: var(--r-pill); font: inherit;
+  flex: 1; min-height: var(--tap); padding: 0.55rem 0.9rem;
+  border-radius: var(--r-pill); font: inherit;
   border: 1px solid var(--line);
   background: var(--surface); color: var(--fg);
 }

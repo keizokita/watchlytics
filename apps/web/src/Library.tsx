@@ -404,10 +404,17 @@ const CSS = SCREEN_CSS + `
 .lib-stats dd { margin: 0.15rem 0 0; font-size: 1.1rem; font-weight: 600; }
 .lib-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
   justify-content: space-between; }
-.lib-rating { display: flex; gap: 0.15rem; align-items: center; }
-.lib-rating button { border: none; background: none; color: var(--fg);
+/* Envolve porque cinco alvos de 44px mais o "clear" não cabem em 360px. */
+.lib-rating { display: flex; flex-wrap: wrap; gap: 0.15rem; align-items: center; }
+/* A estrela continua do mesmo tamanho; o que cresce é a caixa em volta, que
+   era ~24px — o alvo mais fino do app inteiro, e num controle que existe para
+   ser tocado cinco vezes seguidas. Sem fundo nem borda, o ganho aparece como
+   espaço, não como botão maior. */
+.lib-rating button { display: inline-flex; align-items: center; justify-content: center;
+  min-width: var(--tap); min-height: var(--tap);
+  border: none; background: none; color: var(--fg);
   font: inherit; font-size: 1.1rem; line-height: 1; padding: 0.2rem; cursor: pointer; }
-.lib-rating .lib-clear { font-size: 0.75rem; color: var(--muted); padding-left: 0.5rem; }
+.lib-rating .lib-clear { min-width: 0; font-size: 0.75rem; color: var(--muted); padding: 0 0.5rem; }
 .lib-rating .lib-clear:disabled { opacity: 0.35; cursor: default; }
 
 .lib-account { border: 1px solid var(--line); border-radius: var(--r-panel);
@@ -417,7 +424,8 @@ const CSS = SCREEN_CSS + `
 .lib-account-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .lib-account button:disabled { opacity: 0.4; cursor: default; }
 /* A cor do botão destrutivo é a do pass, e só ele é vermelho na tela. */
-.lib-danger { padding: 0.45rem 0.9rem; border-radius: var(--r-pill);
+.lib-danger { display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--tap); padding: 0.45rem 0.9rem; border-radius: var(--r-pill);
   border: 1px solid var(--pass); background: none; color: var(--pass);
   font: inherit; font-size: 0.85rem; cursor: pointer; }
 `;

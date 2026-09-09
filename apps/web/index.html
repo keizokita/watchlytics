@@ -530,7 +530,10 @@
       .notice-hint { font-size: 0.9rem; }
 
       /* D5 — o toggle do perfil público mora na seção de conta */
-      .lib-public { display: flex; gap: 0.5rem; align-items: center; justify-content: center; }
+      /* O <input> nativo tem ~13px, mas o alvo é a <label> inteira: quem
+         clica no texto marca a caixa. É a label que precisa da altura. */
+      .lib-public { display: flex; gap: 0.5rem; align-items: center;
+        justify-content: center; min-height: var(--tap); }
 
       .sr-only {
         position: absolute;
