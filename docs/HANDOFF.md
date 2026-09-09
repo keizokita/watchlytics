@@ -24,7 +24,7 @@ HTML renderizado no servidor. Toda decisão de arquitetura protege esse caminho.
 O `git log` é documentação de verdade aqui: cada commit explica a decisão, não
 só a mudança. Vale ler antes de propor refazer algo.
 
-## Estado: 39 de 39 tarefas (+ trilhas de ingestão: 1 de 7)
+## Estado: 39 de 39 tarefas (+ trilhas de ingestão: 2 de 7)
 
 | Trilha | | |
 |---|---|---|
@@ -41,8 +41,10 @@ repetir; o LIKE vira coleção com abas e estatísticas.
 
 **106 testes** (89 API + 17 web), `npm run check` limpo nos três pacotes e as
 18 asserções do `driver.mjs all` verdes (2026-09-08).
-A trilha **I** (catálogo real, BACKLOG §5) tem só I0.1 fechada; I0.2 é o portão
-serial que segura I1 e I2.
+A trilha **I** (catálogo real, BACKLOG §5) tem a fase serial fechada: I0.1
+(régua) e I0.2 (migration 0003 + `castNames` no contrato). **`schema.ts` e
+`contract/index.ts` estão CONGELADOS** — I1 e I2 podem ser paralelizadas, e
+quem precisar de coluna nova fala antes em vez de editar.
 
 ## Ambiente — o que custa caro redescobrir
 
@@ -181,13 +183,11 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
 
 ## Próximos passos sugeridos
 
-1. **I0.2 — congelar `schema.ts` e `contract/index.ts`.** Portão serial que
-   sobrou: uma migration com todas as adições que I1 e I2 precisam, antes de
-   spawnar qualquer agente. Foram os pontos de contenção da rodada anterior.
-2. **Remover o shim `DEV_USER_ID`** do `auth.ts`. A condição que segurava isto
+1. **Remover o shim `DEV_USER_ID`** do `auth.ts`. A condição que segurava isto
    caiu: um login real completou em produção, então o shim já não é o único
    caminho de entrada. O cliente saiu dele no S7+C1; falta o servidor.
-3. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
+2. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
-4. **Trilha I — elenco no card (I1.1 → I1.2).** Com as 39 fechadas, é o que
-   sobra de conteúdo antes do beta; I0.2 já congelou o contrato que ela usa.
+3. **Trilha I — elenco no card (I1.1 → I1.2).** Com as 39 fechadas, é o que
+   sobra de conteúdo antes do beta, e o I0.2 já congelou o contrato que ela usa.
+   `castNames` viaja vazio hoje: a coluna existe e ninguém a preenche ainda.

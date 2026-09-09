@@ -33,6 +33,20 @@ export const title = z.object({
   genreIds: z.array(genreId),
   score: z.number().int().min(0).max(100),
   voteAverage: z.number(),
+  /**
+   * I1 — elenco principal, até 5 nomes; o card da I1.2 mostra 3. Quem corta é
+   * quem desenha, não o contrato: assim mudar o card não obriga a refazer a
+   * passada de ingestão.
+   *
+   * Array vazio, nunca null: título sem elenco não quebra o card, só não
+   * desenha a linha, e quem consome não precisa do ramo de null além do de
+   * vazio.
+   *
+   * `castNames` e não `cast` de propósito — é o mesmo nome da coluna
+   * `cast_names`, que existe porque CAST é palavra reservada em SQL. Uma
+   * tradução a menos entre banco e contrato é um lugar a menos para errar.
+   */
+  castNames: z.array(z.string()),
 });
 export type Title = z.infer<typeof title>;
 
