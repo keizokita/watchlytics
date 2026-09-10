@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { feedResponse } from "@watchlytics/contract";
+import { signAccess } from "./auth.ts";
 import { pg } from "./db/client.ts";
 import { buildServer } from "./server.ts";
+
+process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
+
+/** β3 — o feed é rota autenticada e o shim saiu: sem Bearer isto é 401. */
+const DEV = process.env["DEV_USER_ID"];
+if (!DEV) throw new Error("DEV_USER_ID não definida (veja .env.example)");
 
 /**
  * O que este teste guarda: que a resposta do feed continua satisfazendo o
@@ -18,7 +25,11 @@ test("GET /v1/feed devolve um lote válido pelo contrato", async (t) => {
     await pg.end();
   });
 
-  const res = await app.inject({ method: "GET", url: "/v1/feed" });
+  const res = await app.inject({
+    method: "GET",
+    url: "/v1/feed",
+    headers: { authorization: `Bearer ${signAccess(DEV)}` },
+  });
   assert.equal(res.statusCode, 200);
 
   const body = feedResponse.parse(res.json());

@@ -186,7 +186,7 @@ async function rotulos(
 export function friendRoutes(app: FastifyInstance): void {
   /** As três listas de uma vez: a tela mostra as três juntas. */
   app.get("/v1/friends", async (req): Promise<FriendsResponse> => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
 
     const rows = await db
       .select()
@@ -214,7 +214,7 @@ export function friendRoutes(app: FastifyInstance): void {
    * mesmo timestamp.
    */
   app.get<{ Querystring: { cursor?: string } }>("/v1/matches", async (req, reply) => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
 
     const cursor = req.query.cursor?.split("|");
     if (cursor && (cursor.length !== 2 || Number.isNaN(Date.parse(cursor[0]!)))) {
@@ -271,7 +271,7 @@ export function friendRoutes(app: FastifyInstance): void {
    * Cliente offline reenvia, e 409 aqui só faria a tela inventar tratamento.
    */
   app.post("/v1/friends/requests", async (req, reply) => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
 
     const parsed = z.object({ handle: z.string().min(1) }).safeParse(req.body);
     if (!parsed.success) {
@@ -324,7 +324,7 @@ export function friendRoutes(app: FastifyInstance): void {
   app.post<{ Params: { userId: string } }>(
     "/v1/friends/requests/:userId/accept",
     async (req, reply) => {
-      const userId = requireUserId(req);
+      const userId = await requireUserId(req);
 
       const parsed = z.uuid().safeParse(req.params.userId);
       if (!parsed.success) {

@@ -44,12 +44,15 @@ await db
   .values(GENRES.map((g) => ({ id: g.id, name: g.name })))
   .onConflictDoUpdate({ target: genres.id, set: { name: sql`excluded.name` } });
 
-// Usuário do shim C1. Produção não define DEV_USER_ID, então não cria nada.
+// Usuário de dev: testes e driver assinam Bearer para este id (β3 tirou o
+// shim que o fazia autenticar sozinho). Produção não define a variável.
 const devUserId = process.env["DEV_USER_ID"];
 if (devUserId) {
   await db
     .insert(users)
-    .values({ id: devUserId, handle: "dev", displayName: "Dev" })
+    // β2 — o usuário de dev nasce com a porta de idade respondida: ele existe
+    // para o driver e os testes rodarem, não para exercitar o cadastro.
+    .values({ id: devUserId, handle: "dev", displayName: "Dev", birthYear: 1990 })
     .onConflictDoNothing();
 }
 

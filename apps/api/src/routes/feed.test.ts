@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { eq, inArray, sql } from "drizzle-orm";
 import { feedResponse, type FeedResponse } from "@watchlytics/contract";
+import { signAccess } from "../auth.ts";
 import { db, pg } from "../db/client.ts";
 import { swipes, titles, users } from "../db/schema.ts";
 import { buildServer } from "../server.ts";
@@ -15,7 +16,9 @@ import { feedPage } from "./feed.ts";
  *   A5 os três degraus da fila vazia, sempre com aviso
  *   A6 a query do feed usando índice em swipes, não seq scan
  *
- * Precisa do banco semeado com DEV_USER_ID definido.
+ * Precisa do banco semeado. `DEV_USER_ID` continua sendo o id do usuário que
+ * o seed cria — depois do β3 ele é só isso, um id de fixture: quem autentica
+ * é o Bearer assinado abaixo.
  */
 const DEV = process.env["DEV_USER_ID"];
 if (!DEV) throw new Error("DEV_USER_ID não definida (veja .env.example)");
@@ -42,19 +45,25 @@ const TEST_USERS = [LOVES_DRAMA, LOVES_ANIMATION, SAW_EVERYTHING, PAGINATES];
 const DRAMA = 7;
 const ANIMATION = 2;
 
+process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
+
 const app = buildServer();
 
-/** Roda o feed como `userId`: o shim C1 (auth.ts) lê o usuário do ambiente. */
+/**
+ * Roda o feed como `userId`.
+ *
+ * β3 — era o shim do C1 lendo o usuário do ambiente, e trocar variável de
+ * processo para mudar de identidade só funcionava porque a autenticação estava
+ * desligada. Agora é um Bearer por usuário, o mesmo caminho da produção.
+ */
 async function feed(userId: string, query = ""): Promise<FeedResponse> {
-  const saved = process.env["DEV_USER_ID"];
-  process.env["DEV_USER_ID"] = userId;
-  try {
-    const res = await app.inject({ method: "GET", url: `/v1/feed${query}` });
-    assert.equal(res.statusCode, 200, `feed respondeu ${res.statusCode}`);
-    return feedResponse.parse(res.json());
-  } finally {
-    process.env["DEV_USER_ID"] = saved;
-  }
+  const res = await app.inject({
+    method: "GET",
+    url: `/v1/feed${query}`,
+    headers: { authorization: `Bearer ${signAccess(userId)}` },
+  });
+  assert.equal(res.statusCode, 200, `feed respondeu ${res.statusCode}`);
+  return feedResponse.parse(res.json());
 }
 
 /** Ids dos títulos que têm `genre` e não têm `without`. */
@@ -84,10 +93,12 @@ test.before(async () => {
   await db
     .insert(users)
     .values(
+      // β2 — `birthYear` é a porta de idade já respondida: sem ano, 403.
       TEST_USERS.map((id, i) => ({
         id,
         handle: `feed-test-${i}`,
         displayName: "Feed test",
+        birthYear: 1990,
       })),
     )
     .onConflictDoNothing();
@@ -118,7 +129,11 @@ test("A1: tipo, gênero, ano e idioma valem combinados", async () => {
 });
 
 test("A1: filtro inválido responde 400, não 500", async () => {
-  const res = await app.inject({ method: "GET", url: "/v1/feed?genres=999" });
+  const res = await app.inject({
+    method: "GET",
+    url: "/v1/feed?genres=999",
+    headers: { authorization: `Bearer ${signAccess(DEV)}` },
+  });
   assert.equal(res.statusCode, 400);
 });
 
@@ -141,7 +156,11 @@ test("A3: duas páginas seguidas não repetem item", async () => {
 });
 
 test("A3: cursor adulterado responde 400", async () => {
-  const res = await app.inject({ method: "GET", url: "/v1/feed?cursor=lixo" });
+  const res = await app.inject({
+    method: "GET",
+    url: "/v1/feed?cursor=lixo",
+    headers: { authorization: `Bearer ${signAccess(DEV)}` },
+  });
   assert.equal(res.statusCode, 400);
 });
 
@@ -240,6 +259,7 @@ test("A6: o feed usa índice em swipes, não seq scan", async () => {
       Array.from({ length: 300 }, (_, i) => ({
         handle: `feed-bench-${i}`,
         displayName: "Bench",
+        birthYear: 1990,
       })),
     )
     .returning({ id: users.id });

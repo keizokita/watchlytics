@@ -282,7 +282,7 @@ function list(v: unknown): string[] | undefined {
 
 export function feedRoutes(app: FastifyInstance) {
   app.get("/v1/feed", async (req, reply) => {
-    const userId = requireUserId();
+    const userId = await requireUserId(req);
     const raw = (req.query ?? {}) as Record<string, unknown>;
 
     const parsed = feedQuery.safeParse({

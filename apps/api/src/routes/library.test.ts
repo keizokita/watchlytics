@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { InjectOptions } from "fastify";
 import { asc, eq } from "drizzle-orm";
 import {
   discardedResponse,
@@ -7,6 +8,7 @@ import {
   profileStats,
   STATS_MIN_WATCHED,
 } from "@watchlytics/contract";
+import { signAccess } from "../auth.ts";
 import { db, pg } from "../db/client.ts";
 import { libraryEntries, swipes, titles, users } from "../db/schema.ts";
 import { buildServer } from "../server.ts";
@@ -23,11 +25,11 @@ import { buildServer } from "../server.ts";
  * paralelo e a suíte de swipes limpa a tabela inteira do usuário dela.
  */
 const USER = "00000000-0000-4000-8000-0000000000d1";
-process.env["DEV_USER_ID"] = USER;
 
 await db
   .insert(users)
-  .values({ id: USER, handle: "trilha-d", displayName: "Trilha D" })
+  // β2 — nasce com a porta de idade já respondida: sem ano, toda rota é 403.
+  .values({ id: USER, handle: "trilha-d", displayName: "Trilha D", birthYear: 1990 })
   .onConflictDoNothing();
 
 /** Pool estável: o feed muda de ordem conforme os swipes do próprio teste. */
@@ -37,31 +39,43 @@ assert.ok(
   "o banco precisa estar semeado (npm run seed)",
 );
 
+process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
+
 const app = buildServer();
 
+/**
+ * β3 — Bearer real em toda requisição: o shim do `DEV_USER_ID` saiu do
+ * `requireUserId`. Sem header, a rota responde 401, que é o que os testes de
+ * anônimo abaixo exercitam com `app.inject` cru.
+ */
+const como = { authorization: `Bearer ${signAccess(USER)}` };
+const inject = (opts: InjectOptions) =>
+  app.inject({ ...opts, headers: { ...como, ...(opts.headers ?? {}) } });
+
+
 const put = (titleId: string, body: Record<string, unknown>) =>
-  app.inject({ method: "PUT", url: `/v1/library/${titleId}`, payload: body });
+  inject({ method: "PUT", url: `/v1/library/${titleId}`, payload: body });
 
 const list = async (status: string) => {
-  const res = await app.inject({ method: "GET", url: `/v1/library?status=${status}` });
+  const res = await inject({ method: "GET", url: `/v1/library?status=${status}` });
   assert.equal(res.statusCode, 200);
   return libraryListResponse.parse(res.json()).items;
 };
 
 const discarded = async () => {
-  const res = await app.inject({ method: "GET", url: "/v1/library/discarded" });
+  const res = await inject({ method: "GET", url: "/v1/library/discarded" });
   assert.equal(res.statusCode, 200);
   return discardedResponse.parse(res.json()).items;
 };
 
 const stats = async () => {
-  const res = await app.inject({ method: "GET", url: "/v1/me/stats" });
+  const res = await inject({ method: "GET", url: "/v1/me/stats" });
   assert.equal(res.statusCode, 200);
   return profileStats.parse(res.json());
 };
 
 const swipe = (titleId: string, direction: 1 | -1) =>
-  app.inject({
+  inject({
     method: "POST",
     url: "/v1/swipes",
     payload: [{ titleId, direction, clientTs: new Date().toISOString() }],
@@ -222,13 +236,7 @@ test("agregados só existem a partir de 10 assistidos", async () => {
   assert.ok(counted > 0 && at.aggregates.topGenres.length <= 3);
 });
 
-test("sem DEV_USER_ID o catálogo responde 401", async () => {
-  const saved = process.env["DEV_USER_ID"];
-  delete process.env["DEV_USER_ID"];
-  try {
-    const res = await app.inject({ method: "GET", url: "/v1/library?status=watched" });
-    assert.equal(res.statusCode, 401);
-  } finally {
-    process.env["DEV_USER_ID"] = saved;
-  }
+test("sem Authorization o catálogo responde 401", async () => {
+  const res = await app.inject({ method: "GET", url: "/v1/library?status=watched" });
+  assert.equal(res.statusCode, 401);
 });
