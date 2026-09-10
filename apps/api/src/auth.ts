@@ -169,30 +169,22 @@ export function clientIp(req: FastifyRequest): string {
 /**
  * Identidade da requisição. Lança 401 (ou 429) — Fastify traduz `statusCode`.
  *
- * `req` é opcional só enquanto o shim do C1 existir: as rotas que ainda não o
- * passam continuam funcionando com o usuário fixo do ambiente.
+ * β3 — o shim do C1 saiu daqui em 2026-09-10. Era um `DEV_USER_ID` do ambiente
+ * atendendo qualquer requisição sem `Authorization`, e ele já tinha escondido um
+ * 401 até a produção: em dev o front nunca mandava header e o bug só apareceu no
+ * ar. Um atalho que substitui a autenticação esconde exatamente a classe de bug
+ * que ele finge cobrir, e com o OAuth no ar ele não era mais o único caminho de
+ * entrada — era só o caminho sem senha.
  */
-export function requireUserId(req?: FastifyRequest): string {
-  const header = req?.headers.authorization;
+export function requireUserId(req: FastifyRequest): string {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) throw unauthorized();
 
-  if (header?.startsWith("Bearer ")) {
-    const userId = verifyAccess(header.slice(7));
-    // Bearer presente e inválido NUNCA cai no shim: senão, em ambiente de dev,
-    // um token expirado passaria a valer como o usuário fixo.
-    if (!userId) throw unauthorized();
+  const userId = verifyAccess(header.slice(7));
+  if (!userId) throw unauthorized();
 
-    if (!rateLimit(`account:${userId}`, ACCOUNT_PER_MIN)) {
-      throw httpError(429, "muitas requisições");
-    }
-    return userId;
+  if (!rateLimit(`account:${userId}`, ACCOUNT_PER_MIN)) {
+    throw httpError(429, "muitas requisições");
   }
-
-  // ponytail: shim do C1 — usuário fixo do ambiente para as trilhas A, B e D
-  // andarem sem OAuth. SAI quando o fluxo do Google estiver em produção: apagar
-  // este bloco, tornar `req` obrigatório e passar `req` em toda rota. Em
-  // produção DEV_USER_ID não é definida, então o caminho abaixo já é 401.
-  const dev = process.env["DEV_USER_ID"];
-  if (dev) return dev;
-
-  throw unauthorized();
+  return userId;
 }

@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { InjectOptions } from "fastify";
 import { asc, eq } from "drizzle-orm";
 import {
   GENRE_IDS,
   ONBOARDING_SWIPES,
   onboardingDeck,
 } from "@watchlytics/contract";
+import { signAccess } from "../auth.ts";
 import { db, pg } from "../db/client.ts";
 import { swipes, titles, users } from "../db/schema.ts";
 import { buildServer } from "../server.ts";
@@ -23,7 +25,6 @@ import { buildServer } from "../server.ts";
  * Usuário próprio, não o DEV_USER_ID do .env: os arquivos rodam em paralelo.
  */
 const USER = "00000000-0000-4000-8000-0000000000d4";
-process.env["DEV_USER_ID"] = USER;
 
 await db
   .insert(users)
@@ -39,7 +40,19 @@ assert.ok(
   "o banco precisa estar semeado (npm run seed)",
 );
 
+process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
+
 const app = buildServer();
+
+/**
+ * β3 — Bearer real em toda requisição: o shim do `DEV_USER_ID` saiu do
+ * `requireUserId`. Sem header, a rota responde 401, que é o que os testes de
+ * anônimo abaixo exercitam com `app.inject` cru.
+ */
+const como = { authorization: `Bearer ${signAccess(USER)}` };
+const inject = (opts: InjectOptions) =>
+  app.inject({ ...opts, headers: { ...como, ...(opts.headers ?? {}) } });
+
 
 /** Estado limpo: o contador é contagem de swipes, e outro teste pode ter deixado. */
 const reset = async (genres: number[] | null = null) => {
@@ -48,7 +61,7 @@ const reset = async (genres: number[] | null = null) => {
 };
 
 const deck = async () => {
-  const res = await app.inject({ method: "GET", url: "/v1/onboarding/deck" });
+  const res = await inject({ method: "GET", url: "/v1/onboarding/deck" });
   assert.equal(res.statusCode, 200, res.body);
   return onboardingDeck.parse(res.json());
 };
@@ -140,7 +153,7 @@ test("terminado o onboarding, a rota não gasta títulos para dizer isso", async
 test("PATCH /v1/me grava os gêneros e recusa entrada inválida", async () => {
   await reset();
   const patch = (body: Record<string, unknown>) =>
-    app.inject({ method: "PATCH", url: "/v1/me", payload: body });
+    inject({ method: "PATCH", url: "/v1/me", payload: body });
 
   const ok = await patch({ preferredGenres: [1, 16] });
   assert.equal(ok.statusCode, 200, ok.body);

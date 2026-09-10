@@ -94,7 +94,7 @@ Prints → `/tmp/watchlytics-run/web.png` (deck inicial) e `web-depois.png`
 ✔ título desconhecido é descartado
 ✔ lote vazio responde 400
 ✔ like sai do feed
-✔ sem DEV_USER_ID a rota responde 401
+✔ sem Authorization a rota responde 401
 ── web ──
 ✔ deck renderizou — Despicable Me
 ✔ 3 cards no DOM (profundidade) — 3
@@ -179,11 +179,10 @@ desenvolvimento sem sujar nada.
   O `cmdApi` encerra o pool; qualquer código depois no mesmo processo que
   reimportar o módulo pega `CONNECTION_ENDED`. O `checkSwipesGravados` abre
   conexão própria com `postgres(...)` de propósito.
-- **`DEV_USER_ID` tem que ser restaurada.** O `cmdApi` troca a variável por um
-  usuário descartável (e apaga no fim, levando os swipes por `ON DELETE
-  CASCADE`). Em `all`, o `cmdWeb` roda depois e sobe uma api que **herda** esse
-  env — deixar o usuário apagado aí faz o `POST /v1/swipes` do navegador
-  estourar a FK.
+- **Não existe mais shim de autenticação.** O β3 tirou o `DEV_USER_ID` do
+  `requireUserId`: o `cmdApi` cria um usuário descartável e assina um Bearer
+  para ele (`signAccess`), e o `cmdWeb` planta sessão de verdade. Toda rota
+  autenticada responde 401 sem header — inclusive no seu `curl` de dev.
 - **O swipe NÃO vira `POST` na hora.** `swipeQueue.ts` (B6) grava em
   `localStorage` e só faz flush 3s depois (`FLUSH_MS`) ou quando junta 5
   pendentes. Conferir o banco logo após o clique devolve zero linha — o driver

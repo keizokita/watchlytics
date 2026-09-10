@@ -53,11 +53,12 @@ const ok = (label, cond, extra = "") => {
 // ─── api: servidor em processo, usuário descartável ─────────────────────────
 
 /**
- * Roda contra um usuário novo a cada execução em vez do DEV_USER_ID do .env.
+ * Roda contra um usuário novo a cada execução, com Bearer de verdade.
  *
- * auth.ts lê process.env a cada requisição, então dá para trocar o usuário
- * depois do boot. Importa porque os swipes do driver não podem sujar o feed
- * de quem estiver com o app aberto no navegador — e porque o DELETE do
+ * Era o shim do DEV_USER_ID trocado no meio do processo; o β3 apagou o shim, e
+ * agora o driver assina um access token para o usuário descartável — o mesmo
+ * caminho que a produção usa. Descartável importa porque os swipes do driver
+ * não podem sujar o feed de quem estiver com o app aberto, e o DELETE do
  * usuário no fim leva os swipes junto por ON DELETE CASCADE.
  */
 async function cmdApi() {
@@ -66,21 +67,18 @@ async function cmdApi() {
   const { db, pg } = await import(join(ROOT, "apps/api/src/db/client.ts"));
   const { users, swipes } = await import(join(ROOT, "apps/api/src/db/schema.ts"));
   const { buildServer } = await import(join(ROOT, "apps/api/src/server.ts"));
+  const { signAccess } = await import(join(ROOT, "apps/api/src/auth.ts"));
   const { eq } = await import("drizzle-orm");
 
-  // Restaurado no finally: em `all`, o cmdWeb roda depois e sobe uma api que
-  // HERDA este env. Deixar o usuário descartável aqui faria o POST /v1/swipes
-  // do navegador estourar a FK contra um usuário já apagado.
-  const original = process.env["DEV_USER_ID"];
   const userId = crypto.randomUUID();
   const handle = `driver-${userId.slice(0, 8)}`;
   await db.insert(users).values({ id: userId, handle, displayName: "Driver" });
-  process.env["DEV_USER_ID"] = userId;
 
   const app = buildServer();
-  const get = (url) => app.inject({ method: "GET", url });
+  const headers = { authorization: `Bearer ${signAccess(userId)}` };
+  const get = (url) => app.inject({ method: "GET", url, headers });
   const post = (payload) =>
-    app.inject({ method: "POST", url: "/v1/swipes", payload });
+    app.inject({ method: "POST", url: "/v1/swipes", payload, headers });
 
   try {
     const health = await get("/health");
@@ -130,15 +128,13 @@ async function cmdApi() {
     const stillThere = after.json().items.some((i) => i.id === items[0].id);
     ok("like sai do feed", !stillThere);
 
-    delete process.env["DEV_USER_ID"];
-    ok("sem DEV_USER_ID a rota responde 401", (await get("/v1/feed")).statusCode === 401);
+    const anon = await app.inject({ method: "GET", url: "/v1/feed" });
+    ok("sem Authorization a rota responde 401", anon.statusCode === 401);
   } finally {
     await db.delete(swipes).where(eq(swipes.userId, userId));
     await db.delete(users).where(eq(users.id, userId));
     await app.close();
     await pg.end();
-    if (original === undefined) delete process.env["DEV_USER_ID"];
-    else process.env["DEV_USER_ID"] = original;
   }
 }
 

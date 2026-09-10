@@ -350,26 +350,23 @@ test("rota protegida: 401 sem token, 200 com token válido", async () => {
   assert.equal(ok.statusCode, 200);
   assert.deepEqual(sessionUser.parse(ok.json()), user);
 
-  const saved = process.env["DEV_USER_ID"];
-  delete process.env["DEV_USER_ID"];
-  try {
-    const anon = await app.inject({ method: "GET", url: "/v1/auth/me" });
-    assert.equal(anon.statusCode, 401);
-  } finally {
-    if (saved) process.env["DEV_USER_ID"] = saved;
-  }
+  const anon = await app.inject({ method: "GET", url: "/v1/auth/me" });
+  assert.equal(anon.statusCode, 401);
 });
 
-test("Bearer inválido é 401 mesmo com o shim do C1 ligado", async () => {
-  assert.ok(process.env["DEV_USER_ID"], "este teste só faz sentido com o shim ligado");
-
+/**
+ * β3 — o shim do C1 saiu, mas o teste fica: era ele que provava que um Bearer
+ * quebrado NUNCA vira usuário de dev. Hoje prova que também não vira anônimo
+ * com acesso: token estragado é 401, não "sem token".
+ */
+test("Bearer inválido é 401, nunca outra identidade", async () => {
   for (const bad of ["Bearer lixo", "Bearer ", `Bearer ${signAccess("x")}z`]) {
     const res = await app.inject({
       method: "GET",
       url: "/v1/auth/me",
       headers: { authorization: bad },
     });
-    assert.equal(res.statusCode, 401, `${bad} não pode cair no usuário de dev`);
+    assert.equal(res.statusCode, 401, `${bad} não pode autenticar ninguém`);
   }
 });
 
