@@ -87,6 +87,8 @@ Prints → `/tmp/watchlytics-run/web.png` (deck inicial) e `web-depois.png`
 ```
 ── api ──
 ✔ GET /health
+✔ sem ano de nascimento o feed é 403 (β2)
+✔ a porta de idade abre com maior de idade
 ✔ GET /v1/feed devolve 20 — Shrek
 ✔ feed puxa do topo do catálogo, não do meio — menor da página 61 · mediana 34
 ✔ POST /v1/swipes aceita
@@ -179,6 +181,10 @@ desenvolvimento sem sujar nada.
   O `cmdApi` encerra o pool; qualquer código depois no mesmo processo que
   reimportar o módulo pega `CONNECTION_ENDED`. O `checkSwipesGravados` abre
   conexão própria com `postgres(...)` de propósito.
+- **Conta sem ano de nascimento não usa o app.** O β2 fecha toda rota
+  autenticada com 403 até `POST /v1/auth/age` receber um ano com 16 anos ou
+  mais; só `/v1/auth/me` e a própria porta respondem antes disso. Usuário criado
+  na mão em SQL precisa de `birth_year`, senão o deck nem carrega.
 - **Não existe mais shim de autenticação.** O β3 tirou o `DEV_USER_ID` do
   `requireUserId`: o `cmdApi` cria um usuário descartável e assina um Bearer
   para ele (`signAccess`), e o `cmdWeb` planta sessão de verdade. Toda rota

@@ -84,6 +84,19 @@ async function cmdApi() {
     const health = await get("/health");
     ok("GET /health", health.json().ok === true);
 
+    // β2 — o usuário nasce sem ano e por isso nasce sem app. A porta é a única
+    // coisa que responde antes dela ser respondida.
+    const fechada = await get("/v1/feed");
+    ok("sem ano de nascimento o feed é 403 (β2)", fechada.statusCode === 403);
+
+    const porta = await app.inject({
+      method: "POST",
+      url: "/v1/auth/age",
+      headers,
+      payload: { birthYear: new Date().getFullYear() - 30 },
+    });
+    ok("a porta de idade abre com maior de idade", porta.json().ok === true);
+
     const feed = await get("/v1/feed");
     const items = feed.json().items;
     ok("GET /v1/feed devolve 20", items.length === 20, items[0]?.title);
@@ -576,9 +589,12 @@ async function abrirSessao(page) {
   const { token, hash } = newRefreshToken(sessionId);
 
   await comBanco(async (sql) => {
+    // β2 — nasce com a porta de idade já respondida. A TELA que pergunta o ano
+    // é da trilha α e ainda não existe; enquanto não existir, o headless não
+    // teria como responder e pararia no 403 antes de ver o deck.
     await sql`
-      insert into users (id, handle, display_name)
-      values (${userId}, ${`driver-${userId.slice(0, 8)}`}, 'Driver')`;
+      insert into users (id, handle, display_name, birth_year)
+      values (${userId}, ${`driver-${userId.slice(0, 8)}`}, 'Driver', 1990)`;
     await sql`
       insert into sessions (id, user_id, refresh_token_hash, expires_at, user_agent)
       values (${sessionId}, ${userId}, ${hash},

@@ -50,7 +50,9 @@ const devUserId = process.env["DEV_USER_ID"];
 if (devUserId) {
   await db
     .insert(users)
-    .values({ id: devUserId, handle: "dev", displayName: "Dev" })
+    // β2 — o usuário de dev nasce com a porta de idade respondida: ele existe
+    // para o driver e os testes rodarem, não para exercitar o cadastro.
+    .values({ id: devUserId, handle: "dev", displayName: "Dev", birthYear: 1990 })
     .onConflictDoNothing();
 }
 

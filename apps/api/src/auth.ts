@@ -4,7 +4,11 @@ import {
   randomBytes,
   timingSafeEqual,
 } from "node:crypto";
+import { eq } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
+import { MIN_AGE } from "@watchlytics/contract";
+import { db } from "./db/client.ts";
+import { users } from "./db/schema.ts";
 
 /**
  * Primitivas de identidade: JWT de acesso, refresh opaco e rate limit.
@@ -167,7 +171,7 @@ export function clientIp(req: FastifyRequest): string {
 // ─── porta de entrada das rotas ─────────────────────────────────────────────
 
 /**
- * Identidade da requisição. Lança 401 (ou 429) — Fastify traduz `statusCode`.
+ * Identidade da requisição. Lança 401, 403 ou 429 — Fastify traduz `statusCode`.
  *
  * β3 — o shim do C1 saiu daqui em 2026-09-10. Era um `DEV_USER_ID` do ambiente
  * atendendo qualquer requisição sem `Authorization`, e ele já tinha escondido um
@@ -175,8 +179,20 @@ export function clientIp(req: FastifyRequest): string {
  * ar. Um atalho que substitui a autenticação esconde exatamente a classe de bug
  * que ele finge cobrir, e com o OAuth no ar ele não era mais o único caminho de
  * entrada — era só o caminho sem senha.
+ *
+ * β2 — e é aqui que a porta de idade fecha, no ÚNICO ponto por onde toda rota
+ * autenticada passa. Um guard por rota seria o mesmo código quinze vezes, e a
+ * décima sexta rota nasceria sem ele.
+ *
+ * `ageGate: false` é para as duas rotas que precisam funcionar com a porta
+ * fechada: `/v1/auth/me`, que é como o cliente descobre que precisa perguntar,
+ * e `/v1/auth/age`, que é a resposta. Qualquer outra rota com a porta aberta
+ * seria uma conta sem idade usando o app.
  */
-export function requireUserId(req: FastifyRequest): string {
+export async function requireUserId(
+  req: FastifyRequest,
+  opts?: { ageGate?: boolean },
+): Promise<string> {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) throw unauthorized();
 
@@ -186,5 +202,32 @@ export function requireUserId(req: FastifyRequest): string {
   if (!rateLimit(`account:${userId}`, ACCOUNT_PER_MIN)) {
     throw httpError(429, "muitas requisições");
   }
+
+  if (opts?.ageGate !== false && (await semIdadeConfirmada(userId))) {
+    throw httpError(403, "porta de idade pendente");
+  }
   return userId;
 }
+
+/**
+ * Uma consulta por requisição autenticada, pela PK.
+ *
+ * ponytail: o alternativo seria carimbar a idade no access token e não
+ * consultar nada — mas aí quem passa pela porta continua bloqueado até o token
+ * expirar (15 min), porque `ageGateResponse` não devolve token novo. A consulta
+ * é honesta e some no dia em que aparecer no perfil de latência.
+ *
+ * Usuário inexistente não é porta fechada: token válido de conta apagada é
+ * problema de quem for ler a linha depois, e virar 403 aqui esconderia isso.
+ */
+async function semIdadeConfirmada(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ birthYear: users.birthYear })
+    .from(users)
+    .where(eq(users.id, userId));
+  return row ? row.birthYear === null : false;
+}
+
+/** Idade em anos cheios não dá para saber só com o ano; este é o ano corrente. */
+export const idadeMinimaOk = (birthYear: number) =>
+  new Date().getFullYear() - birthYear >= MIN_AGE;

@@ -18,7 +18,7 @@ const PAGE = 50;
 
 export function notificationRoutes(app: FastifyInstance): void {
   app.get("/v1/notifications", async (req): Promise<NotificationsResponse> => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
 
     const items = await db
       .select()
@@ -52,7 +52,7 @@ export function notificationRoutes(app: FastifyInstance): void {
    * trabalho que o usuário não pediu.
    */
   app.post("/v1/notifications/read", async (req) => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
 
     const lidas = await db
       .update(notifications)

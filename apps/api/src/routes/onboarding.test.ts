@@ -28,7 +28,8 @@ const USER = "00000000-0000-4000-8000-0000000000d4";
 
 await db
   .insert(users)
-  .values({ id: USER, handle: "trilha-d4", displayName: "Trilha D4" })
+  // β2 — nasce com a porta de idade já respondida: sem ano, toda rota é 403.
+  .values({ id: USER, handle: "trilha-d4", displayName: "Trilha D4", birthYear: 1990 })
   .onConflictDoNothing();
 
 const catalog = await db

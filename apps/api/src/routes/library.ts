@@ -28,7 +28,7 @@ export function libraryRoutes(app: FastifyInstance): void {
   app.put<{ Params: { titleId: string } }>(
     "/v1/library/:titleId",
     async (req, reply) => {
-      const userId = requireUserId(req);
+      const userId = await requireUserId(req);
 
       if (!uuid.safeParse(req.params.titleId).success) {
         reply.code(400);
@@ -88,7 +88,7 @@ export function libraryRoutes(app: FastifyInstance): void {
   app.get<{ Querystring: { status?: string } }>(
     "/v1/library",
     async (req, reply) => {
-      const userId = requireUserId(req);
+      const userId = await requireUserId(req);
 
       const status = libraryStatus.safeParse(req.query.status);
       if (!status.success) {
@@ -129,7 +129,7 @@ export function libraryRoutes(app: FastifyInstance): void {
    * título volta ao feed. Entrada de catálogo nunca expira.
    */
   app.get("/v1/library/discarded", async (req) => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
 
     const rows = await db
       .select()
@@ -142,7 +142,7 @@ export function libraryRoutes(app: FastifyInstance): void {
   });
 
   /** D3 — estatísticas do próprio perfil. O D5 usa a MESMA função. */
-  app.get("/v1/me/stats", async (req) => statsOf(requireUserId(req)));
+  app.get("/v1/me/stats", async (req) => statsOf(await requireUserId(req)));
 }
 
 /**

@@ -28,7 +28,8 @@ const USER = "00000000-0000-4000-8000-0000000000d1";
 
 await db
   .insert(users)
-  .values({ id: USER, handle: "trilha-d", displayName: "Trilha D" })
+  // β2 — nasce com a porta de idade já respondida: sem ano, toda rota é 403.
+  .values({ id: USER, handle: "trilha-d", displayName: "Trilha D", birthYear: 1990 })
   .onConflictDoNothing();
 
 /** Pool estável: o feed muda de ordem conforme os swipes do próprio teste. */

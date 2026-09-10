@@ -138,7 +138,7 @@ export function profileRoutes(app: FastifyInstance): void {
    * têm que ser indistinguíveis de fora.
    */
   app.get<{ Querystring: { q?: string } }>("/v1/users", async (req) => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
     if (!rateLimit(`search:${userId}`, SEARCH_PER_MIN)) {
       throw httpError(429, "muitas buscas");
     }

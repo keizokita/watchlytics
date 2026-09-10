@@ -59,9 +59,10 @@ async function seed() {
   await db
     .insert(users)
     .values([
-      { id: LEFT, handle: "c6-esquerda", displayName: "Esquerda" },
-      { id: USER, handle: "c6-alvo", displayName: "Alvo", email: "alvo@exemplo.test" },
-      { id: RIGHT, handle: "c6-direita", displayName: "Direita" },
+      // β2 — `birthYear` é a porta de idade já respondida: sem ano, 403.
+      { id: LEFT, handle: "c6-esquerda", displayName: "Esquerda", birthYear: 1990 },
+      { id: USER, handle: "c6-alvo", displayName: "Alvo", email: "alvo@exemplo.test", birthYear: 1990 },
+      { id: RIGHT, handle: "c6-direita", displayName: "Direita", birthYear: 1990 },
     ])
     .onConflictDoNothing();
 

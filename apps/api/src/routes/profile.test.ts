@@ -27,8 +27,16 @@ await db
       // O `<script>` é o teste do escape, não decoração.
       displayName: 'Ana <script>alert("xss")</script>',
       isPublic: true,
+      // β2 — a porta de idade já respondida: sem ano, toda rota autenticada é 403.
+      birthYear: 1990,
     },
-    { id: PRIVADO, handle: "perfil-privado", displayName: "Bruno", isPublic: false },
+    {
+      id: PRIVADO,
+      handle: "perfil-privado",
+      displayName: "Bruno",
+      isPublic: false,
+      birthYear: 1990,
+    },
   ])
   .onConflictDoNothing();
 

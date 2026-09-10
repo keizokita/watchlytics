@@ -93,10 +93,12 @@ test.before(async () => {
   await db
     .insert(users)
     .values(
+      // β2 — `birthYear` é a porta de idade já respondida: sem ano, 403.
       TEST_USERS.map((id, i) => ({
         id,
         handle: `feed-test-${i}`,
         displayName: "Feed test",
+        birthYear: 1990,
       })),
     )
     .onConflictDoNothing();
@@ -257,6 +259,7 @@ test("A6: o feed usa índice em swipes, não seq scan", async () => {
       Array.from({ length: 300 }, (_, i) => ({
         handle: `feed-bench-${i}`,
         displayName: "Bench",
+        birthYear: 1990,
       })),
     )
     .returning({ id: users.id });
