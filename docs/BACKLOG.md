@@ -247,7 +247,7 @@ elenco desde o primeiro dia e nunca mostrou nenhum.
 | id | Tarefa | Pronto quando |
 |---|---|---|
 | I1.1 ✅ | Segunda passada de ingestão buscando `/{type}/{id}/credits` | Uma requisição por título, respeitando o mesmo rate limit; retomável — `ingest/credits.ts`, comando próprio, fila é a coluna `credits_synced_at` |
-| I1.2 | Até 3 nomes no card | Título sem elenco não quebra o card, só não mostra a linha |
+| I1.2 ✅ | Até 3 nomes no card | Título sem elenco não quebra o card, só não mostra a linha |
 
 **Possui:** `apps/api/src/ingest/credits.ts` + teste · `apps/web/src/Card.tsx`
 **Não toca:** `ingest/run.ts`, `ingest/tmdb.ts`, `ingest/http.ts`, nada de rota.
@@ -258,6 +258,19 @@ aprendido numa cópia não ensina nada à outra.
 **Atenção:** `/discover` não aceita `append_to_response`, então elenco é
 necessariamente uma segunda passada. Decida se roda junto da carga ou como
 comando separado, e diga por quê.
+
+> **I1.2 fechou em 2026-09-10.** Uma linha no `Card.tsx` e uma classe a mais no
+> seletor da meta. O corte de 3 é do card, não do contrato (que guarda 5) nem da
+> ingestão: mudar quantos nomes cabem não pode obrigar a rebuscar elenco.
+> A linha é a ÚLTIMA do card de propósito — sem elenco ela some e nada acima
+> muda de lugar; no meio, card com e sem elenco moveriam a sinopse a cada swipe.
+> Reticência em uma linha só, como a meta, porque três nomes longos com wrap
+> empurram a sinopse para fora do card.
+>
+> **Falta rodar a passada:** só 10 dos 9830 títulos do banco de dev têm elenco
+> (os do exercício da I1.1). Até `npm run ingest:credits` correr contra o banco
+> de verdade, a linha existe e não aparece — que é exatamente o comportamento
+> de "título sem elenco".
 
 ### I2 — Catálogo vivo
 

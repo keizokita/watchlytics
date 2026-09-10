@@ -188,6 +188,7 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
    caminho de entrada. O cliente saiu dele no S7+C1; falta o servidor.
 2. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
-3. **Trilha I — elenco no card (I1.1 → I1.2).** Com as 39 fechadas, é o que
-   sobra de conteúdo antes do beta, e o I0.2 já congelou o contrato que ela usa.
-   `castNames` viaja vazio hoje: a coluna existe e ninguém a preenche ainda.
+3. **Rodar `ingest:credits`.** A trilha I1 fechou em código (I1.1 busca, I1.2
+   mostra até 3 nomes no card), mas `castNames` ainda viaja vazio: só 10 títulos
+   do banco de dev têm elenco. Uma requisição por título, retomável — o que
+   falta é tempo de rede, não decisão.
