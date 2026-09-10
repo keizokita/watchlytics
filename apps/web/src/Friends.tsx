@@ -456,7 +456,14 @@ export function NotificationsBadge() {
 const CSS = SCREEN_CSS + `
 .friend-search { display: flex; gap: 0.5rem; }
 .friend-search input {
-  flex: 1; min-height: var(--tap); padding: 0.55rem 0.9rem;
+  /* width 0 junto do flex: sem ele, a largura intrínseca do input (size=20,
+     ~262px) entra na medida de max-content do formulário e SOBE a árvore toda
+     — lib, shell e o track do grid do body crescem junto, e o que passa de
+     320px some no overflow-x clip. Era esta a causa da aba "Alerts" e do botão
+     "Search" cortados em 360px; min-width sozinho não basta porque o piso que
+     sobra é o tamanho preferido, não o mínimo. */
+  flex: 1; min-width: 0; width: 0;
+  min-height: var(--tap); padding: 0.55rem 0.9rem;
   border-radius: var(--r-pill); font: inherit;
   border: 1px solid var(--line);
   background: var(--surface); color: var(--fg);
