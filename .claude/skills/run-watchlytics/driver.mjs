@@ -440,11 +440,26 @@ async function cmdWeb() {
         `(() => { const top = document.querySelector('.deck .deck-card:last-child');
           return { cards: document.querySelectorAll('.deck-card').length,
                    botoes: [...document.querySelectorAll('.actions button')].map(b => b.innerText),
-                   fundo: getComputedStyle(top).backgroundImage }; })()`,
+                   fundo: getComputedStyle(top).backgroundImage,
+                   elenco: top.querySelector('.card-cast')?.innerText ?? "" }; })()`,
       );
       const first = await topTitle(page);
       ok("deck renderizou", Boolean(first), first);
       ok("3 cards no DOM (profundidade)", deck?.cards === 3, String(deck?.cards));
+      // I1.2: até 3 nomes, e a linha só existe quando há elenco. A asserção é
+      // sobre o CAMINHO INTEIRO — coluna cast_names, contrato, toTitle, card —,
+      // que é o que nenhum teste de unidade alcança: `Card.tsx` é JSX e o
+      // `node --test` não sabe apagá-lo.
+      //
+      // Só o topo do feed, e de propósito: a I1.1 busca por score decrescente,
+      // então o que está no topo é justamente o que já foi buscado. Um card sem
+      // elenco lá em cima significa regressão, não catálogo incompleto.
+      const nomes = deck?.elenco ? deck.elenco.split(" · ") : [];
+      ok(
+        "elenco no card, até 3 nomes (I1.2)",
+        nomes.length > 0 && nomes.length <= 3,
+        deck?.elenco || "linha ausente — o card de topo devia ter elenco",
+      );
       // B4: o gradiente do id é FORRO, não alternativa — as duas camadas, nesta
       // ordem. Só "inclui linear-gradient" era verde no card SEM pôster nenhum,
       // que é o único caso que o B4 não precisa consertar; a ordem é o que pega

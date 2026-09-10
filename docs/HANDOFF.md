@@ -141,6 +141,20 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
 
 ## Problemas conhecidos
 
+- **Título buscado e sem elenco é normal, não falha.** Três casos no banco de
+  dev: JUJUTSU KAISEN, Black Mirror e Love, Death & Robots. O `/credits` do TMDB
+  não devolve elenco fixo para antologia nem para boa parte do anime. É por isso
+  que `credits_synced_at` preenchido com `cast_names` vazio é um estado
+  esperado, e diferente de *nunca buscado* — e é o caso que o `{cast && ...}` do
+  `Card.tsx` existe para tratar.
+- **O print do driver quase nunca mostra o pôster.** Cada run sobe um vite novo,
+  que força um page reload logo depois do primeiro load; a foto sai do documento
+  recém-recarregado, antes de a imagem pintar. O app está certo — a asserção do
+  B4 lê `url(...), linear-gradient(...)` no `background` e passa. Não conclua
+  regressão de pôster a partir do `web.png`, e não meça carregamento com
+  `performance.getEntriesByType("resource")`: essa lista é por documento e zera
+  no reload. A contagem da pré-carga usa `page.requests` do CDP por esse motivo.
+
 - **Flake não explicado:** `A5 degrau 1` falhou uma vez e não reproduziu em 6
   tentativas, incluindo com banco sujo e simulando primeira execução. Se
   aparecer de novo, há uma pista a mais.
@@ -188,7 +202,8 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
    caminho de entrada. O cliente saiu dele no S7+C1; falta o servidor.
 2. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
-3. **Rodar `ingest:credits`.** A trilha I1 fechou em código (I1.1 busca, I1.2
-   mostra até 3 nomes no card), mas `castNames` ainda viaja vazio: só 10 títulos
-   do banco de dev têm elenco. Uma requisição por título, retomável — o que
-   falta é tempo de rede, não decisão.
+3. **Terminar o `ingest:credits`.** Medido em 2026-09-10: **1876 de 9830**
+   títulos buscados, 1873 com elenco. Rodou pelo topo do score primeiro — é o
+   índice parcial `titles_sem_elenco` funcionando —, então os 20 do topo do feed
+   têm elenco e o deck nunca mostra card vazio. Faltam ~8 mil, e o que falta é
+   tempo de rede, não decisão: a passada é retomável pela própria coluna.
