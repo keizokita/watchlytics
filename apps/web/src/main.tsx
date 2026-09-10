@@ -321,6 +321,13 @@ function Root() {
           gap: 1.25rem;
           /* o item de grid do body já estica; isto é o piso quando não estica */
           min-height: 100%;
+          /* Largura explícita porque o justify-items do body deixa este item
+             shrink-to-fit: sem isto, um filho com width 100% resolve contra o
+             CONTEÚDO do shell — ou seja, contra o próprio elemento que está
+             vazando — e não contra a tela. Era por isso que a tela de amigos
+             cortava a aba "Alerts" em 360px. Os filhos seguem centralizados
+             pelo align-items acima. */
+          width: 100%;
         }
         /* Rodapé no fim da página em toda tela. Sozinha, esta margem já põe o
            conteúdo no topo: toda a folga vai para cima da atribuição. */
