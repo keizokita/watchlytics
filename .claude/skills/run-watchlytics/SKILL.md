@@ -14,11 +14,21 @@ Todos os caminhos são relativos à raiz do repositório.
 ## Prerequisites
 
 Node **≥23** é obrigatório: o projeto executa `.ts` direto, sem `tsx` nem build
-step. O node do PATH do sandbox não é o certo — carregue o nvm:
+step. **Confira antes de carregar qualquer coisa:**
 
 ```bash
-export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use 25   # v25.4.0
+node -v      # nesta máquina: v25.4.0, direto do PATH
 ```
+
+Se já estiver ≥23, **não** carregue o nvm. Havia aqui a instrução de sempre
+rodar `export NVM_DIR=...; . nvm.sh; nvm use 25`, e ela custava caro por um
+motivo que não é o óbvio: o preâmbulo transforma o comando numa linha composta,
+e o classificador do modo automático barra linha composta que ele não reconhece.
+O driver chegou a ser bloqueado no meio de uma verificação por causa disso.
+`node .claude/skills/run-watchlytics/driver.mjs all`, puro, passa.
+
+Se o `node -v` do PATH for antigo, aí sim carregue o nvm — e prefira abrir a
+sessão com ele já ativo a prefixar cada comando.
 
 `podman` (Postgres com `pgvector`) e `google-chrome` (o driver) já estão
 instalados nesta máquina — nada foi instalado nesta sessão. Confira com:

@@ -269,11 +269,20 @@ async function loadUser(userId: string): Promise<SessionUser> {
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
       isPublic: users.isPublic,
+      birthYear: users.birthYear,
     })
     .from(users)
     .where(eq(users.id, userId));
   if (!row) throw unauthorized();
-  return row;
+
+  // β2 — o ano em si NUNCA sai da API: vira booleano aqui. O cliente precisa
+  // saber se deve perguntar, não a idade de ninguém.
+  //
+  // ponytail: por enquanto só reporta. Quem BLOQUEIA o acesso enquanto isto for
+  // true é a trilha γ — hoje uma conta sem ano confirmado continua usando o app
+  // normalmente, e é exatamente esse buraco que o β2 fecha.
+  const { birthYear, ...user } = row;
+  return { ...user, needsAgeGate: birthYear === null };
 }
 
 // ─── sessão ─────────────────────────────────────────────────────────────────

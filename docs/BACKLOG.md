@@ -247,7 +247,7 @@ elenco desde o primeiro dia e nunca mostrou nenhum.
 | id | Tarefa | Pronto quando |
 |---|---|---|
 | I1.1 ✅ | Segunda passada de ingestão buscando `/{type}/{id}/credits` | Uma requisição por título, respeitando o mesmo rate limit; retomável — `ingest/credits.ts`, comando próprio, fila é a coluna `credits_synced_at` |
-| I1.2 | Até 3 nomes no card | Título sem elenco não quebra o card, só não mostra a linha |
+| I1.2 ✅ | Até 3 nomes no card | Título sem elenco não quebra o card, só não mostra a linha |
 
 **Possui:** `apps/api/src/ingest/credits.ts` + teste · `apps/web/src/Card.tsx`
 **Não toca:** `ingest/run.ts`, `ingest/tmdb.ts`, `ingest/http.ts`, nada de rota.
@@ -258,6 +258,26 @@ aprendido numa cópia não ensina nada à outra.
 **Atenção:** `/discover` não aceita `append_to_response`, então elenco é
 necessariamente uma segunda passada. Decida se roda junto da carga ou como
 comando separado, e diga por quê.
+
+> **I1.2 fechou em 2026-09-10.** Uma linha no `Card.tsx` e uma classe a mais no
+> seletor da meta. O corte de 3 é do card, não do contrato (que guarda 5) nem da
+> ingestão: mudar quantos nomes cabem não pode obrigar a rebuscar elenco.
+> A linha é a ÚLTIMA do card de propósito — sem elenco ela some e nada acima
+> muda de lugar; no meio, card com e sem elenco moveriam a sinopse a cada swipe.
+> Reticência em uma linha só, como a meta, porque três nomes longos com wrap
+> empurram a sinopse para fora do card.
+>
+> **Passada rodada em 2026-09-10, banco de dev:** 9830 títulos em 1717s (~29
+> min), fila zerada, 9769 com elenco e média de 4,86 nomes guardados. Os 61 sem
+> elenco não são falha: 48 séries e 13 filmes, e os de score mais alto são
+> antologia (`Black Mirror`, `Love, Death & Robots`) ou animação sem diálogo
+> (`Flow`, `Piper`) — `/tv/{id}/credits` respondeu para 97,4% das séries, então
+> não há buraco sistemático a corrigir. Nenhum 404: `fora do TMDB 0`.
+>
+> Os dois estados foram vistos no navegador, um em cada ponta da fila (que anda
+> por score DESC): com 525 buscados o card do topo era `Hercules`, score 63,
+> ainda na frente da fronteira — nenhuma linha e nada deslocado; com 1500, o
+> topo era `Shrek 2` com "Mike Myers · Eddie Murphy · Cameron Diaz".
 
 ### I2 — Catálogo vivo
 
@@ -296,3 +316,70 @@ A sequência de produção — secret, ingestão real, `DELETE` da fixture, remo
 seed do `release_command` — é operação destrutiva contra produção, está
 documentada no `fly.toml` e depende de autorização do usuário. Não é trilha de
 agente.
+
+---
+
+## 6. Fase beta — objetivo e trilhas
+
+### O objetivo, em uma frase
+
+> **10 a 30 pessoas reais usando o app com amigos de verdade por duas semanas,
+> sem que a gente precise ficar olhando.**
+
+Esse "sem ficar olhando" é o que separa beta de demo. Demo funciona com alguém
+do lado explicando; beta tem que sobreviver a estranho, de madrugada, no celular
+dele, sem ninguém por perto — e alguém tem que ficar sabendo quando quebrar.
+
+O beta é a primeira vez que o produto é testado de verdade: as features sociais
+(amizade, match, títulos em comum) nunca funcionaram entre duas pessoas que não
+sejam a mesma. Match com um usuário só é código sem prova.
+
+### O que já está pronto
+
+As 39 tarefas do backlog (S/A/B/C/D/E), o catálogo real em produção com régua
+800, elenco no card, deploy e CI. **Feature não é o que falta.**
+
+### P0 — bloqueia o convite
+
+Nada disso é opcional: sem os três, convidar alguém é irresponsável ou ilegal.
+
+| id | Tarefa | Por quê |
+|---|---|---|
+| β1 | Política de privacidade e termos de uso, com link no aviso de consentimento | O `consentNotice` promete um acordo que não existe em lugar nenhum. Mercado global = GDPR, não só LGPD |
+| β2 | Idade mínima no cadastro | COPPA (menor de 13 nos EUA) e GDPR. Está no PLAN §8 desde o começo e nunca saiu do papel |
+| β3 | Remover o shim do C1 | `DEV_USER_ID` segue em `auth.ts` com o OAuth em produção. Era para sair no merge do C2 — é exatamente o "não deixe virar permanente" |
+
+### P1 — bloqueia confiar no beta
+
+Dá para convidar sem isso. Você só não fica sabendo de nada.
+
+| id | Tarefa | Por quê |
+|---|---|---|
+| β4 | Error handler + log estruturado na api | Hoje um 500 em produção é invisível: sem logger, sem handler, sem nada |
+| β5 | Um caminho de retorno do usuário | Beta sem canal de feedback é beta que não ensina nada. Um `mailto:` resolve — não construa formulário |
+
+### P2 — qualidade do que eles vão ver
+
+| id | Tarefa | Por quê |
+|---|---|---|
+| β6 | Loop social provado entre duas contas reais | Amizade, match e notificação nunca rodaram entre duas pessoas distintas |
+| β7 | Onboarding conferido contra o catálogo real | O deck estratificado dos 20 swipes foi desenhado para 94 títulos, não para milhares com régua 800 |
+
+### Divisão para agentes paralelos
+
+**Fase serial, antes de spawnar** (mesma regra que funcionou na rodada I):
+uma migration só, com a coluna que β2 precisa, e o contrato congelado depois.
+
+| Trilha | Escopo | Possui | Não toca |
+|---|---|---|---|
+| **α — Conformidade** | β1 + a tela do β2 | `docs/legal/*`, `Onboarding.tsx`, `Login.tsx`, `strings.ts` | backend, rotas |
+| **β — Observabilidade** | β4 | `apps/api/src/obs.ts` (novo), `server.ts` | rotas, web |
+| **γ — Auth endurecida** | β3 + o backend do β2 | `auth.ts`, `apps/api/src/routes/*` | web, docs |
+
+As três são disjuntas por arquivo. α e γ se encontram só no requisito "gravar a
+idade": γ faz o backend, α faz a tela, e o contrato entre elas foi congelado na
+fase serial.
+
+**Fora das trilhas, e são do usuário:** publicar a tela de consentimento do
+Google (ou cadastrar os testadores — o modo Testing tem teto de 100 e só admite
+e-mail listado), e convidar as pessoas.

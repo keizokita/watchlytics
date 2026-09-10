@@ -10,6 +10,10 @@ export function Card({ title: item }: { title: Title }) {
   /** Ano e gênero são a mesma classe de informação: uma linha, um separador. */
   const meta = [String(item.releaseYear), genres].filter(Boolean).join(" · ");
 
+  /* O contrato traz até 5 nomes e quem corta é o card. Três é o que cabe em
+     uma linha; o quarto entraria só como reticência. */
+  const cast = item.castNames.slice(0, 3).join(" · ");
+
   return (
     <article className="card">
       {/* Tipo e nota sobem para o topo: são o filtro rápido de quem decide em
@@ -30,6 +34,9 @@ export function Card({ title: item }: { title: Title }) {
         )}
         <p className="card-meta">{meta}</p>
         <p className="card-overview">{item.overview}</p>
+        {/* Última linha de propósito: título sem elenco perde a linha e nada
+            acima dele muda de lugar de um card para o outro. */}
+        {cast && <p className="card-cast">{cast}</p>}
       </div>
     </article>
   );

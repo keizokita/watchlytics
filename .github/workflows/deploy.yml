@@ -27,6 +27,12 @@ jobs:
       DATABASE_URL_TEST: postgres://dev:dev@localhost:5432/watchlytics
       # C1 — só no CI e em dev. Produção nunca define, e responde 401.
       DEV_USER_ID: 00000000-0000-4000-8000-000000000001
+      # NÃO é secret, e não deve virar um: o suite assina um access próprio
+      # (`signAccess`) para provar que o Bearer manda no catálogo, e para isso o
+      # valor só precisa passar do piso de 32 caracteres do `auth.ts`. Vem
+      # literal para que um clone do repositório rode `npm test` verde sem
+      # pedir nada a ninguém. O segredo de verdade vive no `fly secrets`.
+      AUTH_SECRET: ci-nao-e-segredo-producao-usa-fly-secrets
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

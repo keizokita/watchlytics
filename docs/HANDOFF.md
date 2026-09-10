@@ -167,6 +167,20 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 
 ## Problemas conhecidos
 
+- **Título buscado e sem elenco é normal, não falha.** Três casos no banco de
+  dev: JUJUTSU KAISEN, Black Mirror e Love, Death & Robots. O `/credits` do TMDB
+  não devolve elenco fixo para antologia nem para boa parte do anime. É por isso
+  que `credits_synced_at` preenchido com `cast_names` vazio é um estado
+  esperado, e diferente de *nunca buscado* — e é o caso que o `{cast && ...}` do
+  `Card.tsx` existe para tratar.
+- **O print do driver quase nunca mostra o pôster.** Cada run sobe um vite novo,
+  que força um page reload logo depois do primeiro load; a foto sai do documento
+  recém-recarregado, antes de a imagem pintar. O app está certo — a asserção do
+  B4 lê `url(...), linear-gradient(...)` no `background` e passa. Não conclua
+  regressão de pôster a partir do `web.png`, e não meça carregamento com
+  `performance.getEntriesByType("resource")`: essa lista é por documento e zera
+  no reload. A contagem da pré-carga usa `page.requests` do CDP por esse motivo.
+
 - **Flake não explicado:** `A5 degrau 1` falhou uma vez e não reproduziu em 6
   tentativas, incluindo com banco sujo e simulando primeira execução. Se
   aparecer de novo, há uma pista a mais.
@@ -214,6 +228,14 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
    caminho de entrada. O cliente saiu dele no S7+C1; falta o servidor.
 2. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
-3. **Trilha I — elenco no card (I1.1 → I1.2).** Com as 39 fechadas, é o que
-   sobra de conteúdo antes do beta, e o I0.2 já congelou o contrato que ela usa.
-   `castNames` viaja vazio hoje: a coluna existe e ninguém a preenche ainda.
+3. **Trilhas α, β e γ do beta** (BACKLOG §6). O β0 já congelou schema e
+   contrato, e as três são disjuntas por arquivo — é a mesma fase serial que
+   funcionou na rodada I. O item 1 desta lista é o β3, dentro da γ.
+
+A trilha I saiu do caminho: a I1 fechou inteira em 2026-09-10, passada incluída
+— 9830 títulos em 1717s, fila zerada, **9769 com elenco**, média de 4,86 nomes.
+Rodou pelo topo do score primeiro (é o índice parcial `titles_sem_elenco`
+funcionando), então o deck tinha elenco muito antes do fim. Os 61 sem elenco não
+são falha: antologia (`Black Mirror`) e animação sem diálogo (`Flow`), e nenhum
+404. A I2 continua aberta e **não** bloqueia o beta — em doze meses o catálogo
+não teria nenhum título do ano, e duas semanas de beta cabem folgadas nisso.

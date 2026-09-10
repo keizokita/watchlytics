@@ -244,6 +244,14 @@ export const sessionUser = z.object({
   avatarUrl: z.url().nullable(),
   /** D5 — privado por padrão (PLAN §8.2). A tela precisa saber para oferecer. */
   isPublic: z.boolean(),
+  /**
+   * β2 — `true` enquanto a conta não passou pela porta de idade.
+   *
+   * É um booleano derivado, e não o ano em si, de propósito: o cliente precisa
+   * saber SE deve perguntar, nunca a idade de ninguém. Ano de nascimento não
+   * atravessa a fronteira da API em nenhuma direção além da resposta do gate.
+   */
+  needsAgeGate: z.boolean(),
 });
 export type SessionUser = z.infer<typeof sessionUser>;
 
@@ -337,3 +345,40 @@ export const feedRelaxation = z.enum([
   "exhausted",
 ]);
 export type FeedRelaxation = z.infer<typeof feedRelaxation>;
+
+// ─── porta de idade (β2) ────────────────────────────────────────────────────
+
+/**
+ * Idade mínima global. 16 é o teto da faixa do GDPR (13–16, varia por país):
+ * um número só, o mais restritivo, em vez de tabela por país que ninguém vai
+ * manter correta. Mercado é global (PLAN §1 decisão 6), então o piso vale para
+ * todo mundo.
+ *
+ * ponytail: solução conservadora — exclui adolescente de 13 a 15 em países onde
+ * seria legal. Vira tabela por região quando houver motivo de produto para isso,
+ * não antes.
+ */
+export const MIN_AGE = 16;
+
+/** Corpo de `POST /v1/auth/age`. Ano, nunca data completa. */
+export const ageGateInput = z.object({
+  birthYear: z
+    .number()
+    .int()
+    .min(1900)
+    .max(new Date().getFullYear()),
+});
+export type AgeGateInput = z.infer<typeof ageGateInput>;
+
+/**
+ * `ok: false` quando o ano informado fica abaixo do piso.
+ *
+ * A recusa NÃO cria conta pela metade nem grava o ano: o backend rejeita e
+ * apaga a sessão. Guardar "tentou entrar e é menor" seria acumular justamente o
+ * dado que a lei manda não coletar.
+ */
+export const ageGateResponse = z.object({
+  ok: z.boolean(),
+  minAge: z.number().int(),
+});
+export type AgeGateResponse = z.infer<typeof ageGateResponse>;
