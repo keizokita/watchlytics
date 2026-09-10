@@ -202,8 +202,14 @@ Google acontece; não prova que alguém atravessou ela até o fim. Falta saber s
    caminho de entrada. O cliente saiu dele no S7+C1; falta o servidor.
 2. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
-3. **Terminar o `ingest:credits`.** Medido em 2026-09-10: **1876 de 9830**
-   títulos buscados, 1873 com elenco. Rodou pelo topo do score primeiro — é o
-   índice parcial `titles_sem_elenco` funcionando —, então os 20 do topo do feed
-   têm elenco e o deck nunca mostra card vazio. Faltam ~8 mil, e o que falta é
-   tempo de rede, não decisão: a passada é retomável pela própria coluna.
+3. **Trilhas α, β e γ do beta** (BACKLOG §6). O β0 já congelou schema e
+   contrato, e as três são disjuntas por arquivo — é a mesma fase serial que
+   funcionou na rodada I. O item 1 desta lista é o β3, dentro da γ.
+
+A trilha I saiu do caminho: a I1 fechou inteira em 2026-09-10, passada incluída
+— 9830 títulos em 1717s, fila zerada, **9769 com elenco**, média de 4,86 nomes.
+Rodou pelo topo do score primeiro (é o índice parcial `titles_sem_elenco`
+funcionando), então o deck tinha elenco muito antes do fim. Os 61 sem elenco não
+são falha: antologia (`Black Mirror`) e animação sem diálogo (`Flow`), e nenhum
+404. A I2 continua aberta e **não** bloqueia o beta — em doze meses o catálogo
+não teria nenhum título do ano, e duas semanas de beta cabem folgadas nisso.

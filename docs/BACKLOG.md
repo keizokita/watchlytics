@@ -267,10 +267,17 @@ comando separado, e diga por quê.
 > Reticência em uma linha só, como a meta, porque três nomes longos com wrap
 > empurram a sinopse para fora do card.
 >
-> **Falta rodar a passada:** só 10 dos 9830 títulos do banco de dev têm elenco
-> (os do exercício da I1.1). Até `npm run ingest:credits` correr contra o banco
-> de verdade, a linha existe e não aparece — que é exatamente o comportamento
-> de "título sem elenco".
+> **Passada rodada em 2026-09-10, banco de dev:** 9830 títulos em 1717s (~29
+> min), fila zerada, 9769 com elenco e média de 4,86 nomes guardados. Os 61 sem
+> elenco não são falha: 48 séries e 13 filmes, e os de score mais alto são
+> antologia (`Black Mirror`, `Love, Death & Robots`) ou animação sem diálogo
+> (`Flow`, `Piper`) — `/tv/{id}/credits` respondeu para 97,4% das séries, então
+> não há buraco sistemático a corrigir. Nenhum 404: `fora do TMDB 0`.
+>
+> Os dois estados foram vistos no navegador, um em cada ponta da fila (que anda
+> por score DESC): com 525 buscados o card do topo era `Hercules`, score 63,
+> ainda na frente da fronteira — nenhuma linha e nada deslocado; com 1500, o
+> topo era `Shrek 2` com "Mike Myers · Eddie Murphy · Cameron Diaz".
 
 ### I2 — Catálogo vivo
 
