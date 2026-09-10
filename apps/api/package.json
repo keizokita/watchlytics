@@ -6,7 +6,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "generate": "drizzle-kit generate",
-    "migrate": "node --env-file-if-exists=.env src/db/migrate.ts",
+    "migrate": "node --env-file-if-exists=.env src/db/migrate.ts && DATABASE_URL=\"${DATABASE_URL_TEST:-postgres://dev:dev@localhost:5433/watchlytics_test}\" node src/db/migrate.ts",
     "seed": "node --env-file-if-exists=.env src/seed.ts",
     "dev": "node --env-file-if-exists=.env --watch src/server.ts",
     "test": "DATABASE_URL=\"${DATABASE_URL_TEST:-postgres://dev:dev@localhost:5433/watchlytics_test}\" node --env-file-if-exists=.env --test \"src/**/*.test.ts\"",

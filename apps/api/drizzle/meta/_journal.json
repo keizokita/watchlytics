@@ -29,6 +29,13 @@
       "when": 1788916909328,
       "tag": "0003_high_purple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789057218211,
+      "tag": "0004_age_gate",
+      "breakpoints": true
     }
   ]
 }

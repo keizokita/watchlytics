@@ -38,7 +38,16 @@ export const users = pgTable(
     email: text("email"), // informativo, NUNCA chave de login
     avatarUrl: text("avatar_url"),
     isPublic: boolean("is_public").notNull().default(false),
-    preferredGenres: smallint("preferred_genres").array(),
+    /**
+   * β2 — porta de idade. ANO, não data de nascimento: é o mínimo que satisfaz
+   * COPPA (13 nos EUA) e a faixa do GDPR (13–16, varia por país), e minimização
+   * de dado é princípio das duas leis, não preferência nossa.
+   *
+   * NULL = conta anterior à porta, ou que ainda não respondeu. Quem lê decide o
+   * que fazer com isso; o banco não presume idade de ninguém.
+   */
+  birthYear: smallint("birth_year"),
+  preferredGenres: smallint("preferred_genres").array(),
     tasteVector: vector("taste_vector", { dimensions: TASTE_VECTOR_DIM }),
     createdAt: createdAt(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
