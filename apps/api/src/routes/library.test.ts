@@ -240,3 +240,50 @@ test("sem Authorization o catálogo responde 401", async () => {
   const res = await app.inject({ method: "GET", url: "/v1/library?status=watched" });
   assert.equal(res.statusCode, 401);
 });
+
+/**
+ * O Bearer é quem decide de quem é o catálogo.
+ *
+ * As quatro rotas daqui chamavam `requireUserId()` sem `req`, então caíam no
+ * usuário fixo do ambiente mesmo com um access válido no cabeçalho: em dev,
+ * quem logasse via o catálogo de outra pessoa. O shim não existe mais (β3),
+ * mas o teste continua sendo o que falha se o `req` sumir de novo.
+ */
+test("com Bearer, o catálogo é de quem assinou o token, não de outra conta", async () => {
+  const OUTRO = "00000000-0000-4000-8000-0000000000d2";
+  await db
+    .insert(users)
+    // β2 — com a porta de idade fechada toda rota daqui seria 403, e o que
+    // este caso mede é identidade, não a porta. `DoUpdate` e não `DoNothing`
+    // porque a conta já existe sem ano nos bancos criados antes do β2.
+    .values({
+      id: OUTRO,
+      handle: "trilha-d2",
+      displayName: "Trilha D2",
+      birthYear: 1990,
+    })
+    .onConflictDoUpdate({ target: users.id, set: { birthYear: 1990 } });
+  await db.delete(libraryEntries).where(eq(libraryEntries.userId, OUTRO));
+
+  const como = { authorization: `Bearer ${signAccess(OUTRO)}` };
+  const dele = pool.at(-1)!.id;
+
+  const put = await app.inject({
+    method: "PUT",
+    url: `/v1/library/${dele}`,
+    headers: como,
+    payload: { status: "interested", rating: null },
+  });
+  assert.equal(put.statusCode, 204);
+
+  const res = await app.inject({
+    method: "GET",
+    url: "/v1/library?status=interested",
+    headers: como,
+  });
+  const seus = libraryListResponse.parse(res.json()).items;
+  assert.ok(seus.some((e) => e.title.id === dele));
+
+  // E a conta do arquivo continua sendo outra: o título não vazou para o USER.
+  assert.ok(!(await list("interested")).some((e) => e.title.id === dele));
+});

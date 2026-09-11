@@ -109,7 +109,14 @@ async function exchange(code: string, state: string): Promise<SessionUser> {
     await new Promise((r) => setTimeout(r, COLD_START_MS));
     res = await post();
   }
-  if (!res.ok) throw new Error(`${res.status}`);
+  if (!res.ok) {
+    // Único ponto deste arquivo que lançava detalhe técnico. Tudo mais que ele
+    // lança já é texto de usuário (authNotConfigured, authStateMismatch), e é
+    // por isso que os `catch` daqui continuam lendo `e.message` direto em vez
+    // de passar por `mensagem()`.
+    console.error(`troca de código respondeu ${res.status}`);
+    throw new Error(t.errorGeneric);
+  }
 
   const body = authResponse.parse(await res.json());
   setAccessToken(body.access);
@@ -178,7 +185,7 @@ export function Login() {
 
   return (
     <p className="notice">
-      {error && <span className="error">{t.error(error)} </span>}
+      {error && <span className="error">{error} </span>}
       {user ? (
         <>
           {t.signedInAs(user.handle)}{" "}
@@ -192,7 +199,7 @@ export function Login() {
           className="link"
           onClick={() => {
             setError(null);
-            signIn().catch((e: unknown) => setError(String(e)));
+            signIn().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
           }}
         >
           {t.signIn}

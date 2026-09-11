@@ -110,6 +110,10 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
    decisão: o gesto tem peso? (senão, `framer-motion` se justifica). A outra —
    "o card convence sem pôster?" — perdeu o objeto: agora há pôster.
 
+**Saiu desta lista em 2026-09-09:** "conferir o login no Network do DevTools".
+Os quatro elos foram medidos de fora e o caminho está inteiro — ver o bloco
+abaixo. Não precisa de você.
+
 As contas do S7 e as credenciais do Google saíram desta lista em 2026-09-03; o
 fornecedor de catálogo saiu em 2026-09-08, fechado em TMDB, e a régua (I0.1)
 fechou no mesmo dia em 800. Os secrets do CI foram cadastrados em 2026-09-08 e
@@ -133,11 +137,33 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 `keizokita1`), onboarding com os 20 swipes gravados no Postgres de produção, e
 `/u/keizokita1` servindo `og:url` com o `PUBLIC_ORIGIN`. O S7 é ✅.
 
-E há um terceiro, maior: **nenhum login jamais completou** — 0 usuários e 0
-sessões no banco de produção. O que a linha acima prova é que a troca com o
-Google acontece; não prova que alguém atravessou ela até o fim. Falta saber se o
-`POST /v1/auth/oauth/google` chega a ser chamado ou se o Google barra antes com
-`redirect_uri_mismatch`, e isso só o Network do DevTools responde.
+> **Havia aqui a afirmação de que "nenhum login jamais completou — 0 usuários e
+> 0 sessões". Era falsa, e contradizia o parágrafo logo acima.** Revalidado em
+> 2026-09-09, os quatro elos, cada um medido de fora:
+>
+> 1. **Front não está inerte.** O `client_id` está compilado no bundle servido
+>    (`/assets/index-*.js`) — `VITE_GOOGLE_CLIENT_ID` é build time e a variable
+>    do Actions existe.
+> 2. **A API aceita o `redirect_uri` que o front manda.** `POST
+>    /v1/auth/oauth/google` com `https://watchlytics.pages.dev/` e código falso
+>    responde **401 "provedor recusou o código"** — ou seja, passou pela
+>    allowlist e falou com o Google. Sem a barra final responde 400: o
+>    `REDIRECT_URI` do `Login.tsx` é `${window.location.origin}/`, com barra, e a
+>    comparação da allowlist é string exata.
+> 3. **O Google não barra.** A URL de autorização com o client id e o
+>    `redirect_uri` de produção responde 302 e segue para a tela de login,
+>    carregando `app_domain=https://watchlytics.pages.dev`. Um
+>    `redirect_uri_mismatch` daria Erro 400 antes de qualquer tela.
+> 4. **Existe usuário em produção.** `/v1/users/keizokita1` responde 200 com
+>    `avatarUrl` em `lh3.googleusercontent.com` — essa URL só existe se a troca
+>    de token com o Google tiver dado certo.
+>
+> Não dá para contar sessões daqui (sem `flyctl` e sem a URL do Neon), então o
+> "0 sessões" não foi refutado nem confirmado. Mas ele não é evidência de login
+> quebrado: sessão expira e sai na saída da conta. A hipótese mais provável para
+> os zeros originais é consulta ao banco errado — o Neon tem branches.
+>
+> **Não reabra isto sem um erro observado.** O caminho está medido ponta a ponta.
 
 ## Problemas conhecidos
 

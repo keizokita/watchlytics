@@ -14,6 +14,7 @@ import {
 } from "@watchlytics/contract";
 import { authedFetch } from "./session.ts";
 import { SCREEN_CSS } from "./screenCss.ts";
+import { mensagem } from "./errors.ts";
 import { t } from "./strings.ts";
 
 /**
@@ -33,7 +34,7 @@ const TABS: readonly { id: Tab; label: string }[] = [
 ];
 
 async function getJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
+  const res = await authedFetch(url);
   if (!res.ok) throw new Error(`${url} respondeu ${res.status}`);
   return res.json();
 }
@@ -140,7 +141,7 @@ function Account() {
     setBusy(true);
     setError(null);
     fn()
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => setError(mensagem(e)))
       .finally(() => setBusy(false));
   };
 
@@ -208,7 +209,7 @@ function Account() {
     <section className="lib-account">
       <h2>{t.account}</h2>
       <p className="lib-locked">{t.accountHint}</p>
-      {error && <p className="notice error">{t.error(error)}</p>}
+      {error && <p className="notice error">{error}</p>}
 
       {me && (
         <>
@@ -265,7 +266,7 @@ export function Library() {
       setStats(profileStats.parse(await getJson("/v1/me/stats")));
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(mensagem(e));
     } finally {
       setReady(true);
     }
@@ -281,13 +282,13 @@ export function Library() {
    */
   const save = useCallback(
     async (titleId: string, status: LibraryStatus, rating: number | null) => {
-      const res = await fetch(`/v1/library/${titleId}`, {
+      const res = await authedFetch(`/v1/library/${titleId}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ status, rating }),
       });
       if (!res.ok) {
-        setError(`PUT /v1/library respondeu ${res.status}`);
+        setError(mensagem(new Error(`PUT /v1/library respondeu ${res.status}`)));
         return;
       }
       // Sem mutação otimista: aqui não há gesto esperando a tela, e o item
@@ -328,7 +329,14 @@ export function Library() {
 
       {stats && <Stats stats={stats} />}
 
-      {error && <p className="notice error">{t.error(error)}</p>}
+      {error && (
+        <div className="notice error">
+          <p>{error}</p>
+          <button type="button" className="link" onClick={() => void load()}>
+            {t.retry}
+          </button>
+        </div>
+      )}
       {!ready && <p className="notice">{t.loading}</p>}
 
       {ready && !error && (
@@ -396,10 +404,17 @@ const CSS = SCREEN_CSS + `
 .lib-stats dd { margin: 0.15rem 0 0; font-size: 1.1rem; font-weight: 600; }
 .lib-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
   justify-content: space-between; }
-.lib-rating { display: flex; gap: 0.15rem; align-items: center; }
-.lib-rating button { border: none; background: none; color: var(--fg);
+/* Envolve porque cinco alvos de 44px mais o "clear" não cabem em 360px. */
+.lib-rating { display: flex; flex-wrap: wrap; gap: 0.15rem; align-items: center; }
+/* A estrela continua do mesmo tamanho; o que cresce é a caixa em volta, que
+   era ~24px — o alvo mais fino do app inteiro, e num controle que existe para
+   ser tocado cinco vezes seguidas. Sem fundo nem borda, o ganho aparece como
+   espaço, não como botão maior. */
+.lib-rating button { display: inline-flex; align-items: center; justify-content: center;
+  min-width: var(--tap); min-height: var(--tap);
+  border: none; background: none; color: var(--fg);
   font: inherit; font-size: 1.1rem; line-height: 1; padding: 0.2rem; cursor: pointer; }
-.lib-rating .lib-clear { font-size: 0.75rem; color: var(--muted); padding-left: 0.5rem; }
+.lib-rating .lib-clear { min-width: 0; font-size: 0.75rem; color: var(--muted); padding: 0 0.5rem; }
 .lib-rating .lib-clear:disabled { opacity: 0.35; cursor: default; }
 
 .lib-account { border: 1px solid var(--line); border-radius: var(--r-panel);
@@ -409,7 +424,8 @@ const CSS = SCREEN_CSS + `
 .lib-account-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .lib-account button:disabled { opacity: 0.4; cursor: default; }
 /* A cor do botão destrutivo é a do pass, e só ele é vermelho na tela. */
-.lib-danger { padding: 0.45rem 0.9rem; border-radius: var(--r-pill);
+.lib-danger { display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--tap); padding: 0.45rem 0.9rem; border-radius: var(--r-pill);
   border: 1px solid var(--pass); background: none; color: var(--pass);
   font: inherit; font-size: 0.85rem; cursor: pointer; }
 `;

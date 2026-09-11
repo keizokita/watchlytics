@@ -74,8 +74,6 @@
         color: var(--fg);
         font: 16px/1.5 system-ui, sans-serif;
         overscroll-behavior: none;
-        -webkit-user-select: none;
-        user-select: none;
       }
 
       /* Foco visível em tudo que recebe foco, uma regra só. `:where` mantém a
@@ -88,7 +86,16 @@
 
       /* ─── deck ─────────────────────────────────────────────────────────── */
 
-      .deck-wrap { display: grid; gap: 1.25rem; justify-items: center; }
+      /* Arrastar um card não pode virar seleção de texto. Estava no `body`, o
+         que custava caro longe daqui: o app manda procurar amigo POR HANDLE e
+         a pessoa não conseguia copiar o handle da lista, nem o título de um
+         filme, nem a própria estatística. O gesto mora no deck; a restrição
+         também. */
+      .deck-wrap {
+        display: grid; gap: 1.25rem; justify-items: center;
+        -webkit-user-select: none;
+        user-select: none;
+      }
 
       .deck {
         position: relative;
@@ -318,7 +325,7 @@
         margin-top: auto;
         /* 37rem cabe os quatro controles em uma linha no desktop; em 360px a
            quebra cai em duas linhas, que é o caso previsto na --deck-reserve */
-        max-width: min(37rem, 94vw);
+        max-width: min(37rem, 100%);
       }
       /* <select> se dimensiona pela MAIOR opção, e "Action & Adventure" fazia o
          de gênero sozinho ocupar 177px — teto e reticências em vez disso. O
@@ -424,7 +431,7 @@
         gap: 1rem;
         justify-items: center;
         text-align: center;
-        max-width: min(34rem, 92vw);
+        max-width: min(34rem, 100%);
       }
       .onboarding h1 {
         margin: 0;
@@ -532,7 +539,10 @@
       .notice-hint { font-size: 0.9rem; }
 
       /* D5 — o toggle do perfil público mora na seção de conta */
-      .lib-public { display: flex; gap: 0.5rem; align-items: center; justify-content: center; }
+      /* O <input> nativo tem ~13px, mas o alvo é a <label> inteira: quem
+         clica no texto marca a caixa. É a label que precisa da altura. */
+      .lib-public { display: flex; gap: 0.5rem; align-items: center;
+        justify-content: center; min-height: var(--tap); }
 
       .sr-only {
         position: absolute;
