@@ -351,12 +351,13 @@ Nada disso é opcional: sem os três, convidar alguém é irresponsável ou ileg
 
 ### P1 — bloqueia confiar no beta
 
-Dá para convidar sem isso. Você só não fica sabendo de nada.
+Dá para convidar sem isso. Você só não fica sabendo de nada. **As duas fecharam
+em 2026-09-11** (PRs #20 e #23).
 
 | id | Tarefa | Por quê | |
 |---|---|---|---|
 | β4 | Error handler + log estruturado na api | Hoje um 500 em produção é invisível: sem logger, sem handler, sem nada | ✅ `apps/api/src/obs.ts`, com redação de segredo |
-| β5 | Um caminho de retorno do usuário | Beta sem canal de feedback é beta que não ensina nada. Um `mailto:` resolve — não construa formulário | em curso em `beta/canal-de-retorno` |
+| β5 | Um caminho de retorno do usuário | Beta sem canal de feedback é beta que não ensina nada. Um `mailto:` resolve — não construa formulário | ✅ `mailto:` no rodapé do shell, fora do `user &&`, e os `[PREENCHER]` de contato preenchidos |
 
 ### P2 — qualidade do que eles vão ver
 
