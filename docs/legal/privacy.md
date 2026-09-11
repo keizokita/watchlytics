@@ -1,6 +1,6 @@
 # Watchlytics — Privacy Policy
 
-**Last updated:** 2026-09-10 · **Consent notice version:** `2026-09-02`
+**Last updated:** 2026-09-11 · **Consent notice version:** `2026-09-11`
 **Effective date:** [PREENCHER: data de entrada em vigor]
 
 > This policy is written for the closed beta. It describes what the product
@@ -179,8 +179,13 @@ backwards into the individual titles behind it.
 ## Changes to this policy
 
 If we change this policy in a way that matters, we raise the version of the
-in-app consent notice, and the app asks you to accept it again before you
-continue. The version recorded against your account is always the one you saw.
+in-app consent notice. The version recorded against your account is always the
+one you accepted, and it is in your data export.
+
+An account keeps the version it accepted. If a change affects how we use data
+you have **already** given us, we write to you at the address on your account
+and ask you to accept the new version before it applies to you. We do not put a
+new basis on old data by publishing a page.
 
 A Brazilian-Portuguese version of this policy for LGPD users:
 [PREENCHER: link da versão pt-BR, ou decisão documentada de manter só em inglês].

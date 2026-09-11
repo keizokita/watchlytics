@@ -43,21 +43,27 @@ const MINT_PER_MIN = 20;
 const COOKIE = "wl_refresh";
 
 /**
- * C5 — a versão do aviso que o usuário leu ao entrar, não a de um documento
- * jurídico (que ainda não existe; PLAN §9). Mude junto com o texto de
- * `consentNotice` em apps/web/src/strings.ts, nunca sozinha.
+ * C5 — a versão do aviso que o usuário leu ao entrar. Desde o β1 ela tem um
+ * documento atrás: docs/legal/privacy.md e terms.md, nomeados pelo próprio
+ * aviso. Mude junto com o texto de `consentNotice` em apps/web/src/strings.ts,
+ * nunca sozinha — e é por isso que ela sobe aqui.
  *
  * `profiling` é o único kind gravado: pelo PLAN §8.1 a conta em si roda por
  * execução de contrato, e é o perfilamento de gosto que precisa de
- * consentimento específico. O grafo social entra como kind próprio quando a
- * trilha E existir — a PK (user, kind, version) já aceita a segunda linha.
+ * consentimento específico.
  *
- * ponytail: sem re-consentimento. Subir a versão passa a valer só para quem
- * criar conta depois; quem já entrou continua com a linha antiga. Vira
- * problema quando o texto mudar de verdade, e aí o lugar é um gate no
- * middleware de auth, não aqui.
+ * ponytail: sem re-consentimento, e o gatilho que a nota anterior previa JÁ
+ * disparou — o texto mudou no β1. Subir a versão vale só para quem criar conta
+ * depois: as contas anteriores seguem com `2026-09-02`, que era um aviso que não
+ * nomeava documento nenhum. Num beta fechado isso se resolve falando com as
+ * poucas contas que existem, que é exatamente o que a política promete. Vira
+ * gate no middleware de auth quando houver gente demais para avisar uma por uma.
+ *
+ * ponytail: o grafo social ainda não tem kind próprio, e a política já o declara
+ * como consentimento separado. A PK (user, kind, version) aceita a segunda
+ * linha; falta gravá-la e pedir essa aceitação na tela.
  */
-const CONSENT_VERSION = "2026-09-02";
+const CONSENT_VERSION = "2026-09-11";
 
 const unauthorized = () => httpError(401, "não autenticado");
 
