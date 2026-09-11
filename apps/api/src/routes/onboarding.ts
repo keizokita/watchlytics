@@ -33,9 +33,17 @@ import { toTitle } from "./feed.ts";
  * os ids no SQL e o resto no builder reusa o conversor em vez de manter um
  * segundo.
  *
- * ponytail: o PLAN §1.10 fala de "pool estático precomputado". Com a fixture de
- * 94 títulos isso seria cache de uma consulta que roda em milissegundos. Vira
- * tabela materializada quando o catálogo passar de alguns milhares.
+ * ponytail: o PLAN §1.10 fala de "pool estático precomputado". O gatilho que
+ * esta nota previa — "quando o catálogo passar de alguns milhares" — chegou: o
+ * β7 mediu a rota contra os 9830 títulos da régua 800 e ela custa ~100ms, dos
+ * quais ~60ms são desta consulta (Seq Scan nos 9830 mais o `row_number` por
+ * gênero; não há índice que substitua ranquear todo mundo). E mesmo assim NÃO
+ * virou tabela materializada, porque a medição mostrou a outra metade da conta:
+ * a consulta só roda enquanto `remaining > 0`, ou seja duas vezes na vida de
+ * cada conta — uma ao abrir o onboarding e outra ao salvar os gêneros. Toda
+ * abertura de app depois disso sai pelo `remaining === 0` sem tocar aqui.
+ * Precomputar custaria uma tabela a manter para economizar 200ms por pessoa.
+ * Vira materializada se o deck passar a ser refeito a cada swipe.
  */
 async function stratified(
   userId: string,
