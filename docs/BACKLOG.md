@@ -363,8 +363,42 @@ em 2026-09-11** (PRs #20 e #23).
 
 | id | Tarefa | Por quê | |
 |---|---|---|---|
-| β6 | Loop social provado entre duas contas reais | Amizade, match e notificação nunca rodaram entre duas pessoas distintas | 🔑 precisa de uma segunda pessoa com conta Google no app |
+| β6 | Loop social provado entre duas contas reais | Amizade, match e notificação nunca rodaram entre duas contas distintas *pela tela* | 🔑 precisa de um segundo `sub` do Google — não de uma segunda pessoa. Checklist abaixo |
 | β7 | Onboarding conferido contra o catálogo real | O deck estratificado dos 20 swipes foi desenhado para 94 títulos, não para milhares com régua 800 | ✅ medido em 9830 títulos: 20/20 itens e 19/19 gêneros, ~100ms, duas vezes por conta |
+
+### β6 — a checklist, e o que ela NÃO precisa provar
+
+O loop social entre dois usuários distintos **já está provado na suíte**:
+`friends.test.ts` cobre busca por handle (E1), normalização do par e as três
+listas (E2), as três forças de match (E3), o cruzamento retroativo no aceite com
+uma notificação por pessoa em vez de uma por título (E4) e o match forte
+notificando na hora (E5). Nada disso precisa ser refeito à mão — refazer teste
+verde no navegador é o jeito mais caro de não descobrir nada.
+
+O que a suíte não alcança é tudo o que depende de uma conta **criada pelo
+Google** e de uma sessão **de verdade no navegador**. É só isso que a checklist
+cobre. E para isso basta um segundo `sub` do Google: qualquer segunda conta que
+você já tenha serve para ensaiar, e o primeiro amigo que logar entrega a coisa
+real de graça.
+
+| id | O que provar | Pronto quando |
+|---|---|---|
+| β6.1 | Conta nova entra por OAuth | O handle sai de outro local-part sem colidir; `consents` ganha a linha com a `CONSENT_VERSION` corrente; a porta de idade é cobrada — ela nunca rodou num cadastro real |
+| β6.2 | Duas sessões vivas ao mesmo tempo | Navegadores (ou dispositivos) diferentes, cada um rotacionando o próprio cookie de refresh sem derrubar o outro. O C3 trata reuso de refresh como replay e revoga a sessão inteira: duas sessões legítimas não podem disparar isso |
+| β6.3 | Amizade ponta a ponta pela tela | A busca B pelo handle e pede; B vê em "Friend requests" e aceita; as três listas ficam certas dos DOIS lados |
+| β6.4 | Match e notificação na tela | Os dois curtem o mesmo título e cada um vê o match. Dê um like ANTES do aceite para exercitar o cruzamento retroativo do E4 |
+| β6.5 | Perfil público do outro | `/u/<handle>` do outro, com o piso de 10 assistidos respeitado |
+
+**Atenção — o badge leva até 60s.** `NotificationsBadge` faz poll de
+`/v1/notifications` a cada 60 segundos (`Friends.tsx:435`), e só a aba de avisos
+zera na hora. Notificação que "não chegou" em 10 segundos é o intervalo do poll,
+não defeito. Quem testar precisa saber disso antes, senão vira bug reportado.
+
+**Atenção — publique o app no Google antes de chamar alguém.** Os escopos são
+`openid email profile`, todos não-sensíveis: app só com escopo não-sensível vai
+para "In production" sem verificação do Google. Em modo Testing você tem que
+cadastrar o Gmail de cada pessoa antes, o teto é 100, e quem não está na lista vê
+"access blocked" — você descobre isso pelo WhatsApp dela.
 
 ### Divisão para agentes paralelos
 
