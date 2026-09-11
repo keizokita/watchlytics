@@ -14,7 +14,7 @@
 | Controller | Keizo Kita, a natural person resident in Brazil, acting as controller in his own name. There is no company behind Watchlytics. Written contact goes to the address below. |
 | Privacy contact | keizokita1+watchlytics@gmail.com |
 | Data Protection Officer (LGPD art. 41) | None appointed. As a small-scale processing agent we are exempt from appointing one (ANPD Resolução CD/ANPD nº 2/2022), and keep the communication channel that exemption requires: the privacy contact above, answered by the controller himself. |
-| EU/EEA representative (GDPR art. 27) | None appointed, because none is required: the beta is invite-only and is not offered to people in the EU, the EEA or the UK, and we do not target or monitor anyone there. If we ever invite someone living in those countries, we appoint a representative first. |
+| EU/EEA representative (GDPR art. 27) | None appointed. We are not established in the EU, the EEA or the UK, and art. 27(2)(a) does not require a representative where the processing is occasional, does not include large-scale processing of special categories of data, and is unlikely to put anyone's rights at risk. A closed beta of a few dozen invited people, with no special-category data, meets all three. The privacy contact above answers for us in the meantime, and we appoint a representative before the service outgrows that exemption. |
 
 If you are in Brazil, this policy covers our obligations under the **LGPD**
 (Lei 13.709/2018). If you are in the EU, the UK or the EEA, it covers the
