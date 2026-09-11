@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "dev": "npm run legal && vite",
+    "build": "npm run legal && tsc --noEmit && vite build",
     "check": "tsc --noEmit",
-    "test": "node --test src/*.test.ts"
+    "test": "node --test src/*.test.ts",
+    "legal": "node legal.mjs"
   },
   "dependencies": {
     "@watchlytics/contract": "*",
@@ -19,6 +20,7 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.1",
     "@vitejs/plugin-react": "^5.0.4",
+    "marked": "^18.0.12",
     "typescript": "^5.9.3",
     "vite": "^7.1.9"
   }

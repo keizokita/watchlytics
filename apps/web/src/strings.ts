@@ -7,17 +7,23 @@
 /**
  * β1 — onde os dois documentos ficam públicos.
  *
- * Aponta para o markdown no GitHub, que é público, renderiza e é a MESMA fonte
- * que o repositório versiona — copiar o texto para `public/` criaria uma segunda
- * versão para manter desatualizada.
+ * Servidos pelo próprio domínio do app: `apps/web/legal.mjs` renderiza
+ * `docs/legal/*.md` para `public/legal/` no build, então a fonte continua sendo
+ * a única que o repositório versiona e não há segunda cópia para manter.
  *
- * ponytail: o link sai do domínio do app, o que é estranho para documento legal.
- * Vira `/legal/privacy` servido pelo Pages no dia em que houver domínio próprio
- * e um renderizador de markdown — não antes, e não por causa disto.
+ * Saiu do blob do GitHub por dois motivos. Repositório privado ou renomeado
+ * levaria junto a política que o aviso de consentimento promete. E a tela de
+ * consentimento do Google, para sair do modo Testing, exige o link da política
+ * num `Authorized domain` verificado no Search Console — `github.com` não é um
+ * domínio que a gente possa verificar, e `pages.dev` é.
+ *
+ * Caminho relativo e com `.html`: relativo porque o domínio muda quando houver
+ * um próprio, e com extensão porque é o único caminho que o `vite dev`, o
+ * `vite preview` e o Pages servem igual. O Pages também aceitaria sem, o
+ * servidor de dev não.
  */
-const LEGAL_BASE = "https://github.com/keizokita/watchlytics/blob/main/docs/legal";
-export const PRIVACY_URL = `${LEGAL_BASE}/privacy.md`;
-export const TERMS_URL = `${LEGAL_BASE}/terms.md`;
+export const PRIVACY_URL = "/legal/privacy.html";
+export const TERMS_URL = "/legal/terms.html";
 
 /**
  * β5 — o caminho de retorno do beta.

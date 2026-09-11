@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# Gerado por apps/web/legal.mjs a partir de docs/legal/*.md
+apps/web/public/legal/
 *.tsbuildinfo
 .env
 .DS_Store
