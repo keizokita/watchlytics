@@ -25,8 +25,6 @@ jobs:
       # do banco de desenvolvimento. Aqui o banco já é pequeno e semeado com a
       # fixture, então aponta para ele mesmo em vez de criar um segundo.
       DATABASE_URL_TEST: postgres://dev:dev@localhost:5432/watchlytics
-      # C1 — só no CI e em dev. Produção nunca define, e responde 401.
-      DEV_USER_ID: 00000000-0000-4000-8000-000000000001
       # NÃO é secret, e não deve virar um: o suite assina um access próprio
       # (`signAccess`) para provar que o Bearer manda no catálogo, e para isso o
       # valor só precisa passar do piso de 32 caracteres do `auth.ts`. Vem

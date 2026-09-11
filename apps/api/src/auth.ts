@@ -173,8 +173,9 @@ export function clientIp(req: FastifyRequest): string {
 /**
  * Identidade da requisição. Lança 401, 403 ou 429 — Fastify traduz `statusCode`.
  *
- * β3 — o shim do C1 saiu daqui em 2026-09-10. Era um `DEV_USER_ID` do ambiente
- * atendendo qualquer requisição sem `Authorization`, e ele já tinha escondido um
+ * β3 — o shim do C1 saiu daqui em 2026-09-10. Era uma variável de ambiente com
+ * um id de usuário atendendo qualquer requisição sem `Authorization`, e ele já
+ * tinha escondido um
  * 401 até a produção: em dev o front nunca mandava header e o bug só apareceu no
  * ar. Um atalho que substitui a autenticação esconde exatamente a classe de bug
  * que ele finge cobrir, e com o OAuth no ar ele não era mais o único caminho de

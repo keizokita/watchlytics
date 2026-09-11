@@ -25,8 +25,8 @@ import { buildServer } from "../server.ts";
  *   3. o export abre como JSON e traz catálogo, swipes, amigos e matches
  *   4. o export não vaza credencial (hash de refresh não é dado pessoal)
  *
- * Usuário próprio, não o DEV_USER_ID do .env: os arquivos de teste rodam em
- * paralelo, e este aqui apaga a conta inteira.
+ * Usuário próprio, criado aqui: os arquivos de teste rodam em paralelo, e este
+ * aqui apaga a conta inteira.
  */
 const USER = "00000000-0000-4000-8000-0000000000c6";
 /** Ids escolhidos para cercar o USER: friendships exige `user_a < user_b`. */
@@ -38,7 +38,7 @@ process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
 const app = buildServer();
 
 /**
- * β3 — Bearer real em toda requisição: o shim do `DEV_USER_ID` saiu do
+ * β3 — Bearer real em toda requisição: o shim de autenticação saiu do
  * `requireUserId`. Sem header, a rota responde 401, que é o que os testes de
  * anônimo abaixo exercitam com `app.inject` cru.
  */

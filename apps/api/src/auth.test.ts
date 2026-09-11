@@ -445,7 +445,7 @@ const responderIdade = (userId: string, birthYear: number) =>
   });
 
 test("β2 — conta sem ano não usa o app, mas enxerga a própria porta", async () => {
-  const { user } = await loginNative("sub-porta-fechada");
+  const { user, refresh: token } = await loginNative("sub-porta-fechada");
 
   const fechada = await app.inject({
     method: "GET",
@@ -461,6 +461,16 @@ test("β2 — conta sem ano não usa o app, mas enxerga a própria porta", async
   });
   assert.equal(eu.statusCode, 200, "/me responde com a porta fechada");
   assert.equal(sessionUser.parse(eu.json()).needsAgeGate, true);
+
+  // Sair tem que continuar possível com a porta fechada: uma conta que não pode
+  // nem se deslogar ficaria presa na única tela que ela enxerga.
+  const saiu = await app.inject({
+    method: "POST",
+    url: "/v1/auth/logout",
+    payload: { refresh: token },
+  });
+  assert.equal(saiu.statusCode, 204, "logout não passa pela porta de idade");
+  assert.equal((await refresh(token)).statusCode, 401, "e revogou de verdade");
 });
 
 test("β2 — maior de idade passa, e passa para o app inteiro", async () => {

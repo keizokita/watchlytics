@@ -29,7 +29,7 @@ import { buildServer } from "../server.ts";
  *   4. quem pediu não aceita o próprio pedido
  *
  * Usuários próprios com Bearer real: aqui preciso de três identidades
- * diferentes na mesma suíte, e o shim do DEV_USER_ID só tem uma.
+ * diferentes na mesma suíte, e o shim de autenticação só tinha uma.
  */
 process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
 

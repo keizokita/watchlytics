@@ -55,7 +55,7 @@ const ok = (label, cond, extra = "") => {
 /**
  * Roda contra um usuário novo a cada execução, com Bearer de verdade.
  *
- * Era o shim do DEV_USER_ID trocado no meio do processo; o β3 apagou o shim, e
+ * Era o shim de autenticação trocado no meio do processo; o β3 apagou o shim, e
  * agora o driver assina um access token para o usuário descartável — o mesmo
  * caminho que a produção usa. Descartável importa porque os swipes do driver
  * não podem sujar o feed de quem estiver com o app aberto, e o DELETE do
@@ -435,7 +435,7 @@ async function cmdWeb() {
     const page = await openChrome();
     try {
       // Sem isto o shell pinta a tela de entrada e o deck nunca monta: desde o
-      // C2/C3 o Root só monta o app com sessão, e o shim do DEV_USER_ID não
+      // C2/C3 o Root só monta o app com sessão, e o shim de autenticação não
       // vale para o `POST /v1/auth/refresh` que o Login.tsx usa para resolvê-la.
       await page.cmd("Network.enable");
       usuario = await abrirSessao(page);
@@ -564,11 +564,11 @@ async function cmdWeb() {
 /**
  * Usuário descartável com sessão, para o headless entrar no app.
  *
- * O shim do DEV_USER_ID não resolve o portão de entrada: o shell decide o que
+ * O shim de autenticação não resolvia o portão de entrada: o shell decide o que
  * montar pelo `resume()` do Login.tsx, que chama `POST /v1/auth/refresh` — rota
  * que lê o cookie httpOnly e não passa pelo shim.
  *
- * E o usuário é DESCARTÁVEL, não o do .env, porque o run precisa ESCREVER: os
+ * E o usuário é DESCARTÁVEL, criado a cada run, porque o run precisa ESCREVER: os
  * 20 swipes que abrem o onboarding, mais os do próprio teste. Escrevendo no
  * usuário compartilhado, um Ctrl-C no meio deixava 20 LIKEs para sempre — e o
  * feed exclui LIKE incondicionalmente, então aqueles títulos sumiam do deck
@@ -576,9 +576,9 @@ async function cmdWeb() {
  * com 20 swipes já presentes ela não emprestava nada, e perdia junto a lista
  * do que limpar.
  *
- * Funciona porque a api resolve o usuário pelo Bearer da sessão, não pelo shim:
- * o DEV_USER_ID do processo da api nunca entra nesta conta. E a limpeza vira
- * uma linha só — `delete from users` cascateia sessão e swipes.
+ * Funciona porque a api resolve o usuário pelo Bearer da sessão, e não existe
+ * mais atalho nenhum no ambiente. E a limpeza vira uma linha só —
+ * `delete from users` cascateia sessão e swipes.
  */
 async function abrirSessao(page) {
   const { newRefreshToken, REFRESH_TTL_S } = await import(

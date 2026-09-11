@@ -3,7 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { GENRES, genreId, titleType } from "@watchlytics/contract";
 import { db, pg } from "./db/client.ts";
-import { genres, titleExternalIds, titles, users } from "./db/schema.ts";
+import { genres, titleExternalIds, titles } from "./db/schema.ts";
 
 /**
  * A fixture entra pela MESMA porta que um fornecedor real usaria:
@@ -43,18 +43,6 @@ await db
   .insert(genres)
   .values(GENRES.map((g) => ({ id: g.id, name: g.name })))
   .onConflictDoUpdate({ target: genres.id, set: { name: sql`excluded.name` } });
-
-// Usuário de dev: testes e driver assinam Bearer para este id (β3 tirou o
-// shim que o fazia autenticar sozinho). Produção não define a variável.
-const devUserId = process.env["DEV_USER_ID"];
-if (devUserId) {
-  await db
-    .insert(users)
-    // β2 — o usuário de dev nasce com a porta de idade respondida: ele existe
-    // para o driver e os testes rodarem, não para exercitar o cadastro.
-    .values({ id: devUserId, handle: "dev", displayName: "Dev", birthYear: 1990 })
-    .onConflictDoNothing();
-}
 
 const seeded = new Set(
   (

@@ -5,7 +5,7 @@ import { eq, sql } from "drizzle-orm";
 import type { SwipeInput } from "@watchlytics/contract";
 import { signAccess } from "./auth.ts";
 import { db, pg } from "./db/client.ts";
-import { swipes } from "./db/schema.ts";
+import { swipes, users } from "./db/schema.ts";
 import { buildServer } from "./server.ts";
 
 /**
@@ -14,13 +14,20 @@ import { buildServer } from "./server.ts";
  *   2. título repetido dentro do mesmo lote não quebra o INSERT
  *   3. like nunca volta ao feed; dislike volta depois de 180 dias
  *
- * Precisa do banco semeado. `DEV_USER_ID` é o id do usuário que o seed cria —
- * depois do β3 ele é só um id de fixture, e quem autentica é o Bearer.
+ * Precisa do banco semeado (npm run seed).
+ *
+ * Usuário próprio, criado aqui: este arquivo apaga a tabela de swipes da conta
+ * seis vezes, e os arquivos de teste rodam em paralelo contra o mesmo banco.
  */
-const USER = process.env["DEV_USER_ID"];
-if (!USER) throw new Error("DEV_USER_ID não definida (veja .env.example)");
+const USER = "00000000-0000-4000-8000-0000000000a0";
 
 process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
+
+await db
+  .insert(users)
+  // β2 — nasce com a porta de idade já respondida: sem ano, toda rota é 403.
+  .values({ id: USER, handle: "swipes-test", displayName: "A0", birthYear: 1990 })
+  .onConflictDoNothing();
 
 const app = buildServer();
 
@@ -62,7 +69,8 @@ async function twoFeedIds(): Promise<[string, string]> {
 }
 
 test.after(async () => {
-  await db.delete(swipes).where(eq(swipes.userId, USER));
+  // A conta é só deste arquivo: apagá-la leva os swipes por ON DELETE CASCADE.
+  await db.delete(users).where(eq(users.id, USER));
   await app.close();
   await pg.end();
 });

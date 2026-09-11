@@ -21,8 +21,8 @@ import { buildServer } from "../server.ts";
  *   4. "descartados" sai de swipes, NUNCA de library_entries
  *   5. o piso de 10 assistidos não devolve agregado nenhum
  *
- * Usuário próprio, não o DEV_USER_ID do .env: os arquivos de teste rodam em
- * paralelo e a suíte de swipes limpa a tabela inteira do usuário dela.
+ * Usuário próprio, criado aqui: os arquivos de teste rodam em paralelo e a
+ * suíte de swipes limpa a tabela inteira do usuário dela.
  */
 const USER = "00000000-0000-4000-8000-0000000000d1";
 
@@ -44,7 +44,7 @@ process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
 const app = buildServer();
 
 /**
- * β3 — Bearer real em toda requisição: o shim do `DEV_USER_ID` saiu do
+ * β3 — Bearer real em toda requisição: o shim de autenticação saiu do
  * `requireUserId`. Sem header, a rota responde 401, que é o que os testes de
  * anônimo abaixo exercitam com `app.inject` cru.
  */
