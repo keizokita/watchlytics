@@ -15,7 +15,7 @@ import { authedFetch } from "./session.ts";
 import { Onboarding } from "./Onboarding.tsx";
 import { drop, enqueue, startFlushing } from "./swipeQueue.ts";
 import { mensagem } from "./errors.ts";
-import { t } from "./strings.ts";
+import { FEEDBACK_URL, t } from "./strings.ts";
 
 /** Busca mais cards quando restam estes: o swipe não pode esperar rede. */
 const REFILL_AT = 5;
@@ -353,6 +353,12 @@ function Root() {
           line-height: 1.4;
         }
         .shell .attribution a { color: var(--muted); text-decoration: none; }
+        /* Em linha própria e com folga: colado na atribuição do TMDB, o convite
+           lia como a primeira frase do texto legal, e ninguém clica em texto
+           legal. */
+        .shell .attribution .feedback {
+          display: block; margin-bottom: 0.6rem; text-decoration: underline;
+        }
         .shell .attribution a:hover { color: var(--fg); }
         .shell .attribution a:focus-visible {
           outline: 2px solid var(--fg); outline-offset: 3px; border-radius: 4px;
@@ -399,6 +405,13 @@ function Root() {
           não cumpre. `order: 3` a mantém por último mesmo quando a nav desce
           para depois do conteúdo na home deslogada. */}
       <footer className="attribution">
+        {/* β5 — o caminho de retorno. Fica no shell, e fora do `user &&` de
+            propósito: quem não consegue entrar é justamente quem mais precisa
+            conseguir contar isso. Sem `target="_blank"`: `mailto:` não abre
+            aba, abre o cliente de e-mail. */}
+        <a className="feedback" href={FEEDBACK_URL}>
+          {t.feedbackLink}
+        </a>
         <a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer noopener">
           {t.tmdbAttribution}
         </a>
