@@ -343,27 +343,27 @@ As 39 tarefas do backlog (S/A/B/C/D/E), o catálogo real em produção com régu
 
 Nada disso é opcional: sem os três, convidar alguém é irresponsável ou ilegal.
 
-| id | Tarefa | Por quê |
-|---|---|---|
-| β1 | Política de privacidade e termos de uso, com link no aviso de consentimento | O `consentNotice` promete um acordo que não existe em lugar nenhum. Mercado global = GDPR, não só LGPD |
-| β2 | Idade mínima no cadastro | COPPA (menor de 13 nos EUA) e GDPR. Está no PLAN §8 desde o começo e nunca saiu do papel |
-| β3 | Remover o shim do C1 | `DEV_USER_ID` segue em `auth.ts` com o OAuth em produção. Era para sair no merge do C2 — é exatamente o "não deixe virar permanente" |
+| id | Tarefa | Por quê | |
+|---|---|---|---|
+| β1 | Política de privacidade e termos de uso, com link no aviso de consentimento | O `consentNotice` promete um acordo que não existe em lugar nenhum. Mercado global = GDPR, não só LGPD | ✅ `docs/legal/*`, e a `CONSENT_VERSION` subiu junto com o texto (β1.1) |
+| β2 | Idade mínima no cadastro | COPPA (menor de 13 nos EUA) e GDPR. Está no PLAN §8 desde o começo e nunca saiu do papel | ✅ 16 anos, gravada no login e cobrada em toda rota autenticada |
+| β3 | Remover o shim do C1 | `DEV_USER_ID` segue em `auth.ts` com o OAuth em produção. Era para sair no merge do C2 — é exatamente o "não deixe virar permanente" | ✅ o nome não existe mais em `apps/`, `.github/` nem `.claude/` |
 
 ### P1 — bloqueia confiar no beta
 
 Dá para convidar sem isso. Você só não fica sabendo de nada.
 
-| id | Tarefa | Por quê |
-|---|---|---|
-| β4 | Error handler + log estruturado na api | Hoje um 500 em produção é invisível: sem logger, sem handler, sem nada |
-| β5 | Um caminho de retorno do usuário | Beta sem canal de feedback é beta que não ensina nada. Um `mailto:` resolve — não construa formulário |
+| id | Tarefa | Por quê | |
+|---|---|---|---|
+| β4 | Error handler + log estruturado na api | Hoje um 500 em produção é invisível: sem logger, sem handler, sem nada | ✅ `apps/api/src/obs.ts`, com redação de segredo |
+| β5 | Um caminho de retorno do usuário | Beta sem canal de feedback é beta que não ensina nada. Um `mailto:` resolve — não construa formulário | em curso em `beta/canal-de-retorno` |
 
 ### P2 — qualidade do que eles vão ver
 
-| id | Tarefa | Por quê |
-|---|---|---|
-| β6 | Loop social provado entre duas contas reais | Amizade, match e notificação nunca rodaram entre duas pessoas distintas |
-| β7 | Onboarding conferido contra o catálogo real | O deck estratificado dos 20 swipes foi desenhado para 94 títulos, não para milhares com régua 800 |
+| id | Tarefa | Por quê | |
+|---|---|---|---|
+| β6 | Loop social provado entre duas contas reais | Amizade, match e notificação nunca rodaram entre duas pessoas distintas | 🔑 precisa de uma segunda pessoa com conta Google no app |
+| β7 | Onboarding conferido contra o catálogo real | O deck estratificado dos 20 swipes foi desenhado para 94 títulos, não para milhares com régua 800 | ✅ medido em 9830 títulos: 20/20 itens e 19/19 gêneros, ~100ms, duas vezes por conta |
 
 ### Divisão para agentes paralelos
 
@@ -379,6 +379,10 @@ uma migration só, com a coluna que β2 precisa, e o contrato congelado depois.
 As três são disjuntas por arquivo. α e γ se encontram só no requisito "gravar a
 idade": γ faz o backend, α faz a tela, e o contrato entre elas foi congelado na
 fase serial.
+
+**As três fecharam em 2026-09-11** (PRs #19, #20, #21 e #22). O encontro entre α
+e γ funcionou como desenhado: o backend chegou primeiro e a tela encaixou no
+contrato congelado, sem ida e volta. O P0 inteiro está em `main` e no ar.
 
 **Fora das trilhas, e são do usuário:** publicar a tela de consentimento do
 Google (ou cadastrar os testadores — o modo Testing tem teto de 100 e só admite

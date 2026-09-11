@@ -39,8 +39,8 @@ só a mudança. Vale ler antes de propor refazer algo.
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
 repetir; o LIKE vira coleção com abas e estatísticas.
 
-**106 testes** (89 API + 17 web), `npm run check` limpo nos três pacotes e as
-18 asserções do `driver.mjs all` verdes (2026-09-08).
+**135 testes** (108 API + 27 web), `npm run check` limpo nos três pacotes e as
+asserções do `driver.mjs` verdes (recontado em `main` em 2026-09-11).
 A trilha **I** (catálogo real, BACKLOG §5) tem a fase serial fechada: I0.1
 (régua) e I0.2 (migration 0003 + `castNames` no contrato). **`schema.ts` e
 `contract/index.ts` estão CONGELADOS** — I1 e I2 podem ser paralelizadas, e
@@ -109,6 +109,9 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 1. **Veredito do gesto no celular.** Uma pergunta em aberto que reverte
    decisão: o gesto tem peso? (senão, `framer-motion` se justifica). A outra —
    "o card convence sem pôster?" — perdeu o objeto: agora há pôster.
+2. **Uma segunda pessoa no app** (β6). O loop social nunca rodou entre duas
+   contas distintas de gente diferente, e não há como provar isso sozinho: a
+   suíte cobre três identidades, mas identidade de teste não aceita convite.
 
 **Saiu desta lista em 2026-09-09:** "conferir o login no Network do DevTools".
 Os quatro elos foram medidos de fora e o caminho está inteiro — ver o bloco
@@ -223,14 +226,27 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 
 ## Próximos passos sugeridos
 
-1. **Remover o shim `DEV_USER_ID`** do `auth.ts`. A condição que segurava isto
-   caiu: um login real completou em produção, então o shim já não é o único
-   caminho de entrada. O cliente saiu dele no S7+C1; falta o servidor.
-2. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
+O P0 do beta fechou em 2026-09-11: β1, β2 e β3 estão em `main` e no ar, junto
+com o β4. As três trilhas paralelas (α, β, γ) foram mergeadas pelos PRs #19,
+#20, #21 e #22, e a divisão por arquivo do BACKLOG §6 aguentou — o único
+encontro entre duas trilhas, "gravar a idade", encaixou no contrato congelado
+sem ida e volta.
+
+1. **Convidar as primeiras pessoas.** É o que o P0 destravava, e não depende de
+   mais código: a idade é cobrada em toda rota, os documentos existem e são
+   nomeados pelo aviso, e o shim não existe mais. O que falta é publicar a tela
+   de consentimento do Google ou cadastrar os testadores no modo Testing (teto
+   de 100, só e-mail listado).
+2. **β6 — o loop social entre duas contas reais** (§Bloqueado 2). Amizade,
+   match e notificação estão testados entre três identidades na suíte, mas
+   nunca rodaram entre duas PESSOAS. Precisa da segunda conta Google do item 1.
+3. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
-3. **Trilhas α, β e γ do beta** (BACKLOG §6). O β0 já congelou schema e
-   contrato, e as três são disjuntas por arquivo — é a mesma fase serial que
-   funcionou na rodada I. O item 1 desta lista é o β3, dentro da γ.
+
+O β5 (canal de retorno) está em curso em `beta/canal-de-retorno`. O β7 fechou:
+o deck do onboarding foi medido contra os 9830 títulos e entrega 20/20 itens
+cobrindo os 19 gêneros em ~100ms, duas vezes na vida de cada conta — o porquê
+de não virar tabela materializada está no comentário de `routes/onboarding.ts`.
 
 A trilha I saiu do caminho: a I1 fechou inteira em 2026-09-10, passada incluída
 — 9830 títulos em 1717s, fila zerada, **9769 com elenco**, média de 4,86 nomes.
