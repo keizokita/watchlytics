@@ -380,11 +380,18 @@ Nada disso é opcional: sem os três, convidar alguém é irresponsável ou ileg
 > cópia para manter desatualizada. O build falha se um documento não virar HTML
 > com título.
 >
-> **O que continua aberto:** 13 `[PREENCHER]` nos dois documentos, contados em
-> 2026-09-11 — 9 na política e 4 nos termos: controlador, encarregado da LGPD,
-> representante na UE, data de entrada em vigor, lei aplicável e foro. Identificar o controlador é o que GDPR e LGPD exigem, e
-> publicar com esses buracos é promessa quebrada, não rascunho. Para 10 a 30
-> pessoas, a lista de test users resolve sem esse custo.
+> **β1.3** fechou os `[PREENCHER]` que sobravam, no mesmo dia (#29). Nenhum dos
+> campos exigia empresa, que era o receio: controlador pode ser pessoa natural
+> (GDPR art. 4(7), LGPD art. 5º VI). O encarregado da LGPD fica dispensado —
+> agente de tratamento de pequeno porte não precisa indicar um (Res. CD/ANPD nº
+> 2/2022), precisa manter canal com o titular, e o canal é o mesmo e-mail. O
+> representante na UE não é exigido porque o beta não é oferecido na UE, no EEE
+> nem no Reino Unido, e isso é verificável: no modo Testing cada testador entra
+> por e-mail digitado à mão numa lista de no máximo 100. Contagem de
+> `[PREENCHER]` nos dois documentos: **zero**.
+>
+> **O que continua aberto:** publicar a tela de consentimento do Google, que é
+> do usuário. Para 10 a 30 pessoas a lista de test users resolve sem esse custo.
 
 > **β2 fechou em 2026-09-11**: o backend no #19, a tela no #21.
 >
@@ -460,10 +467,10 @@ em 2026-09-11** (PRs #20 e #23).
 > que serve requisição, para um beta de 10 a 30 pessoas em que o `fly logs` já
 > mostra a linha. Se a decisão mudar, agora existe linha estruturada para mandar.
 >
-> **O que continua aberto:** a `privacy.md` declara a retenção dos logs
-> operacionais em dois lugares e os dois seguem `[PREENCHER]`. Ficou mais urgente
-> com esta tarefa, que é justamente quem passou a produzir esses logs; depende da
-> janela real do Fly, que não foi medida.
+> **A retenção ficou declarada no mesmo dia**, pelo β1.3 (#29): a política diz
+> que log operacional não é retido por nós, envelhece no fluxo do provedor de
+> hospedagem e não fica cópia. Isso é consequência direta desta tarefa — o log
+> passou a existir, então passou a precisar de declaração.
 
 > **β5 fechou em 2026-09-11** (#23). O link fica no rodapé do shell, que já
 > existia para a atribuição do TMDB, e **fora do `user &&`**: quem não consegue
