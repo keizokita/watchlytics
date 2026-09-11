@@ -243,7 +243,10 @@ sem ida e volta.
 3. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
 
-O β5 (canal de retorno) está em curso em `beta/canal-de-retorno`. O β7 fechou:
+O β5 fechou junto (PR #23): o retorno é um `mailto:` no rodapé do shell, fora
+do `user &&`, porque quem não consegue entrar é quem mais precisa contar isso —
+e com ele saíram os quatro `[PREENCHER: e-mail de contato]` que a política tinha
+deixado em aberto. O β7 fechou também:
 o deck do onboarding foi medido contra os 9830 títulos e entrega 20/20 itens
 cobrindo os 19 gêneros em ~100ms, duas vezes na vida de cada conta — o porquê
 de não virar tabela materializada está no comentário de `routes/onboarding.ts`.
