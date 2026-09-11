@@ -1,14 +1,14 @@
 # Watchlytics — Terms of Use
 
-**Last updated:** 2026-09-10
-**Effective date:** [PREENCHER: data de entrada em vigor]
+**Last updated:** 2026-09-11
+**Effective date:** 2026-09-11
 
 These terms are the agreement between you and us about using Watchlytics. By
 signing in, you accept them. If you do not accept them, do not sign in.
 
 | | |
 |---|---|
-| Provider | [PREENCHER: razão social, CNPJ e endereço do fornecedor] |
+| Provider | Keizo Kita, a natural person resident in Maringá, Paraná, Brazil, providing Watchlytics in his own name. There is no company behind it. |
 | Contact | keizokita1+watchlytics@gmail.com |
 
 ## 1. What Watchlytics is
@@ -100,8 +100,8 @@ accept, you can delete your account, and your data goes with it.
 
 ## 10. Governing law and venue
 
-These terms are governed by [PREENCHER: legislação aplicável]. Disputes go to
-[PREENCHER: foro/comarca competente]. If you are a consumer, this does not take
+These terms are governed by the laws of Brazil. Disputes go to the courts of
+the comarca of Maringá, Paraná. If you are a consumer, this does not take
 away your right to bring a claim where you live, when the law gives you that
 right.
 
