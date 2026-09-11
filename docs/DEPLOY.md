@@ -121,7 +121,28 @@ pedir.
 
 > A tela de consentimento em **Testing** só admite quem estiver na lista de test
 > users (teto de 100). Antes de convidar gente para o beta, adicione os testers
-> ou publique o app.
+> em [Google Auth Platform → Audience](https://console.cloud.google.com/auth/audience)
+> — vale na hora, sem revisão.
+
+Para **publicar** (sair do Testing e tirar o teto), o formulário pede homepage e
+link da política, e os domínios precisam estar em *Authorized domains*
+verificados no Search Console. O que colar:
+
+| Campo | Valor |
+|---|---|
+| Application home page | `https://watchlytics.pages.dev/` |
+| Privacy policy link | `https://watchlytics.pages.dev/legal/privacy.html` |
+| Terms of service link | `https://watchlytics.pages.dev/legal/terms.html` |
+
+As duas páginas são geradas no build por `apps/web/legal.mjs` a partir de
+`docs/legal/*.md` — é por isso que elas ficam no domínio do app e não no
+GitHub, que não dá para verificar como domínio nosso.
+
+> **Não publique com os `[PREENCHER]` de pé.** A política e os termos ainda
+> declaram controlador, encarregado, representante na UE, data de vigência e lei
+> aplicável como campos em branco, e é justamente a identificação do controlador
+> que GDPR e LGPD exigem. No modo Testing isso é rascunho; publicado é promessa
+> quebrada.
 
 ## 4. GitHub (CI)
 
