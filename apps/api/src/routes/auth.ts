@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
+  ageGateInput,
+  MIN_AGE,
   oauthExchange,
   oauthProvider,
   refreshRequest,
+  type AgeGateResponse,
   type AuthResponse,
   type AuthTransport,
   type SessionUser,
@@ -16,6 +19,7 @@ import {
   constantTimeEqual,
   hashRefresh,
   httpError,
+  idadeMinimaOk,
   newRefreshToken,
   rateLimit,
   requireUserId,
@@ -278,9 +282,8 @@ async function loadUser(userId: string): Promise<SessionUser> {
   // β2 — o ano em si NUNCA sai da API: vira booleano aqui. O cliente precisa
   // saber se deve perguntar, não a idade de ninguém.
   //
-  // ponytail: por enquanto só reporta. Quem BLOQUEIA o acesso enquanto isto for
-  // true é a trilha γ — hoje uma conta sem ano confirmado continua usando o app
-  // normalmente, e é exatamente esse buraco que o β2 fecha.
+  // Quem BLOQUEIA enquanto isto for true é o `requireUserId` (β2): esta rota e
+  // a `/v1/auth/age` são as duas que respondem com a porta fechada.
   const { birthYear, ...user } = row;
   return { ...user, needsAgeGate: birthYear === null };
 }
@@ -487,6 +490,55 @@ export function registerAuth(app: FastifyInstance): void {
     return null;
   });
 
-  /** Rota protegida de verdade: é por ela que o cliente sabe quem ele é. */
-  app.get("/v1/auth/me", async (req) => loadUser(requireUserId(req)));
+  /**
+   * Rota protegida de verdade: é por ela que o cliente sabe quem ele é.
+   *
+   * Fora da porta de idade de propósito: é ela que devolve `needsAgeGate`, e
+   * bloqueá-la deixaria o cliente sem saber por que foi bloqueado.
+   */
+  app.get("/v1/auth/me", async (req) =>
+    loadUser(await requireUserId(req, { ageGate: false })),
+  );
+
+  /**
+   * β2 — a porta de idade.
+   *
+   * Responde 200 com `ok: false` em vez de 4xx: a avaliação da porta funcionou,
+   * o que ela decidiu está no corpo, e o cliente que acabou de perguntar a idade
+   * precisa LER a resposta — um 403 aqui cairia no mesmo tratamento genérico de
+   * erro que a porta fechada de todas as outras rotas.
+   *
+   * A recusa não grava o ano e não deixa conta pela metade: revoga as sessões e
+   * limpa o cookie. O access token em circulação ainda vale por até 15 minutos,
+   * e não tem problema — sem ano gravado, `requireUserId` fecha a porta em toda
+   * rota que não seja esta e a `/me`. Guardar "tentou entrar e é menor" seria
+   * acumular justamente o dado que a lei manda não coletar.
+   */
+  app.post("/v1/auth/age", async (req, reply): Promise<AgeGateResponse | { error: string }> => {
+    const userId = await requireUserId(req, { ageGate: false });
+
+    const parsed = ageGateInput.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400);
+      return { error: "requisição inválida" };
+    }
+
+    if (!idadeMinimaOk(parsed.data.birthYear)) {
+      await db
+        .update(sessions)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+      setRefreshCookie(reply, "", 0);
+      return { ok: false, minAge: MIN_AGE };
+    }
+
+    // `isNull` no WHERE: a porta se responde UMA vez. Sem isso, quem já passou
+    // poderia reescrever o ano, e a coluna deixaria de ser prova de nada.
+    await db
+      .update(users)
+      .set({ birthYear: parsed.data.birthYear })
+      .where(and(eq(users.id, userId), isNull(users.birthYear)));
+
+    return { ok: true, minAge: MIN_AGE };
+  });
 }

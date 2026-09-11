@@ -15,7 +15,7 @@ export function swipeRoutes(app: FastifyInstance) {
    * upsert. Sem UUID de request, sem tabela de dedup.
    */
   app.post("/v1/swipes", async (req, reply) => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
 
     const parsed = swipeBatch.safeParse(req.body);
     if (!parsed.success) {
@@ -108,7 +108,7 @@ export function swipeRoutes(app: FastifyInstance) {
   app.delete<{ Params: { titleId: string } }>(
     "/v1/swipes/:titleId",
     async (req, reply) => {
-      const userId = requireUserId(req);
+      const userId = await requireUserId(req);
       const titleId = req.params.titleId;
 
       if (!z.uuid().safeParse(titleId).success) {

@@ -81,7 +81,7 @@ async function stratified(
 
 export function onboardingRoutes(app: FastifyInstance): void {
   app.get("/v1/onboarding/deck", async (req): Promise<OnboardingDeck> => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
 
     const [me] = await db
       .select({ genres: users.preferredGenres })

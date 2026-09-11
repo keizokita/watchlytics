@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { eq, inArray } from "drizzle-orm";
-import { authResponse, sessionUser } from "@watchlytics/contract";
+import { authResponse, MIN_AGE, sessionUser } from "@watchlytics/contract";
 import { ACCESS_TTL_S, signAccess, verifyAccess } from "./auth.ts";
 import { db, pg } from "./db/client.ts";
 import { consents, identities, sessions, users } from "./db/schema.ts";
@@ -350,26 +350,23 @@ test("rota protegida: 401 sem token, 200 com token válido", async () => {
   assert.equal(ok.statusCode, 200);
   assert.deepEqual(sessionUser.parse(ok.json()), user);
 
-  const saved = process.env["DEV_USER_ID"];
-  delete process.env["DEV_USER_ID"];
-  try {
-    const anon = await app.inject({ method: "GET", url: "/v1/auth/me" });
-    assert.equal(anon.statusCode, 401);
-  } finally {
-    if (saved) process.env["DEV_USER_ID"] = saved;
-  }
+  const anon = await app.inject({ method: "GET", url: "/v1/auth/me" });
+  assert.equal(anon.statusCode, 401);
 });
 
-test("Bearer inválido é 401 mesmo com o shim do C1 ligado", async () => {
-  assert.ok(process.env["DEV_USER_ID"], "este teste só faz sentido com o shim ligado");
-
+/**
+ * β3 — o shim do C1 saiu, mas o teste fica: era ele que provava que um Bearer
+ * quebrado NUNCA vira usuário de dev. Hoje prova que também não vira anônimo
+ * com acesso: token estragado é 401, não "sem token".
+ */
+test("Bearer inválido é 401, nunca outra identidade", async () => {
   for (const bad of ["Bearer lixo", "Bearer ", `Bearer ${signAccess("x")}z`]) {
     const res = await app.inject({
       method: "GET",
       url: "/v1/auth/me",
       headers: { authorization: bad },
     });
-    assert.equal(res.statusCode, 401, `${bad} não pode cair no usuário de dev`);
+    assert.equal(res.statusCode, 401, `${bad} não pode autenticar ninguém`);
   }
 });
 
@@ -428,4 +425,122 @@ test("C5 — primeiro login grava consentimento versionado, o segundo não dupli
     .where(eq(consents.userId, first.user.id));
   assert.equal(afterSecond.length, 1, "voltar a entrar não é aceitar de novo");
   assert.deepEqual(afterSecond[0]?.acceptedAt, afterFirst[0]?.acceptedAt);
+});
+
+// ─── β2: porta de idade ─────────────────────────────────────────────────────
+
+/**
+ * A conta nova nasce SEM ano — o Google não devolve idade e não vamos pedir a
+ * ele. Enquanto ela não responder, o app inteiro fica fechado; o que abre é a
+ * própria porta e a rota que diz que ela existe.
+ */
+const como = (userId: string) => ({ authorization: `Bearer ${signAccess(userId)}` });
+
+const responderIdade = (userId: string, birthYear: number) =>
+  app.inject({
+    method: "POST",
+    url: "/v1/auth/age",
+    headers: como(userId),
+    payload: { birthYear },
+  });
+
+test("β2 — conta sem ano não usa o app, mas enxerga a própria porta", async () => {
+  const { user, refresh: token } = await loginNative("sub-porta-fechada");
+
+  const fechada = await app.inject({
+    method: "GET",
+    url: "/v1/feed",
+    headers: como(user.id),
+  });
+  assert.equal(fechada.statusCode, 403, "sem ano, rota autenticada é 403");
+
+  const eu = await app.inject({
+    method: "GET",
+    url: "/v1/auth/me",
+    headers: como(user.id),
+  });
+  assert.equal(eu.statusCode, 200, "/me responde com a porta fechada");
+  assert.equal(sessionUser.parse(eu.json()).needsAgeGate, true);
+
+  // Sair tem que continuar possível com a porta fechada: uma conta que não pode
+  // nem se deslogar ficaria presa na única tela que ela enxerga.
+  const saiu = await app.inject({
+    method: "POST",
+    url: "/v1/auth/logout",
+    payload: { refresh: token },
+  });
+  assert.equal(saiu.statusCode, 204, "logout não passa pela porta de idade");
+  assert.equal((await refresh(token)).statusCode, 401, "e revogou de verdade");
+});
+
+test("β2 — maior de idade passa, e passa para o app inteiro", async () => {
+  const { user } = await loginNative("sub-porta-abre");
+
+  const res = await responderIdade(user.id, new Date().getFullYear() - 30);
+  assert.equal(res.statusCode, 200, res.body);
+  assert.deepEqual(res.json(), { ok: true, minAge: MIN_AGE });
+
+  const aberta = await app.inject({
+    method: "GET",
+    url: "/v1/feed",
+    headers: como(user.id),
+  });
+  assert.equal(aberta.statusCode, 200, "com ano gravado o feed responde");
+
+  const eu = await app.inject({
+    method: "GET",
+    url: "/v1/auth/me",
+    headers: como(user.id),
+  });
+  assert.equal(sessionUser.parse(eu.json()).needsAgeGate, false);
+});
+
+test("β2 — menor não entra, não vira linha no banco e perde a sessão", async () => {
+  const { user, refresh: token } = await loginNative("sub-menor");
+
+  const res = await responderIdade(user.id, new Date().getFullYear() - (MIN_AGE - 1));
+  assert.equal(res.statusCode, 200, "a porta avaliou; o veredito está no corpo");
+  assert.deepEqual(res.json(), { ok: false, minAge: MIN_AGE });
+
+  const [linha] = await db
+    .select({ birthYear: users.birthYear })
+    .from(users)
+    .where(eq(users.id, user.id));
+  assert.equal(linha?.birthYear, null, "recusa NÃO grava a idade de menor");
+
+  const ainda = await app.inject({
+    method: "GET",
+    url: "/v1/feed",
+    headers: como(user.id),
+  });
+  assert.equal(ainda.statusCode, 403, "continua sem app");
+
+  // O access em circulação ainda vale por até 15 min, e por isso a porta é que
+  // segura; o refresh, esse morre na hora.
+  assert.equal((await refresh(token)).statusCode, 401, "a sessão foi revogada");
+});
+
+test("β2 — a porta se responde uma vez só", async () => {
+  const { user } = await loginNative("sub-porta-uma-vez");
+  const anoOk = new Date().getFullYear() - 30;
+  assert.equal((await responderIdade(user.id, anoOk)).statusCode, 200);
+
+  // Segunda resposta é aceita pelo contrato, mas não reescreve a coluna: a
+  // idade gravada é a que abriu a porta, não a última que alguém mandou.
+  const depois = await responderIdade(user.id, new Date().getFullYear() - 50);
+  assert.deepEqual(depois.json(), { ok: true, minAge: MIN_AGE });
+
+  const [linha] = await db
+    .select({ birthYear: users.birthYear })
+    .from(users)
+    .where(eq(users.id, user.id));
+  assert.equal(linha?.birthYear, anoOk);
+});
+
+test("β2 — ano fora do formato é 400, não 500", async () => {
+  const { user } = await loginNative("sub-ano-invalido");
+  for (const birthYear of ["mil novecentos", 1899, new Date().getFullYear() + 1, 19.5]) {
+    const res = await responderIdade(user.id, birthYear as number);
+    assert.equal(res.statusCode, 400, `${birthYear} devia ser 400`);
+  }
 });

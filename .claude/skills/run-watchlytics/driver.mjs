@@ -53,11 +53,12 @@ const ok = (label, cond, extra = "") => {
 // ─── api: servidor em processo, usuário descartável ─────────────────────────
 
 /**
- * Roda contra um usuário novo a cada execução em vez do DEV_USER_ID do .env.
+ * Roda contra um usuário novo a cada execução, com Bearer de verdade.
  *
- * auth.ts lê process.env a cada requisição, então dá para trocar o usuário
- * depois do boot. Importa porque os swipes do driver não podem sujar o feed
- * de quem estiver com o app aberto no navegador — e porque o DELETE do
+ * Era o shim de autenticação trocado no meio do processo; o β3 apagou o shim, e
+ * agora o driver assina um access token para o usuário descartável — o mesmo
+ * caminho que a produção usa. Descartável importa porque os swipes do driver
+ * não podem sujar o feed de quem estiver com o app aberto, e o DELETE do
  * usuário no fim leva os swipes junto por ON DELETE CASCADE.
  */
 async function cmdApi() {
@@ -66,25 +67,35 @@ async function cmdApi() {
   const { db, pg } = await import(join(ROOT, "apps/api/src/db/client.ts"));
   const { users, swipes } = await import(join(ROOT, "apps/api/src/db/schema.ts"));
   const { buildServer } = await import(join(ROOT, "apps/api/src/server.ts"));
+  const { signAccess } = await import(join(ROOT, "apps/api/src/auth.ts"));
   const { eq } = await import("drizzle-orm");
 
-  // Restaurado no finally: em `all`, o cmdWeb roda depois e sobe uma api que
-  // HERDA este env. Deixar o usuário descartável aqui faria o POST /v1/swipes
-  // do navegador estourar a FK contra um usuário já apagado.
-  const original = process.env["DEV_USER_ID"];
   const userId = crypto.randomUUID();
   const handle = `driver-${userId.slice(0, 8)}`;
   await db.insert(users).values({ id: userId, handle, displayName: "Driver" });
-  process.env["DEV_USER_ID"] = userId;
 
   const app = buildServer();
-  const get = (url) => app.inject({ method: "GET", url });
+  const headers = { authorization: `Bearer ${signAccess(userId)}` };
+  const get = (url) => app.inject({ method: "GET", url, headers });
   const post = (payload) =>
-    app.inject({ method: "POST", url: "/v1/swipes", payload });
+    app.inject({ method: "POST", url: "/v1/swipes", payload, headers });
 
   try {
     const health = await get("/health");
     ok("GET /health", health.json().ok === true);
+
+    // β2 — o usuário nasce sem ano e por isso nasce sem app. A porta é a única
+    // coisa que responde antes dela ser respondida.
+    const fechada = await get("/v1/feed");
+    ok("sem ano de nascimento o feed é 403 (β2)", fechada.statusCode === 403);
+
+    const porta = await app.inject({
+      method: "POST",
+      url: "/v1/auth/age",
+      headers,
+      payload: { birthYear: new Date().getFullYear() - 30 },
+    });
+    ok("a porta de idade abre com maior de idade", porta.json().ok === true);
 
     const feed = await get("/v1/feed");
     const items = feed.json().items;
@@ -130,15 +141,13 @@ async function cmdApi() {
     const stillThere = after.json().items.some((i) => i.id === items[0].id);
     ok("like sai do feed", !stillThere);
 
-    delete process.env["DEV_USER_ID"];
-    ok("sem DEV_USER_ID a rota responde 401", (await get("/v1/feed")).statusCode === 401);
+    const anon = await app.inject({ method: "GET", url: "/v1/feed" });
+    ok("sem Authorization a rota responde 401", anon.statusCode === 401);
   } finally {
     await db.delete(swipes).where(eq(swipes.userId, userId));
     await db.delete(users).where(eq(users.id, userId));
     await app.close();
     await pg.end();
-    if (original === undefined) delete process.env["DEV_USER_ID"];
-    else process.env["DEV_USER_ID"] = original;
   }
 }
 
@@ -426,7 +435,7 @@ async function cmdWeb() {
     const page = await openChrome();
     try {
       // Sem isto o shell pinta a tela de entrada e o deck nunca monta: desde o
-      // C2/C3 o Root só monta o app com sessão, e o shim do DEV_USER_ID não
+      // C2/C3 o Root só monta o app com sessão, e o shim de autenticação não
       // vale para o `POST /v1/auth/refresh` que o Login.tsx usa para resolvê-la.
       await page.cmd("Network.enable");
       usuario = await abrirSessao(page);
@@ -555,11 +564,11 @@ async function cmdWeb() {
 /**
  * Usuário descartável com sessão, para o headless entrar no app.
  *
- * O shim do DEV_USER_ID não resolve o portão de entrada: o shell decide o que
+ * O shim de autenticação não resolvia o portão de entrada: o shell decide o que
  * montar pelo `resume()` do Login.tsx, que chama `POST /v1/auth/refresh` — rota
  * que lê o cookie httpOnly e não passa pelo shim.
  *
- * E o usuário é DESCARTÁVEL, não o do .env, porque o run precisa ESCREVER: os
+ * E o usuário é DESCARTÁVEL, criado a cada run, porque o run precisa ESCREVER: os
  * 20 swipes que abrem o onboarding, mais os do próprio teste. Escrevendo no
  * usuário compartilhado, um Ctrl-C no meio deixava 20 LIKEs para sempre — e o
  * feed exclui LIKE incondicionalmente, então aqueles títulos sumiam do deck
@@ -567,9 +576,9 @@ async function cmdWeb() {
  * com 20 swipes já presentes ela não emprestava nada, e perdia junto a lista
  * do que limpar.
  *
- * Funciona porque a api resolve o usuário pelo Bearer da sessão, não pelo shim:
- * o DEV_USER_ID do processo da api nunca entra nesta conta. E a limpeza vira
- * uma linha só — `delete from users` cascateia sessão e swipes.
+ * Funciona porque a api resolve o usuário pelo Bearer da sessão, e não existe
+ * mais atalho nenhum no ambiente. E a limpeza vira uma linha só —
+ * `delete from users` cascateia sessão e swipes.
  */
 async function abrirSessao(page) {
   const { newRefreshToken, REFRESH_TTL_S } = await import(
@@ -580,9 +589,12 @@ async function abrirSessao(page) {
   const { token, hash } = newRefreshToken(sessionId);
 
   await comBanco(async (sql) => {
+    // β2 — nasce com a porta de idade já respondida. A TELA que pergunta o ano
+    // é da trilha α e ainda não existe; enquanto não existir, o headless não
+    // teria como responder e pararia no 403 antes de ver o deck.
     await sql`
-      insert into users (id, handle, display_name)
-      values (${userId}, ${`driver-${userId.slice(0, 8)}`}, 'Driver')`;
+      insert into users (id, handle, display_name, birth_year)
+      values (${userId}, ${`driver-${userId.slice(0, 8)}`}, 'Driver', 1990)`;
     await sql`
       insert into sessions (id, user_id, refresh_token_hash, expires_at, user_agent)
       values (${sessionId}, ${userId}, ${hash},

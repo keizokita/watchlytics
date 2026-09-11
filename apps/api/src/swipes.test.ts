@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { InjectOptions } from "fastify";
 import { eq, sql } from "drizzle-orm";
 import type { SwipeInput } from "@watchlytics/contract";
+import { signAccess } from "./auth.ts";
 import { db, pg } from "./db/client.ts";
-import { swipes } from "./db/schema.ts";
+import { swipes, users } from "./db/schema.ts";
 import { buildServer } from "./server.ts";
 
 /**
@@ -12,12 +14,27 @@ import { buildServer } from "./server.ts";
  *   2. título repetido dentro do mesmo lote não quebra o INSERT
  *   3. like nunca volta ao feed; dislike volta depois de 180 dias
  *
- * Precisa do banco semeado com DEV_USER_ID definido.
+ * Precisa do banco semeado (npm run seed).
+ *
+ * Usuário próprio, criado aqui: este arquivo apaga a tabela de swipes da conta
+ * seis vezes, e os arquivos de teste rodam em paralelo contra o mesmo banco.
  */
-const USER = process.env["DEV_USER_ID"];
-if (!USER) throw new Error("DEV_USER_ID não definida (veja .env.example)");
+const USER = "00000000-0000-4000-8000-0000000000a0";
+
+process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
+
+await db
+  .insert(users)
+  // β2 — nasce com a porta de idade já respondida: sem ano, toda rota é 403.
+  .values({ id: USER, handle: "swipes-test", displayName: "A0", birthYear: 1990 })
+  .onConflictDoNothing();
 
 const app = buildServer();
+
+/** β3 — Bearer real; sem header a rota responde 401 (último teste do arquivo). */
+const como = { authorization: `Bearer ${signAccess(USER)}` };
+const inject = (opts: InjectOptions) =>
+  app.inject({ ...opts, headers: { ...como, ...(opts.headers ?? {}) } });
 
 /**
  * TODOS os títulos que o feed ainda mostraria, não só o primeiro lote.
@@ -30,7 +47,7 @@ const feedIds = async () => {
   const all: string[] = [];
   let url = "/v1/feed";
   for (;;) {
-    const res = await app.inject({ method: "GET", url });
+    const res = await inject({ method: "GET", url });
     assert.equal(res.statusCode, 200);
     const body = res.json() as {
       items: { id: string }[];
@@ -42,7 +59,7 @@ const feedIds = async () => {
   }
 };
 const post = (payload: SwipeInput[]) =>
-  app.inject({ method: "POST", url: "/v1/swipes", payload });
+  inject({ method: "POST", url: "/v1/swipes", payload });
 
 /** Dois primeiros ids do feed, já estreitados para string. */
 async function twoFeedIds(): Promise<[string, string]> {
@@ -52,7 +69,8 @@ async function twoFeedIds(): Promise<[string, string]> {
 }
 
 test.after(async () => {
-  await db.delete(swipes).where(eq(swipes.userId, USER));
+  // A conta é só deste arquivo: apagá-la leva os swipes por ON DELETE CASCADE.
+  await db.delete(users).where(eq(users.id, USER));
   await app.close();
   await pg.end();
 });
@@ -143,7 +161,7 @@ test("undo apaga o swipe e o título volta ao feed", async () => {
   ]);
   assert.ok(!(await feedIds()).includes(liked), "saiu do feed");
 
-  const del = await app.inject({
+  const del = await inject({
     method: "DELETE",
     url: `/v1/swipes/${liked}`,
   });
@@ -151,7 +169,7 @@ test("undo apaga o swipe e o título volta ao feed", async () => {
   assert.ok((await feedIds()).includes(liked), "voltou ao feed");
 
   // idempotente: o cliente pode chamar sem saber se o swipe chegou a existir
-  const again = await app.inject({
+  const again = await inject({
     method: "DELETE",
     url: `/v1/swipes/${liked}`,
   });
@@ -159,12 +177,12 @@ test("undo apaga o swipe e o título volta ao feed", async () => {
 });
 
 test("undo com id inválido responde 400", async () => {
-  const res = await app.inject({ method: "DELETE", url: "/v1/swipes/abc" });
+  const res = await inject({ method: "DELETE", url: "/v1/swipes/abc" });
   assert.equal(res.statusCode, 400);
 });
 
 test("corpo inválido responde 400, não 500", async () => {
-  const res = await app.inject({
+  const res = await inject({
     method: "POST",
     url: "/v1/swipes",
     payload: [{ titleId: "não é uuid", direction: 7, clientTs: "ontem" }],
@@ -172,12 +190,6 @@ test("corpo inválido responde 400, não 500", async () => {
   assert.equal(res.statusCode, 400);
 });
 
-test("sem DEV_USER_ID a rota responde 401", async () => {
-  const saved = process.env["DEV_USER_ID"];
-  delete process.env["DEV_USER_ID"];
-  try {
-    assert.equal((await app.inject({ method: "GET", url: "/v1/feed" })).statusCode, 401);
-  } finally {
-    process.env["DEV_USER_ID"] = saved;
-  }
+test("sem Authorization a rota responde 401", async () => {
+  assert.equal((await app.inject({ method: "GET", url: "/v1/feed" })).statusCode, 401);
 });

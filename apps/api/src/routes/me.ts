@@ -36,7 +36,7 @@ export function meRoutes(app: FastifyInstance): void {
    * que uma conta não couber numa resposta.
    */
   app.post("/v1/me/export", async (req, reply) => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
 
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) {
@@ -103,7 +103,7 @@ export function meRoutes(app: FastifyInstance): void {
    * é erro do cliente, não UPDATE sem colunas.
    */
   app.patch("/v1/me", async (req, reply) => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
 
     const parsed = z
       .object({
@@ -154,7 +154,7 @@ export function meRoutes(app: FastifyInstance): void {
    * (`identities` não tem coluna para eles).
    */
   app.delete("/v1/me", async (req, reply) => {
-    const userId = requireUserId(req);
+    const userId = await requireUserId(req);
 
     const gone = await db
       .delete(users)

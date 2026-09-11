@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { InjectOptions } from "fastify";
 import { asc, eq } from "drizzle-orm";
 import {
   discardedResponse,
@@ -20,15 +21,15 @@ import { buildServer } from "../server.ts";
  *   4. "descartados" sai de swipes, NUNCA de library_entries
  *   5. o piso de 10 assistidos não devolve agregado nenhum
  *
- * Usuário próprio, não o DEV_USER_ID do .env: os arquivos de teste rodam em
- * paralelo e a suíte de swipes limpa a tabela inteira do usuário dela.
+ * Usuário próprio, criado aqui: os arquivos de teste rodam em paralelo e a
+ * suíte de swipes limpa a tabela inteira do usuário dela.
  */
 const USER = "00000000-0000-4000-8000-0000000000d1";
-process.env["DEV_USER_ID"] = USER;
 
 await db
   .insert(users)
-  .values({ id: USER, handle: "trilha-d", displayName: "Trilha D" })
+  // β2 — nasce com a porta de idade já respondida: sem ano, toda rota é 403.
+  .values({ id: USER, handle: "trilha-d", displayName: "Trilha D", birthYear: 1990 })
   .onConflictDoNothing();
 
 /** Pool estável: o feed muda de ordem conforme os swipes do próprio teste. */
@@ -38,31 +39,43 @@ assert.ok(
   "o banco precisa estar semeado (npm run seed)",
 );
 
+process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
+
 const app = buildServer();
 
+/**
+ * β3 — Bearer real em toda requisição: o shim de autenticação saiu do
+ * `requireUserId`. Sem header, a rota responde 401, que é o que os testes de
+ * anônimo abaixo exercitam com `app.inject` cru.
+ */
+const como = { authorization: `Bearer ${signAccess(USER)}` };
+const inject = (opts: InjectOptions) =>
+  app.inject({ ...opts, headers: { ...como, ...(opts.headers ?? {}) } });
+
+
 const put = (titleId: string, body: Record<string, unknown>) =>
-  app.inject({ method: "PUT", url: `/v1/library/${titleId}`, payload: body });
+  inject({ method: "PUT", url: `/v1/library/${titleId}`, payload: body });
 
 const list = async (status: string) => {
-  const res = await app.inject({ method: "GET", url: `/v1/library?status=${status}` });
+  const res = await inject({ method: "GET", url: `/v1/library?status=${status}` });
   assert.equal(res.statusCode, 200);
   return libraryListResponse.parse(res.json()).items;
 };
 
 const discarded = async () => {
-  const res = await app.inject({ method: "GET", url: "/v1/library/discarded" });
+  const res = await inject({ method: "GET", url: "/v1/library/discarded" });
   assert.equal(res.statusCode, 200);
   return discardedResponse.parse(res.json()).items;
 };
 
 const stats = async () => {
-  const res = await app.inject({ method: "GET", url: "/v1/me/stats" });
+  const res = await inject({ method: "GET", url: "/v1/me/stats" });
   assert.equal(res.statusCode, 200);
   return profileStats.parse(res.json());
 };
 
 const swipe = (titleId: string, direction: 1 | -1) =>
-  app.inject({
+  inject({
     method: "POST",
     url: "/v1/swipes",
     payload: [{ titleId, direction, clientTs: new Date().toISOString() }],
@@ -223,31 +236,33 @@ test("agregados só existem a partir de 10 assistidos", async () => {
   assert.ok(counted > 0 && at.aggregates.topGenres.length <= 3);
 });
 
-test("sem DEV_USER_ID o catálogo responde 401", async () => {
-  const saved = process.env["DEV_USER_ID"];
-  delete process.env["DEV_USER_ID"];
-  try {
-    const res = await app.inject({ method: "GET", url: "/v1/library?status=watched" });
-    assert.equal(res.statusCode, 401);
-  } finally {
-    process.env["DEV_USER_ID"] = saved;
-  }
+test("sem Authorization o catálogo responde 401", async () => {
+  const res = await app.inject({ method: "GET", url: "/v1/library?status=watched" });
+  assert.equal(res.statusCode, 401);
 });
 
 /**
- * O Bearer manda mais que o shim.
+ * O Bearer é quem decide de quem é o catálogo.
  *
  * As quatro rotas daqui chamavam `requireUserId()` sem `req`, então caíam no
  * usuário fixo do ambiente mesmo com um access válido no cabeçalho: em dev,
- * quem logasse via o catálogo de outra pessoa. Este teste é o que falha se o
- * `req` sumir de novo.
+ * quem logasse via o catálogo de outra pessoa. O shim não existe mais (β3),
+ * mas o teste continua sendo o que falha se o `req` sumir de novo.
  */
-test("com Bearer, o catálogo é de quem assinou o token, não do DEV_USER_ID", async () => {
+test("com Bearer, o catálogo é de quem assinou o token, não de outra conta", async () => {
   const OUTRO = "00000000-0000-4000-8000-0000000000d2";
   await db
     .insert(users)
-    .values({ id: OUTRO, handle: "trilha-d2", displayName: "Trilha D2" })
-    .onConflictDoNothing();
+    // β2 — com a porta de idade fechada toda rota daqui seria 403, e o que
+    // este caso mede é identidade, não a porta. `DoUpdate` e não `DoNothing`
+    // porque a conta já existe sem ano nos bancos criados antes do β2.
+    .values({
+      id: OUTRO,
+      handle: "trilha-d2",
+      displayName: "Trilha D2",
+      birthYear: 1990,
+    })
+    .onConflictDoUpdate({ target: users.id, set: { birthYear: 1990 } });
   await db.delete(libraryEntries).where(eq(libraryEntries.userId, OUTRO));
 
   const como = { authorization: `Bearer ${signAccess(OUTRO)}` };
@@ -269,6 +284,6 @@ test("com Bearer, o catálogo é de quem assinou o token, não do DEV_USER_ID", 
   const seus = libraryListResponse.parse(res.json()).items;
   assert.ok(seus.some((e) => e.title.id === dele));
 
-  // E o shim continua sendo outra pessoa: o título não vazou para o USER.
+  // E a conta do arquivo continua sendo outra: o título não vazou para o USER.
   assert.ok(!(await list("interested")).some((e) => e.title.id === dele));
 });

@@ -29,7 +29,7 @@ import { buildServer } from "../server.ts";
  *   4. quem pediu não aceita o próprio pedido
  *
  * Usuários próprios com Bearer real: aqui preciso de três identidades
- * diferentes na mesma suíte, e o shim do DEV_USER_ID só tem uma.
+ * diferentes na mesma suíte, e o shim de autenticação só tinha uma.
  */
 process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
 
@@ -40,9 +40,10 @@ const CARLA = "00000000-0000-4000-8000-0000000000e3";
 await db
   .insert(users)
   .values([
-    { id: ANA, handle: "ana-teste-e1", displayName: "Ana", email: "ana@example.com" },
-    { id: BRUNO, handle: "bruno-teste-e1", displayName: "Bruno" },
-    { id: CARLA, handle: "carla-teste-e1", displayName: "Carla" },
+    // β2 — `birthYear` é a porta de idade já respondida: sem ano, 403.
+    { id: ANA, handle: "ana-teste-e1", displayName: "Ana", email: "ana@example.com", birthYear: 1990 },
+    { id: BRUNO, handle: "bruno-teste-e1", displayName: "Bruno", birthYear: 1990 },
+    { id: CARLA, handle: "carla-teste-e1", displayName: "Carla", birthYear: 1990 },
   ])
   .onConflictDoNothing();
 

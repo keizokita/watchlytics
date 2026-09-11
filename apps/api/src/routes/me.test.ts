@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { InjectOptions } from "fastify";
 import { asc, eq, sql } from "drizzle-orm";
+import { signAccess } from "../auth.ts";
 import { db, pg } from "../db/client.ts";
 import {
   consents,
@@ -23,17 +25,27 @@ import { buildServer } from "../server.ts";
  *   3. o export abre como JSON e traz catálogo, swipes, amigos e matches
  *   4. o export não vaza credencial (hash de refresh não é dado pessoal)
  *
- * Usuário próprio, não o DEV_USER_ID do .env: os arquivos de teste rodam em
- * paralelo, e este aqui apaga a conta inteira.
+ * Usuário próprio, criado aqui: os arquivos de teste rodam em paralelo, e este
+ * aqui apaga a conta inteira.
  */
 const USER = "00000000-0000-4000-8000-0000000000c6";
 /** Ids escolhidos para cercar o USER: friendships exige `user_a < user_b`. */
 const LEFT = "00000000-0000-4000-8000-0000000000c5";
 const RIGHT = "00000000-0000-4000-8000-0000000000c7";
 
-process.env["DEV_USER_ID"] = USER;
+process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
 
 const app = buildServer();
+
+/**
+ * β3 — Bearer real em toda requisição: o shim de autenticação saiu do
+ * `requireUserId`. Sem header, a rota responde 401, que é o que os testes de
+ * anônimo abaixo exercitam com `app.inject` cru.
+ */
+const como = { authorization: `Bearer ${signAccess(USER)}` };
+const inject = (opts: InjectOptions) =>
+  app.inject({ ...opts, headers: { ...como, ...(opts.headers ?? {}) } });
+
 
 const pool = await db.select().from(titles).orderBy(asc(titles.id)).limit(2);
 assert.ok(pool.length === 2, "o banco precisa estar semeado (npm run seed)");
@@ -47,9 +59,10 @@ async function seed() {
   await db
     .insert(users)
     .values([
-      { id: LEFT, handle: "c6-esquerda", displayName: "Esquerda" },
-      { id: USER, handle: "c6-alvo", displayName: "Alvo", email: "alvo@exemplo.test" },
-      { id: RIGHT, handle: "c6-direita", displayName: "Direita" },
+      // β2 — `birthYear` é a porta de idade já respondida: sem ano, 403.
+      { id: LEFT, handle: "c6-esquerda", displayName: "Esquerda", birthYear: 1990 },
+      { id: USER, handle: "c6-alvo", displayName: "Alvo", email: "alvo@exemplo.test", birthYear: 1990 },
+      { id: RIGHT, handle: "c6-direita", displayName: "Direita", birthYear: 1990 },
     ])
     .onConflictDoNothing();
 
@@ -143,7 +156,7 @@ test.after(async () => {
 test("C6 — export abre como JSON e traz catálogo, swipes, amigos e matches", async () => {
   await seed();
 
-  const res = await app.inject({ method: "POST", url: "/v1/me/export" });
+  const res = await inject({ method: "POST", url: "/v1/me/export" });
   assert.equal(res.statusCode, 200);
   assert.match(res.headers["content-type"] as string, /application\/json/);
   assert.match(
@@ -190,7 +203,7 @@ test("C6 — DELETE /v1/me apaga em cascata, sem sobrar linha em tabela nenhuma"
     assert.ok(n > 0, `o teste precisa de linha em ${tabela} para provar algo`);
   }
 
-  const res = await app.inject({ method: "DELETE", url: "/v1/me" });
+  const res = await inject({ method: "DELETE", url: "/v1/me" });
   assert.equal(res.statusCode, 204);
 
   const depois = await rowsFor(USER);
@@ -213,23 +226,17 @@ test("C6 — DELETE /v1/me apaga em cascata, sem sobrar linha em tabela nenhuma"
 });
 
 test("C6 — apagar duas vezes é 404, não 500", async () => {
-  const res = await app.inject({ method: "DELETE", url: "/v1/me" });
+  const res = await inject({ method: "DELETE", url: "/v1/me" });
   assert.equal(res.statusCode, 404);
 });
 
-test("sem DEV_USER_ID as rotas de conta respondem 401", async () => {
-  const saved = process.env["DEV_USER_ID"];
-  delete process.env["DEV_USER_ID"];
-  try {
-    assert.equal(
-      (await app.inject({ method: "POST", url: "/v1/me/export" })).statusCode,
-      401,
-    );
-    assert.equal(
-      (await app.inject({ method: "DELETE", url: "/v1/me" })).statusCode,
-      401,
-    );
-  } finally {
-    process.env["DEV_USER_ID"] = saved;
-  }
+test("sem Authorization as rotas de conta respondem 401", async () => {
+  assert.equal(
+    (await app.inject({ method: "POST", url: "/v1/me/export" })).statusCode,
+    401,
+  );
+  assert.equal(
+    (await app.inject({ method: "DELETE", url: "/v1/me" })).statusCode,
+    401,
+  );
 });
