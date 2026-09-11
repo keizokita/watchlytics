@@ -349,6 +349,79 @@ Nada disso é opcional: sem os três, convidar alguém é irresponsável ou ileg
 | β2 | Idade mínima no cadastro | COPPA (menor de 13 nos EUA) e GDPR. Está no PLAN §8 desde o começo e nunca saiu do papel | ✅ 16 anos, gravada no login e cobrada em toda rota autenticada |
 | β3 | Remover o shim do C1 | `DEV_USER_ID` segue em `auth.ts` com o OAuth em produção. Era para sair no merge do C2 — é exatamente o "não deixe virar permanente" | ✅ o nome não existe mais em `apps/`, `.github/` nem `.claude/` |
 
+> **β1 fechou em 2026-09-11**, em três PRs (#21, #22, #26). O texto descreve o
+> que o produto faz hoje, conferido contra o schema e as rotas: o hash do
+> refresh e o User-Agent em `sessions`, o IP em `consents` (o único guardado de
+> propósito, porque a lei pede prova do consentimento), a exclusão em cascata
+> sem soft-delete, os 30 dias da sessão e os 180 do descarte. GDPR além de LGPD,
+> com base legal por finalidade. O §8.7 do PLAN virou parágrafo próprio: o
+> backend chama o TMDB sem nenhum dado do usuário, mas o navegador busca pôster
+> e elenco no CDN deles, o que revela IP e quais títulos a pessoa viu.
+>
+> **β1.1** foi achado conferindo se a γ tinha subido a versão do aviso — não
+> tinha. A `CONSENT_VERSION` ficou em `2026-09-02` enquanto o texto já era
+> outro, e cada conta criada nesse intervalo gravou a aceitação de uma versão
+> que não estava mais na tela. Registro errado é pior que registro ausente: o
+> ausente se vê, e é o registro que a lei manda poder mostrar. Subiu para
+> `2026-09-11`. Junto apareceu que a política afirmava que o app pede o aceite
+> de novo quando o texto muda — e o app não faz isso, porque o consentimento é
+> gravado uma vez, dentro da transação que cria a conta. Entre construir o gate
+> de re-consentimento e fazer a política dizer a verdade, ficou a verdade: num
+> beta fechado as contas anteriores são poucas e conhecidas, então a política
+> promete escrever para elas, que é cumprível por uma pessoa. O gate ficou como
+> `ponytail:` nomeado em `auth.ts`.
+>
+> **β1.2** tirou os links do blob do GitHub. Não foi estética: para sair do modo
+> Testing, o formulário da tela de consentimento do Google exige o link da
+> política num domínio verificado no Search Console, e `github.com` não é um
+> domínio que a gente possa verificar — `pages.dev` é. `apps/web/legal.mjs`
+> renderiza `docs/legal/*.md` para `public/legal/` no build, então a fonte
+> continua sendo o markdown que o repositório versiona e não nasce uma segunda
+> cópia para manter desatualizada. O build falha se um documento não virar HTML
+> com título.
+>
+> **O que continua aberto:** 13 `[PREENCHER]` nos dois documentos, contados em
+> 2026-09-11 — 9 na política e 4 nos termos: controlador, encarregado da LGPD,
+> representante na UE, data de entrada em vigor, lei aplicável e foro. Identificar o controlador é o que GDPR e LGPD exigem, e
+> publicar com esses buracos é promessa quebrada, não rascunho. Para 10 a 30
+> pessoas, a lista de test users resolve sem esse custo.
+
+> **β2 fechou em 2026-09-11**: o backend no #19, a tela no #21.
+>
+> `POST /v1/auth/age` grava `users.birth_year` quando o ano satisfaz os 16. Quando
+> não satisfaz, responde `200` com `{ ok: false, minAge: 16 }`, **não grava o ano**
+> e revoga as sessões da conta: guardar "tentou entrar e é menor" acumularia
+> justamente o dado que a lei manda não coletar.
+>
+> O bloqueio mora no `requireUserId`, o único ponto por onde toda rota autenticada
+> passa — um guard por rota seria o mesmo código quinze vezes, e a décima sexta
+> rota nasceria sem ele. Enquanto `birth_year` for nulo a resposta é `403`, e não
+> `401`: a sessão é válida, o que falta é a porta. As exceções são as três que
+> precisam funcionar com a porta fechada — `/v1/auth/me`, que é como o cliente
+> descobre que precisa perguntar; `/v1/auth/age`, que é a resposta; e o logout,
+> senão a conta ficaria presa na única tela que enxerga. O access em circulação
+> ainda vale por até 15 minutos depois da recusa, e é por isso que quem segura é a
+> porta em toda requisição, não a revogação.
+>
+> Na tela, com `needsAgeGate` a nav sai junto com o conteúdo: "não passa da tela"
+> inclui não contornar por um link. Pede o ano, nunca a data. A decisão de idade é
+> do servidor; o cliente só valida a forma do ano, para que digitação pela metade
+> não vire recusa. A lógica ficou em `ageGate.ts`, fora do `.tsx`, porque a suíte
+> da web roda em `node --test` sem DOM — seis casos, incluindo a prova de que o
+> corpo que vai para a rede leva `birthYear` e só ele.
+
+> **β3 fechou em 2026-09-11** (#19). `requireUserId` deixou de aceitar requisição
+> sem `Authorization`: o `req` passou a ser obrigatório e o bloco que resolvia o
+> usuário por variável de ambiente foi apagado.
+>
+> O nome da variável não sobreviveu em `apps/`, `.github/` nem `.claude/`, e isso
+> é o ponto: enquanto o nome seguisse vivo num `process.env`, o caminho de volta
+> para o atalho continuava aberto. O seed não cria mais o usuário de dev, e
+> `server.test.ts`, `feed.test.ts` e `swipes.test.ts` passaram a criar e limpar a
+> própria conta, como os outros arquivos já faziam — três arquivos de teste
+> compartilhando uma conta era o que produzia corrida entre suítes rodando em
+> paralelo no mesmo banco.
+
 ### P1 — bloqueia confiar no beta
 
 Dá para convidar sem isso. Você só não fica sabendo de nada. **As duas fecharam
@@ -358,6 +431,63 @@ em 2026-09-11** (PRs #20 e #23).
 |---|---|---|---|
 | β4 | Error handler + log estruturado na api | Hoje um 500 em produção é invisível: sem logger, sem handler, sem nada | ✅ `apps/api/src/obs.ts`, com redação de segredo |
 | β5 | Um caminho de retorno do usuário | Beta sem canal de feedback é beta que não ensina nada. Um `mailto:` resolve — não construa formulário | ✅ `mailto:` no rodapé do shell, fora do `user &&`, e os `[PREENCHER]` de contato preenchidos |
+
+> **β4 fechou em 2026-09-11** (#20). Antes, um 500 não deixava rastro nenhum: o
+> Fastify subia sem logger e o error handler padrão devolvia a mensagem interna
+> ao cliente sem registrar nada em lugar algum. Agora toda requisição sai em uma
+> linha JSON, que é como o Fly agrega, e um 500 produz uma linha de nível error
+> com stack, método, rota e o id de correlação que o cliente recebeu no corpo —
+> a resposta leva só o id. 4xx fica fora do log de erro: 401 sem token e 400 de
+> validação são o contrato funcionando, e alerta que dispara no esperado é
+> alerta que a gente aprende a ignorar.
+>
+> **Sem dependência nova.** O pino já vem dentro do Fastify, já escreve JSON por
+> linha e já põe o `reqId` no logger filho de cada requisição.
+>
+> A redação de segredo é o que mais vale, e são duas camadas. Os serializers são
+> lista de PERMISSÃO: o padrão do pino despeja toda propriedade própria do erro,
+> e um erro do postgres carrega `query` e `parameters` — onde moram o hash do
+> refresh e o e-mail. Em cima disso, `scrub()` passa em URL, mensagem e stack. O
+> e-mail não é paranoia: `duplicate key … Key (email)=(a@b.com)` vem pronto na
+> mensagem do postgres, sem ninguém escrever `log(email)`.
+>
+> **Medido em produção no mesmo dia:** com `?cursor=VISIVEL123&code=SEGREDO456`,
+> a linha de acesso saiu `cursor=VISIVEL123&code=[redigido]` — a redação acerta
+> o alvo sem cegar o log. No buffer logo após o deploy, 7×200, 3×401, 2×403 e
+> zero linhas de nível error.
+>
+> **Sentry ficou de fora:** conta nova, SDK novo e egress a partir do processo
+> que serve requisição, para um beta de 10 a 30 pessoas em que o `fly logs` já
+> mostra a linha. Se a decisão mudar, agora existe linha estruturada para mandar.
+>
+> **O que continua aberto:** a `privacy.md` declara a retenção dos logs
+> operacionais em dois lugares e os dois seguem `[PREENCHER]`. Ficou mais urgente
+> com esta tarefa, que é justamente quem passou a produzir esses logs; depende da
+> janela real do Fly, que não foi medida.
+
+> **β5 fechou em 2026-09-11** (#23). O link fica no rodapé do shell, que já
+> existia para a atribuição do TMDB, e **fora do `user &&`**: quem não consegue
+> entrar é justamente quem mais precisa conseguir contar isso.
+>
+> `mailto:` e não formulário, como o backlog já pedia. Formulário quer rota,
+> tabela, moderação e uma tela de "obrigado", e nada disso ensina mais do que um
+> e-mail ensina. O assunto vai preenchido para separar o beta do resto da caixa.
+> O endereço leva o sufixo `+watchlytics`, que serve para filtrar e **não** para
+> proteger: o endereço base continua legível no `href`. Trocar por uma conta só
+> do app no dia em que o volume justificar.
+>
+> O link ficou em linha própria e sublinhado depois de ser visto no navegador:
+> colado na atribuição do TMDB, ele lia como a primeira frase do texto legal, e
+> ninguém clica em texto legal. Sem teste — é uma constante e um link, não há
+> ramo para quebrar; o que vale aqui é a conferência nos dois estados, deslogado
+> e logado, com o console limpo. Confirmado depois no bundle publicado.
+>
+> Junto foram os quatro `[PREENCHER: e-mail de contato]` de `privacy.md` e
+> `terms.md`: a política prometia um canal de contato que não existia em lugar
+> nenhum, que é o mesmo defeito do β5, só que no papel.
+>
+> **Falta uma coisa, e é fora do código:** criar o filtro no Gmail para
+> `+watchlytics`. Sem ele o sufixo não organiza nada.
 
 ### P2 — qualidade do que eles vão ver
 
