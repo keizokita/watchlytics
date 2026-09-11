@@ -1,5 +1,5 @@
-import Fastify from "fastify";
 import { pg } from "./db/client.ts";
+import { buildApp } from "./obs.ts";
 import { registerAuth } from "./routes/auth.ts";
 import { feedRoutes } from "./routes/feed.ts";
 import { friendRoutes } from "./routes/friends.ts";
@@ -16,7 +16,7 @@ import { swipeRoutes } from "./routes/swipes.ts";
  * tempo, que era exatamente a condição para dividir.
  */
 export function buildServer() {
-  const app = Fastify();
+  const app = buildApp();
 
   app.get("/health", async () => ({ ok: true }));
 
