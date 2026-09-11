@@ -27,7 +27,7 @@ import {
   signAccess,
 } from "../auth.ts";
 import { db } from "../db/client.ts";
-import { consents, identities, sessions, users } from "../db/schema.ts";
+import { consents, identities, sessions, swipes, users } from "../db/schema.ts";
 
 /**
  * C2/C3/C4 — troca do código OAuth, rotação do refresh e sessão.
@@ -362,6 +362,42 @@ async function rotate(
   return { userId: session.userId, refresh: next.token };
 }
 
+/**
+ * β2 — o que fazer com quem declara menos de MIN_AGE.
+ *
+ * Apaga a conta, e a cascata leva identidade, sessão e consentimento junto. É o
+ * que a política promete e o único fim honesto: a conta nasceu no login do
+ * Google minutos antes e não tem nada dentro além do que o Google mandou.
+ *
+ * O `unless` é o que impede isto de virar arma. Conta anterior ao β2 também tem
+ * `birth_year` nulo, e essa tem catálogo, swipes e amizades — um erro de
+ * digitação (2015 em vez de 1995) apagaria a vida de alguém sem confirmação
+ * nenhuma. Por isso o apagar só vale para conta que NUNCA entrou no
+ * app, e quem já entrou apenas perde a sessão e continua fora até responder um
+ * ano válido. Os dados dessa pessoa não são meus para destruir por engano.
+ *
+ * O sinal de "nunca entrou" é ter zero swipes: o onboarding (D4) exige
+ * ONBOARDING_SWIPES antes de qualquer outra tela, então conta que usou o app
+ * tem swipe, e conta que não tem swipe não tem mais nada a perder.
+ */
+async function recusar(userId: string): Promise<void> {
+  const [usou] = await db
+    .select({ userId: swipes.userId })
+    .from(swipes)
+    .where(eq(swipes.userId, userId))
+    .limit(1);
+
+  if (!usou) {
+    await db.delete(users).where(eq(users.id, userId));
+    return;
+  }
+
+  await db
+    .update(sessions)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+}
+
 // ─── transporte ─────────────────────────────────────────────────────────────
 
 /**
@@ -514,11 +550,11 @@ export function registerAuth(app: FastifyInstance): void {
    * precisa LER a resposta — um 403 aqui cairia no mesmo tratamento genérico de
    * erro que a porta fechada de todas as outras rotas.
    *
-   * A recusa não grava o ano e não deixa conta pela metade: revoga as sessões e
-   * limpa o cookie. O access token em circulação ainda vale por até 15 minutos,
-   * e não tem problema — sem ano gravado, `requireUserId` fecha a porta em toda
-   * rota que não seja esta e a `/me`. Guardar "tentou entrar e é menor" seria
-   * acumular justamente o dado que a lei manda não coletar.
+   * A recusa não grava o ano e apaga a conta que acabou de nascer — ver
+   * `recusar` abaixo. Guardar "tentou entrar e é menor" seria acumular
+   * justamente o dado que a lei manda não coletar, e a conta criada no login
+   * guarda nome, e-mail e avatar vindos do Google: deixá-la de pé seria guardar
+   * dado pessoal de menor declarado, que é o oposto do que a política promete.
    */
   app.post("/v1/auth/age", async (req, reply): Promise<AgeGateResponse | { error: string }> => {
     const userId = await requireUserId(req, { ageGate: false });
@@ -530,10 +566,7 @@ export function registerAuth(app: FastifyInstance): void {
     }
 
     if (!idadeMinimaOk(parsed.data.birthYear)) {
-      await db
-        .update(sessions)
-        .set({ revokedAt: new Date() })
-        .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+      await recusar(userId);
       setRefreshCookie(reply, "", 0);
       return { ok: false, minAge: MIN_AGE };
     }

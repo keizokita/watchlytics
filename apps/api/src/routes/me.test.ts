@@ -225,9 +225,14 @@ test("C6 — DELETE /v1/me apaga em cascata, sem sobrar linha em tabela nenhuma"
   assert.equal((await rowsFor(RIGHT))["users"], 1);
 });
 
-test("C6 — apagar duas vezes é 404, não 500", async () => {
+test("C6 — apagar duas vezes é 401, não 500", async () => {
+  // Era 404, vindo do `returning` vazio da própria rota. Virou 401 no β2.1: o
+  // `requireUserId` passou a exigir que o dono do token exista, e a conta desta
+  // suíte foi apagada no teste anterior. 401 é a resposta mais honesta das duas
+  // — não é a conta que sumiu de uma rota, é o token que não tem mais dono. O
+  // 404 da rota continua lá para a corrida entre a checagem e o DELETE.
   const res = await inject({ method: "DELETE", url: "/v1/me" });
-  assert.equal(res.statusCode, 404);
+  assert.equal(res.statusCode, 401);
 });
 
 test("sem Authorization as rotas de conta respondem 401", async () => {

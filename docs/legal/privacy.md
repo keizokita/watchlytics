@@ -97,9 +97,12 @@ need to answer the only question we are allowed to ask.
 country-by-country table we could not keep correct. It also satisfies COPPA,
 which protects children under 13 in the United States.
 
-If the year you give us puts you under 16, we do not create your account and
-**we do not store the year**. Recording "this person tried to sign up and is
-under age" would mean keeping exactly the data the law tells us not to collect.
+If the year you give us puts you under 16, **we delete the account and keep
+nothing**. Signing in with Google had already created a row with your name,
+e-mail address and picture; that row is deleted on the spot, and the year you
+typed is never stored. Recording "this person tried to sign up and is under age"
+would mean keeping exactly the data the law tells us not to collect — and so
+would keeping the account itself.
 
 ## Who else sees your data
 
