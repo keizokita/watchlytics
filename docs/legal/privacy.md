@@ -1,7 +1,7 @@
 # Watchlytics — Privacy Policy
 
 **Last updated:** 2026-09-11 · **Consent notice version:** `2026-09-11`
-**Effective date:** [PREENCHER: data de entrada em vigor]
+**Effective date:** 2026-09-11
 
 > This policy is written for the closed beta. It describes what the product
 > actually does today — not what it might do later. Every claim below can be
@@ -11,10 +11,10 @@
 
 | | |
 |---|---|
-| Controller | [PREENCHER: razão social, CNPJ e endereço do controlador] |
+| Controller | Keizo Kita, a natural person resident in Brazil, acting as controller in his own name. There is no company behind Watchlytics. Written contact goes to the address below. |
 | Privacy contact | keizokita1+watchlytics@gmail.com |
-| Data Protection Officer (LGPD art. 41) | [PREENCHER: nome e contato do encarregado] |
-| EU/EEA representative (GDPR art. 27) | [PREENCHER: representante na UE, ou declaração de que não é exigido] |
+| Data Protection Officer (LGPD art. 41) | None appointed. As a small-scale processing agent we are exempt from appointing one (ANPD Resolução CD/ANPD nº 2/2022), and keep the communication channel that exemption requires: the privacy contact above, answered by the controller himself. |
+| EU/EEA representative (GDPR art. 27) | None appointed, because none is required: the beta is invite-only and is not offered to people in the EU, the EEA or the UK, and we do not target or monitor anyone there. If we ever invite someone living in those countries, we appoint a representative first. |
 
 If you are in Brazil, this policy covers our obligations under the **LGPD**
 (Lei 13.709/2018). If you are in the EU, the UK or the EEA, it covers the
@@ -59,8 +59,11 @@ before the `@`, or from your name. It is the only way other people can find you.
   the IP address the acceptance came from. The law requires us to be able to
   show this, which is why it is the one place we store an IP on purpose.
 - operational logs from the server may record IP address, request path, status
-  and timestamp, so that an error in the beta is not invisible. Retention:
-  [PREENCHER: retenção dos logs operacionais].
+  and timestamp, so that an error in the beta is not invisible. We store none of
+  them ourselves: they are written to standard output and live only in our
+  hosting provider's rolling log stream, which we do not export, archive or
+  search after the fact. Entries age out on the provider's own schedule, and we
+  do not extend it.
 
 **What we do not collect:** no full date of birth, no precise location, no
 payment data, no phone number, no contact list, no free-text profile, no
@@ -111,10 +114,16 @@ under age" would mean keeping exactly the data the law tells us not to collect.
   every card you see, and it is the one unavoidable disclosure in the product.
   *This product uses the TMDB API but is not endorsed or certified by TMDB.*
 - **Our infrastructure providers**, acting as processors on our instructions:
-  Neon (the PostgreSQL database), Fly.io (the API) and Cloudflare Pages (the
-  web app). Hosting regions and the transfer mechanism for data leaving Brazil
-  or the EEA: [PREENCHER: regiões dos provedores e mecanismo de transferência
-  internacional — cláusulas-padrão, decisão de adequação, etc.].
+  Neon (the PostgreSQL database, AWS South America East 1, São Paulo, Brazil),
+  Fly.io (the API, region `gru`, São Paulo, Brazil) and Cloudflare Pages (the
+  web app and the proxy that keeps everything on one origin, served from a
+  global edge network).
+
+  **Your account data is stored in Brazil.** What crosses the border is request
+  traffic passing through whichever Cloudflare edge location is nearest to you,
+  which can be outside the country. That transfer rests on the standard
+  contractual clauses in the provider's data processing agreement (LGPD art. 33,
+  and the standard clauses of ANPD Resolução CD/ANPD nº 19/2024).
 
 We do not sell your data, we do not share it for advertising, and we do not
 disclose it to anyone else unless a law or a valid legal order requires it.
@@ -139,9 +148,12 @@ search does not confirm whether an account exists.
   stops the same card appearing again tomorrow.
 - **Consent records:** for as long as the account exists, as the proof the law
   requires — they are deleted with the account.
-- **Server logs:** [PREENCHER: retenção dos logs operacionais].
+- **Server logs:** not retained by us at all — see above. They age out of the
+  hosting provider's log stream and we keep no copy.
 - **Backups** kept by our infrastructure providers may hold deleted data for a
-  short window: [PREENCHER: janela de retenção de backup do provedor].
+  short window: our database provider keeps a point-in-time restore window
+  measured in days, and data you delete can survive there until that window
+  rolls off — after which it is gone. We keep no backups of our own.
 
 ## Your rights
 
@@ -187,5 +199,9 @@ you have **already** given us, we write to you at the address on your account
 and ask you to accept the new version before it applies to you. We do not put a
 new basis on old data by publishing a page.
 
-A Brazilian-Portuguese version of this policy for LGPD users:
-[PREENCHER: link da versão pt-BR, ou decisão documentada de manter só em inglês].
+There is no Brazilian-Portuguese version of this policy yet, and that is a
+decision rather than an oversight: the beta is invite-only, and everyone in it
+reads English. It is not a barrier to your rights — write to the privacy contact
+above in Portuguese and you get an answer in Portuguese, and nothing in the
+section above depends on which language you read this in. A translated version
+comes before the app is open to the public.
