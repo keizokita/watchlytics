@@ -93,10 +93,10 @@ export const t = {
    * suba a CONSENT_VERSION do backend: é a versão DESTE aviso que fica
    * registrada.
    *
-   * β1 — o texto mudou: agora nomeia os dois documentos e o grafo social, que a
-   * política declara como base de consentimento separada. A CONSENT_VERSION de
-   * routes/auth.ts PRECISA subir junto, e ela é da trilha γ — sem isso a conta
-   * grava que aceitou um aviso que ninguém leu.
+   * β1 — o texto nomeia os dois documentos e o grafo social, que a política
+   * declara como base de consentimento separada. A CONSENT_VERSION de
+   * routes/auth.ts subiu junto (`2026-09-11`): sem isso a conta gravaria que
+   * aceitou um aviso que não é mais este.
    */
   consentNotice:
     "By signing in you agree to the Terms of Use, and to the Privacy Policy — including using your swipes and your friends list to personalize what you see next.",
