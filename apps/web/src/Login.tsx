@@ -4,7 +4,7 @@ import {
   sessionUser,
   type SessionUser,
 } from "@watchlytics/contract";
-import { t } from "./strings.ts";
+import { PRIVACY_URL, TERMS_URL, t } from "./strings.ts";
 import {
   authedFetch,
   getUser,
@@ -210,7 +210,20 @@ export function Login() {
       {!user && CLIENT_ID && (
         // C5 — o consentimento é gravado na criação da conta; o aviso tem que
         // estar VISÍVEL no clique que cria, senão o registro é teatro.
-        <span className="consent">{t.consentNotice}</span>
+        //
+        // β1 — e agora os dois documentos são alcançáveis do mesmo aviso: sem
+        // isso o texto prometia um acordo que a pessoa não tinha como ler.
+        // `target="_blank"` de propósito: abrir a política no meio do login
+        // perderia o `code_verifier` que está no sessionStorage desta aba.
+        <span className="consent">
+          {t.consentNotice}{" "}
+          <a href={TERMS_URL} target="_blank" rel="noreferrer noopener">
+            {t.terms}
+          </a>{" "}
+          <a href={PRIVACY_URL} target="_blank" rel="noreferrer noopener">
+            {t.privacyPolicy}
+          </a>
+        </span>
       )}
     </p>
   );

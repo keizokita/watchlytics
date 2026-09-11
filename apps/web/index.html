@@ -536,6 +536,10 @@
       }
       /* C5 — quebra de linha própria: o aviso pertence ao botão de entrar */
       .consent { display: block; font-size: 0.72rem; margin-top: 0.35rem; }
+      /* β1 — sublinhado, e não só cor: o link para os documentos legais tem que
+         ser reconhecível como link sem depender de distinguir --fg de --muted. */
+      .consent a { color: var(--fg); text-decoration: underline; }
+      .consent a:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
       .notice-hint { font-size: 0.9rem; }
 
       /* D5 — o toggle do perfil público mora na seção de conta */

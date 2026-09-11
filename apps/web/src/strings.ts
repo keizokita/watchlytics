@@ -4,6 +4,21 @@
  * Não é infra de i18n — é o que faz adicionar i18n depois custar um dia em vez
  * de duas semanas. O mercado do v1 é global com inglês como base (PLAN §1).
  */
+/**
+ * β1 — onde os dois documentos ficam públicos.
+ *
+ * Aponta para o markdown no GitHub, que é público, renderiza e é a MESMA fonte
+ * que o repositório versiona — copiar o texto para `public/` criaria uma segunda
+ * versão para manter desatualizada.
+ *
+ * ponytail: o link sai do domínio do app, o que é estranho para documento legal.
+ * Vira `/legal/privacy` servido pelo Pages no dia em que houver domínio próprio
+ * e um renderizador de markdown — não antes, e não por causa disto.
+ */
+const LEGAL_BASE = "https://github.com/keizokita/watchlytics/blob/main/docs/legal";
+export const PRIVACY_URL = `${LEGAL_BASE}/privacy.md`;
+export const TERMS_URL = `${LEGAL_BASE}/terms.md`;
+
 export const t = {
   pass: "Pass",
   like: "Like",
@@ -76,10 +91,34 @@ export const t = {
   /**
    * C5 — o que a conta grava em `consents` na primeira entrada. Mudou o texto,
    * suba a CONSENT_VERSION do backend: é a versão DESTE aviso que fica
-   * registrada. Sem link porque a política ainda não existe (PLAN §9).
+   * registrada.
+   *
+   * β1 — o texto mudou: agora nomeia os dois documentos e o grafo social, que a
+   * política declara como base de consentimento separada. A CONSENT_VERSION de
+   * routes/auth.ts PRECISA subir junto, e ela é da trilha γ — sem isso a conta
+   * grava que aceitou um aviso que ninguém leu.
    */
   consentNotice:
-    "By signing in you agree that your swipes are used to personalize what you see next.",
+    "By signing in you agree to the Terms of Use, and to the Privacy Policy — including using your swipes and your friends list to personalize what you see next.",
+  privacyPolicy: "Privacy Policy",
+  terms: "Terms of Use",
+
+  // β2 — porta de idade. Ano, nunca data completa: é o mínimo que responde à
+  // única pergunta que a lei nos deixa fazer (ver docs/legal/privacy.md).
+  ageGateTitle: "One question before you start.",
+  ageGateBody: (min: number) =>
+    `Watchlytics is for people ${min} and over. We ask for the year you were born and nothing else — not the day, not the month.`,
+  ageGateLabel: "Year you were born",
+  ageGateAction: "Continue",
+  /** O ano está fora do intervalo que o contrato aceita, não é recusa. */
+  ageGateInvalid: "Enter the four digits of the year you were born.",
+  /**
+   * A recusa. Sem culpa, sem "tente de novo": a pessoa respondeu com honestidade
+   * e a resposta encerra o assunto. Diz também que nada foi guardado, porque é
+   * verdade e é a parte que importa para quem acabou de digitar o ano.
+   */
+  ageGateRefused: (min: number) =>
+    `Thanks for answering honestly. Watchlytics is only for people ${min} and over, so we can't set up your account. We did not keep the year you entered, and there is nothing here for you to come back to.`,
   authStateMismatch: "Sign-in did not come back from where it started.",
 
   // A1 — filtros
