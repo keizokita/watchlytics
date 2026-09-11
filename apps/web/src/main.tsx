@@ -5,6 +5,7 @@ import {
   type FeedResponse,
   type Title,
 } from "@watchlytics/contract";
+import { AgeGate } from "./AgeGate.tsx";
 import { Deck } from "./Deck.tsx";
 import { Filters, toParams, type FeedFilters } from "./Filters.tsx";
 import { Friends, NotificationsBadge } from "./Friends.tsx";
@@ -359,8 +360,11 @@ function Root() {
       `}</style>
       <nav className={user ? undefined : "below"}>
         {/* Sem sessão as três telas são 401: link que não leva a lugar nenhum
-            é pior que link ausente. */}
-        {user ? (
+            é pior que link ausente.
+
+            β2 — e com a porta de idade aberta a nav também sai: "não passa da
+            tela" inclui não contornar por um link. */}
+        {user && !user.needsAgeGate ? (
           <>
             <a href="#/" aria-current={inLibrary || inFriends ? undefined : "page"}>
               {t.navDeck}
@@ -378,6 +382,10 @@ function Root() {
       </nav>
       {user === undefined ? null : !user ? (
         <SignedOut />
+      ) : user.needsAgeGate ? (
+        // β2 — antes de qualquer tela, e antes de qualquer requisição de dado:
+        // a idade é condição para a conta existir, não uma etapa do onboarding.
+        <AgeGate user={user} />
       ) : inLibrary ? (
         <Library />
       ) : inFriends ? (
