@@ -9,7 +9,7 @@ signing in, you accept them. If you do not accept them, do not sign in.
 | | |
 |---|---|
 | Provider | [PREENCHER: razão social, CNPJ e endereço do fornecedor] |
-| Contact | [PREENCHER: e-mail de contato] |
+| Contact | keizokita1+watchlytics@gmail.com |
 
 ## 1. What Watchlytics is
 
@@ -55,7 +55,7 @@ you under 16, we do not create the account.
   accounts, friend requests or searches.
 - Try to reach data that is not yours, interfere with our authentication, or
   probe, scan or overload the service. (Reporting a flaw you found is welcome
-  and is not a breach of this clause: [PREENCHER: e-mail de contato].)
+  and is not a breach of this clause: keizokita1+watchlytics@gmail.com.)
 - Impersonate another person, or use the social features to harass anyone.
 - Resell, redistribute or build a competing catalogue out of the data we show.
 - Use the service where doing so would break the law that applies to you.

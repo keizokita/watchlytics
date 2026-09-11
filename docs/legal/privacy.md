@@ -12,7 +12,7 @@
 | | |
 |---|---|
 | Controller | [PREENCHER: razão social, CNPJ e endereço do controlador] |
-| Privacy contact | [PREENCHER: e-mail de contato para privacidade] |
+| Privacy contact | keizokita1+watchlytics@gmail.com |
 | Data Protection Officer (LGPD art. 41) | [PREENCHER: nome e contato do encarregado] |
 | EU/EEA representative (GDPR art. 27) | [PREENCHER: representante na UE, ou declaração de que não é exigido] |
 
@@ -153,7 +153,7 @@ us, under **"Your data"** in the app:
   art. 18, V).
 - **Delete** — erases all of it immediately (GDPR art. 17 / LGPD art. 18, VI).
 
-For the rest, write to [PREENCHER: e-mail de contato para privacidade]:
+For the rest, write to keizokita1+watchlytics@gmail.com:
 access and confirmation of processing, correction of incomplete or wrong data,
 information about who we share data with, withdrawal of consent, objection to
 processing, restriction of processing, and review of decisions taken only by

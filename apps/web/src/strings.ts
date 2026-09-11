@@ -19,6 +19,20 @@ const LEGAL_BASE = "https://github.com/keizokita/watchlytics/blob/main/docs/lega
 export const PRIVACY_URL = `${LEGAL_BASE}/privacy.md`;
 export const TERMS_URL = `${LEGAL_BASE}/terms.md`;
 
+/**
+ * β5 — o caminho de retorno do beta.
+ *
+ * `mailto:` e não formulário: formulário quer rota, tabela, moderação e uma
+ * tela de "obrigado", e nada disso ensina mais do que um e-mail ensina. O
+ * assunto vem preenchido para separar o beta do resto da caixa de entrada.
+ *
+ * O sufixo `+watchlytics` não esconde o endereço base de ninguém — serve para
+ * filtrar, não para proteger. Trocar por uma conta só do app no dia em que o
+ * volume justificar.
+ */
+export const FEEDBACK_EMAIL = "keizokita1+watchlytics@gmail.com";
+export const FEEDBACK_URL = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent("Watchlytics beta")}`;
+
 export const t = {
   pass: "Pass",
   like: "Like",
@@ -206,4 +220,10 @@ export const t = {
    */
   tmdbAttribution:
     "This product uses the TMDB API but is not endorsed or certified by TMDB.",
+
+  /**
+   * Diz que é beta E o que fazer com isso na mesma frase: "beta" sozinho
+   * explica o defeito, não abre caminho para contar dele.
+   */
+  feedbackLink: "Beta — tell us what broke",
 } as const;
