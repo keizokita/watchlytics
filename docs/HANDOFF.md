@@ -39,7 +39,7 @@ só a mudança. Vale ler antes de propor refazer algo.
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
 repetir; o LIKE vira coleção com abas e estatísticas.
 
-**135 testes** (108 API + 27 web), `npm run check` limpo nos três pacotes e as
+**136 testes** (109 API + 27 web), `npm run check` limpo nos três pacotes e as
 asserções do `driver.mjs` verdes (recontado em `main` em 2026-09-11).
 A trilha **I** (catálogo real, BACKLOG §5) tem a fase serial fechada: I0.1
 (régua) e I0.2 (migration 0003 + `castNames` no contrato). **`schema.ts` e
@@ -109,9 +109,13 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 1. **Veredito do gesto no celular.** Uma pergunta em aberto que reverte
    decisão: o gesto tem peso? (senão, `framer-motion` se justifica). A outra —
    "o card convence sem pôster?" — perdeu o objeto: agora há pôster.
-2. **Uma segunda pessoa no app** (β6). O loop social nunca rodou entre duas
-   contas distintas de gente diferente, e não há como provar isso sozinho: a
-   suíte cobre três identidades, mas identidade de teste não aceita convite.
+2. **Uma segunda conta Google** (β6). O loop social nunca rodou entre duas
+   contas distintas *pela tela*: a suíte cobre três identidades, mas identidade
+   de teste não aceita convite.
+
+   Não precisa de outra pessoa — precisa de um segundo `sub` do Google, que é
+   uma conta a mais no mesmo navegador anônimo. A checklist β6.1–β6.5 está no
+   BACKLOG §6 e diz o que provar em cada passo.
 
 **Saiu desta lista em 2026-09-09:** "conferir o login no Network do DevTools".
 Os quatro elos foram medidos de fora e o caminho está inteiro — ver o bloco
@@ -239,7 +243,8 @@ sem ida e volta.
    de 100, só e-mail listado).
 2. **β6 — o loop social entre duas contas reais** (§Bloqueado 2). Amizade,
    match e notificação estão testados entre três identidades na suíte, mas
-   nunca rodaram entre duas PESSOAS. Precisa da segunda conta Google do item 1.
+   nunca rodaram PELA TELA entre duas contas. Precisa da segunda conta Google
+   do item 1 — não de uma segunda pessoa.
 3. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
 
