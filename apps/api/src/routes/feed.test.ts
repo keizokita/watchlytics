@@ -98,14 +98,21 @@ test.before(async () => {
     .insert(users)
     .values(
       // β2 — `birthYear` é a porta de idade já respondida: sem ano, 403.
+      // β8 — e `handleChosen`, a do handle: sem ela, 403 também.
       TEST_USERS.map((id, i) => ({
         id,
         handle: `feed-test-${i}`,
         displayName: "Feed test",
         birthYear: 1990,
+        handleChosen: true,
       })),
     )
-    .onConflictDoNothing();
+    // DoUpdate e não DoNothing: a linha pode ter sobrado de uma rodada
+    // anterior às portas, e fixture com porta fechada é 403 em todo teste.
+    .onConflictDoUpdate({
+      target: users.id,
+      set: { birthYear: 1990, handleChosen: true },
+    });
 });
 
 test.after(async () => {
@@ -264,6 +271,7 @@ test("A6: o feed usa índice em swipes, não seq scan", async () => {
         handle: `feed-bench-${i}`,
         displayName: "Bench",
         birthYear: 1990,
+        handleChosen: true,
       })),
     )
     .returning({ id: users.id });

@@ -29,8 +29,13 @@ const USER = "00000000-0000-4000-8000-0000000000d1";
 await db
   .insert(users)
   // β2 — nasce com a porta de idade já respondida: sem ano, toda rota é 403.
-  .values({ id: USER, handle: "trilha-d", displayName: "Trilha D", birthYear: 1990 })
-  .onConflictDoNothing();
+  .values({ id: USER, handle: "trilha-d", displayName: "Trilha D", birthYear: 1990, handleChosen: true })
+  // DoUpdate e não DoNothing: a linha pode ter sobrado de uma rodada
+  // anterior às portas, e fixture com porta fechada é 403 em todo teste.
+  .onConflictDoUpdate({
+    target: users.id,
+    set: { birthYear: 1990, handleChosen: true },
+  });
 
 /** Pool estável: o feed muda de ordem conforme os swipes do próprio teste. */
 const pool = await db.select().from(titles).orderBy(asc(titles.id)).limit(20);
@@ -261,8 +266,9 @@ test("com Bearer, o catálogo é de quem assinou o token, não de outra conta", 
       handle: "trilha-d2",
       displayName: "Trilha D2",
       birthYear: 1990,
+      handleChosen: true,
     })
-    .onConflictDoUpdate({ target: users.id, set: { birthYear: 1990 } });
+    .onConflictDoUpdate({ target: users.id, set: { birthYear: 1990, handleChosen: true } });
   await db.delete(libraryEntries).where(eq(libraryEntries.userId, OUTRO));
 
   const como = { authorization: `Bearer ${signAccess(OUTRO)}` };

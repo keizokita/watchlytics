@@ -30,6 +30,7 @@ await db
       isPublic: true,
       // β2 — a porta de idade já respondida: sem ano, toda rota autenticada é 403.
       birthYear: 1990,
+      handleChosen: true,
     },
     {
       id: PRIVADO,
@@ -37,6 +38,7 @@ await db
       displayName: "Bruno",
       isPublic: false,
       birthYear: 1990,
+      handleChosen: true,
     },
   ])
   .onConflictDoNothing();

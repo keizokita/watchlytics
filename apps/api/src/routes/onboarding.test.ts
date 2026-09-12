@@ -29,8 +29,13 @@ const USER = "00000000-0000-4000-8000-0000000000d4";
 await db
   .insert(users)
   // β2 — nasce com a porta de idade já respondida: sem ano, toda rota é 403.
-  .values({ id: USER, handle: "trilha-d4", displayName: "Trilha D4", birthYear: 1990 })
-  .onConflictDoNothing();
+  .values({ id: USER, handle: "trilha-d4", displayName: "Trilha D4", birthYear: 1990, handleChosen: true })
+  // DoUpdate e não DoNothing: a linha pode ter sobrado de uma rodada
+  // anterior às portas, e fixture com porta fechada é 403 em todo teste.
+  .onConflictDoUpdate({
+    target: users.id,
+    set: { birthYear: 1990, handleChosen: true },
+  });
 
 const catalog = await db
   .select({ id: titles.id, genreIds: titles.genreIds, score: titles.score })
