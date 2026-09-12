@@ -39,7 +39,8 @@ You must be **16 or older**. This is the limit the data protection laws impose
 on us, not a preference — see *Age* in the [Privacy Policy](./privacy.md).
 
 When you sign up we ask for your birth year. If you give us a year that puts
-you under 16, we do not create the account.
+you under 16, the account that signing in created is deleted, and we keep
+neither it nor the year.
 
 ## 4. Your account
 

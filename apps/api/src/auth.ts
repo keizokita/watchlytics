@@ -175,11 +175,10 @@ export function clientIp(req: FastifyRequest): string {
  *
  * β3 — o shim do C1 saiu daqui em 2026-09-10. Era uma variável de ambiente com
  * um id de usuário atendendo qualquer requisição sem `Authorization`, e ele já
- * tinha escondido um
- * 401 até a produção: em dev o front nunca mandava header e o bug só apareceu no
- * ar. Um atalho que substitui a autenticação esconde exatamente a classe de bug
- * que ele finge cobrir, e com o OAuth no ar ele não era mais o único caminho de
- * entrada — era só o caminho sem senha.
+ * tinha escondido um 401 até a produção: em dev o front nunca mandava header e o
+ * bug só apareceu no ar. Um atalho que substitui a autenticação esconde
+ * exatamente a classe de bug que ele finge cobrir, e com o OAuth no ar ele não
+ * era mais o único caminho de entrada — era só o caminho sem senha.
  *
  * β2 — e é aqui que a porta de idade fecha, no ÚNICO ponto por onde toda rota
  * autenticada passa. Um guard por rota seria o mesmo código quinze vezes, e a
@@ -188,7 +187,15 @@ export function clientIp(req: FastifyRequest): string {
  * `ageGate: false` é para as duas rotas que precisam funcionar com a porta
  * fechada: `/v1/auth/me`, que é como o cliente descobre que precisa perguntar,
  * e `/v1/auth/age`, que é a resposta. Qualquer outra rota com a porta aberta
- * seria uma conta sem idade usando o app.
+ * seria uma conta sem idade usando o app. `false` dispensa a PORTA, nunca a
+ * conta: as duas rotas continuam exigindo que o dono do token exista.
+ *
+ * ponytail: uma consulta pela PK em toda requisição autenticada. O alternativo
+ * seria carimbar a idade no access token e não consultar nada — mas aí quem
+ * passa pela porta continua bloqueado até o token expirar (15 min), porque
+ * `ageGateResponse` não devolve token novo, e conta apagada seguiria entrando
+ * pelo mesmo prazo. A consulta é honesta e some no dia em que aparecer no
+ * perfil de latência.
  */
 export async function requireUserId(
   req: FastifyRequest,
@@ -204,29 +211,21 @@ export async function requireUserId(
     throw httpError(429, "muitas requisições");
   }
 
-  if (opts?.ageGate !== false && (await semIdadeConfirmada(userId))) {
-    throw httpError(403, "porta de idade pendente");
-  }
-  return userId;
-}
-
-/**
- * Uma consulta por requisição autenticada, pela PK.
- *
- * ponytail: o alternativo seria carimbar a idade no access token e não
- * consultar nada — mas aí quem passa pela porta continua bloqueado até o token
- * expirar (15 min), porque `ageGateResponse` não devolve token novo. A consulta
- * é honesta e some no dia em que aparecer no perfil de latência.
- *
- * Usuário inexistente não é porta fechada: token válido de conta apagada é
- * problema de quem for ler a linha depois, e virar 403 aqui esconderia isso.
- */
-async function semIdadeConfirmada(userId: string): Promise<boolean> {
   const [row] = await db
     .select({ birthYear: users.birthYear })
     .from(users)
     .where(eq(users.id, userId));
-  return row ? row.birthYear === null : false;
+
+  // Token válido de uma conta que não existe mais. Acontece de propósito: a
+  // recusa da porta de idade apaga a conta, e o access dela ainda vale por até
+  // 15 minutos. Não autenticado é a resposta certa — 403 diria "falta responder
+  // a porta", e não falta: não há mais a quem responder.
+  if (!row) throw unauthorized();
+
+  if (opts?.ageGate !== false && row.birthYear === null) {
+    throw httpError(403, "porta de idade pendente");
+  }
+  return userId;
 }
 
 /** Idade em anos cheios não dá para saber só com o ano; este é o ano corrente. */

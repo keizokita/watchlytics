@@ -4,7 +4,7 @@ import { eq, inArray } from "drizzle-orm";
 import { authResponse, MIN_AGE, sessionUser } from "@watchlytics/contract";
 import { ACCESS_TTL_S, signAccess, verifyAccess } from "./auth.ts";
 import { db, pg } from "./db/client.ts";
-import { consents, identities, sessions, users } from "./db/schema.ts";
+import { consents, identities, sessions, swipes, titles, users } from "./db/schema.ts";
 import { providers } from "./routes/auth.ts";
 import { buildServer } from "./server.ts";
 
@@ -495,28 +495,72 @@ test("β2 — maior de idade passa, e passa para o app inteiro", async () => {
   assert.equal(sessionUser.parse(eu.json()).needsAgeGate, false);
 });
 
-test("β2 — menor não entra, não vira linha no banco e perde a sessão", async () => {
+test("β2 — menor não entra, e a conta some inteira do banco", async () => {
   const { user, refresh: token } = await loginNative("sub-menor");
 
   const res = await responderIdade(user.id, new Date().getFullYear() - (MIN_AGE - 1));
   assert.equal(res.statusCode, 200, "a porta avaliou; o veredito está no corpo");
   assert.deepEqual(res.json(), { ok: false, minAge: MIN_AGE });
 
-  const [linha] = await db
-    .select({ birthYear: users.birthYear })
+  // Não é "o ano não foi gravado": é a conta inteira que não existe mais. O
+  // login do Google tinha gravado nome, e-mail e avatar, e nada disso é dado
+  // que se guarde de alguém que acabou de declarar ter menos de MIN_AGE.
+  const sobrou = await db
+    .select({ id: users.id })
     .from(users)
     .where(eq(users.id, user.id));
-  assert.equal(linha?.birthYear, null, "recusa NÃO grava a idade de menor");
+  assert.deepEqual(sobrou, [], "recusa apaga a conta, não só o ano");
 
+  for (const [nome, tabela, coluna] of [
+    ["identities", identities, identities.userId],
+    ["sessions", sessions, sessions.userId],
+    ["consents", consents, consents.userId],
+  ] as const) {
+    const linhas = await db.select().from(tabela).where(eq(coluna, user.id));
+    assert.deepEqual(linhas, [], `${nome} devia ter ido junto pela cascata`);
+  }
+
+  // O access em circulação ainda vale por até 15 min. Sem dono, ele é 401 e não
+  // 403: não falta responder a porta, falta a conta.
   const ainda = await app.inject({
     method: "GET",
     url: "/v1/feed",
     headers: como(user.id),
   });
-  assert.equal(ainda.statusCode, 403, "continua sem app");
+  assert.equal(ainda.statusCode, 401, "token de conta apagada não autentica");
 
-  // O access em circulação ainda vale por até 15 min, e por isso a porta é que
-  // segura; o refresh, esse morre na hora.
+  assert.equal((await refresh(token)).statusCode, 401, "a sessão foi revogada");
+});
+
+test("β2 — conta que já usou o app não é apagada por um ano errado", async () => {
+  const { user, refresh: token } = await loginNative("sub-anterior-ao-beta2");
+
+  // Uma conta anterior ao β2: `birth_year` nulo, mas com uso de verdade dentro.
+  // É o caso que transforma a recusa em arma se ela apagar sem olhar.
+  const [titulo] = await db.select({ id: titles.id }).from(titles).limit(1);
+  assert.ok(titulo, "o banco precisa estar semeado (npm run seed)");
+  await db.insert(swipes).values({ userId: user.id, titleId: titulo.id, direction: 1 });
+
+  const res = await responderIdade(user.id, new Date().getFullYear() - (MIN_AGE - 1));
+  assert.deepEqual(res.json(), { ok: false, minAge: MIN_AGE });
+
+  const [linha] = await db
+    .select({ birthYear: users.birthYear })
+    .from(users)
+    .where(eq(users.id, user.id));
+  assert.ok(linha, "conta com uso dentro NÃO é apagada");
+  assert.equal(linha.birthYear, null, "e o ano de menor continua sem ser gravado");
+
+  const meus = await db.select().from(swipes).where(eq(swipes.userId, user.id));
+  assert.equal(meus.length, 1, "o que ela tinha continua lá");
+
+  // Fica de fora do app, e não some: responder um ano válido a traz de volta.
+  const ainda = await app.inject({
+    method: "GET",
+    url: "/v1/feed",
+    headers: como(user.id),
+  });
+  assert.equal(ainda.statusCode, 403, "sem ano válido, segue sem app");
   assert.equal((await refresh(token)).statusCode, 401, "a sessão foi revogada");
 });
 
