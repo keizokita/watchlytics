@@ -16,6 +16,11 @@ primary_region = "gru"
 # por title_id (routes/feed.ts:173-190), então a cópia gêmea reaparece depois do
 # swipe — duplicata quebra a garantia de não-repetição, não é só ruído no deck.
 #
+# A atualização diária do catálogo (`/changes` + fila fria) NÃO roda aqui: ela
+# é uma máquina efêmera criada por .github/workflows/ingest.yml, que herda os
+# secrets deste app. Este `release_command` continua sendo só a migration —
+# deploy que espera por ingestão é deploy que trava.
+#
 # Para recarregar ou baixar a régua: `node apps/api/src/ingest/run.ts
 # --min-votes N` dentro da máquina (o TMDB_READ_TOKEN já é secret). Baixar a
 # régua só insere. SUBIR exige DELETE, e as FKs são ON DELETE CASCADE

@@ -52,6 +52,10 @@ fly secrets set AUTH_SECRET="$(node -e "console.log(require('crypto').randomByte
 fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile
 ```
 
+> Falta um terceiro secret, o `TMDB_READ_TOKEN`, sem o qual o catálogo nunca se
+> atualiza. Ele tem passo próprio na [seção 5](#5-ingestão-do-catálogo-i2),
+> junto do agendamento que o usa.
+
 O `release_command` roda `migrate` antes de trocar as máquinas — se a migration
 falhar, o deploy aborta sem derrubar o que está no ar.
 
@@ -174,6 +178,111 @@ pgvector como service container.
 
 ---
 
+## 5. Ingestão do catálogo (I2)
+
+O código que mantém o catálogo vivo já existe (`ingest/changes.ts`), mas em
+produção falta o secret e falta quem o chame todo dia. Catálogo que não se
+atualiza apodrece: em doze meses não tem nenhum título do ano.
+
+### Onde a passada diária roda
+
+Num **workflow agendado do GitHub** que cria uma **máquina efêmera no Fly**:
+[`.github/workflows/ingest.yml`](../.github/workflows/ingest.yml).
+
+O relógio é do GitHub; a execução é do Fly. `fly console` levanta uma máquina a
+partir da imagem do último release, roda o comando e a destrói. Como a máquina
+nasce dentro do app, ela herda os secrets do app — `DATABASE_URL` e
+`TMDB_READ_TOKEN` não passam pelo GitHub. O único secret que o workflow usa é o
+`FLY_API_TOKEN`, que já está cadastrado para o deploy. **Nenhum secret novo.**
+
+As duas alternativas e por que não:
+
+| Alternativa | Por que não |
+|---|---|
+| Máquina agendada do Fly (`fly machine run --schedule daily`) | É criada uma vez, fora do `fly deploy`, e fica presa na imagem daquele dia. Meses depois a ingestão roda código velho e ninguém percebe — o mesmo apodrecimento que ela existe para evitar. E a falha só aparece para quem for olhar `fly logs` de uma máquina que já esqueceu que existe. |
+| Actions com a `DATABASE_URL` de produção nos secrets | Exposição nova: a credencial do banco num terceiro lugar, legível por qualquer workflow do repositório. O desenho acima entrega o mesmo agendamento sem ela. |
+
+O `auto_stop`/`min_machines_running = 0` da máquina de serviço **não** atrapalha
+nenhum dos dois: a máquina da ingestão é outra, efêmera, e não está no pool do
+`http_service`.
+
+> Uma passada perdida se recupera sozinha. O cursor fica em `ingest_state`, e o
+> `janelas()` fatia de onde parou até hoje em janelas de até 14 dias. Por isso o
+> agendamento não precisa de retry, alerta nem fila: um dia sem rodar custa um
+> dia a mais na passada seguinte.
+
+### O que executar, em ordem
+
+**1. Pegar o token do TMDB.** Em
+[themoviedb.org/settings/api](https://www.themoviedb.org/settings/api), copiar o
+**API Read Access Token (v4)** — é o JWT longo, não a "API Key (v3)". O
+`ingest/http.ts` manda `Authorization: Bearer`, e a chave v3 não serve.
+
+**2. Cadastrar como secret do Fly:**
+
+```bash
+fly secrets set TMDB_READ_TOKEN='<read access token v4>' -a watchlytics-api
+```
+
+> `fly secrets set` reinicia as máquinas do app. Faça junto de um deploy ou
+> fora do horário de uso.
+
+**3. Deployar a branch da ingestão.** O workflow usa a imagem do **último
+release** — se `ingest/changes.ts` ainda não estiver nela, a máquina efêmera
+sobe sem o arquivo. Um push em `main` com o código do I2 já resolve (o CI
+deploya).
+
+**4. Conferir sem escrever nada:**
+
+```bash
+fly console -a watchlytics-api -C "node apps/api/src/ingest/changes.ts --dry-run"
+```
+
+Saída esperada: uma linha `changes tmdb | de <ontem> a <hoje> | 1 janela(s) ...`
+e, no fim, `fim em Ns | ... | DRY-RUN`. Se der
+`TMDB_READ_TOKEN ausente`, o passo 2 não pegou; se der erro de módulo não
+encontrado, é o passo 3.
+
+**5. Rodar a primeira passada de verdade** pela UI: Actions → *ingestão diária
+(tmdb /changes)* → **Run workflow**. É o mesmo caminho que o cron vai usar, e é
+o que prova que o `FLY_API_TOKEN` tem permissão de criar máquina. A partir daí
+ela roda sozinha às 06:00 UTC (03:00 em São Paulo).
+
+**6. Conferir que o cursor andou:**
+
+```sql
+select key, value, updated_at from ingest_state where key = 'changes_cursor';
+```
+
+### Uma vez só, não agendado
+
+O catálogo de produção foi carregado antes do I1, então **os títulos de lá não
+têm elenco** — o card não mostra a linha. A passada de elenco é um comando à
+parte, retomável, e roda no mesmo lugar:
+
+```bash
+fly console -a watchlytics-api -C "node apps/api/src/ingest/credits.ts"
+```
+
+Levou ~29 min para 9830 títulos no banco de dev. Se cair no meio, rodar de novo
+continua de onde parou — a fila é a coluna `credits_synced_at`.
+
+> **Uma ingestão por vez.** A pausa de 60ms do `ingest/http.ts` é estado de
+> módulo, logo por processo: dois comandos ao mesmo tempo são duas janelas
+> contra a mesma cota do TMDB. Não rode o de elenco enquanto o workflow diário
+> estiver rodando.
+
+### O que pode dar errado depois
+
+- **O GitHub desliga cron de repositório parado há 60 dias.** Chega por e-mail e
+  volta com um clique em Actions — ou com qualquer push.
+- **Run cancelado por timeout deixa a máquina efêmera de pé.** `fly machine
+  list -a watchlytics-api` mostra; `fly machine destroy <id>` limpa.
+- **`FLY_API_TOKEN` expirado** aparece como falha no passo do `flyctl`, não como
+  passada vazia.
+
+---
+
 ## Definition of done do S7
 
 - [ ] `https://watchlytics-api.fly.dev/health` devolve `{"ok":true}`
@@ -183,12 +292,20 @@ pgvector como service container.
 - [ ] `PUBLIC_ORIGIN` definida no Fly com a URL do Pages, e `/u/<handle>` de um
       perfil público abre com as OG tags (é o que o WhatsApp lê)
 - [ ] Um push em `main` dispara o CI e redeploya as duas pontas
+- [ ] `TMDB_READ_TOKEN` no `fly secrets list` e o workflow *ingestão diária*
+      verde num disparo manual, com `changes_cursor` gravado em `ingest_state`
 
 ## Custo
 
 Zero enquanto estiver nos tiers gratuitos. O que muda isso primeiro é o Neon
 (limite de horas de compute e storage); Fly com `min_machines_running = 0`
 suspende quando ninguém acessa.
+
+A ingestão diária soma pouco: uma máquina `shared-cpu-1x`/512mb viva por ~5 min
+por dia (~2,5 h/mês, na ordem de **US$ 0,01/mês**) e um job do Actions de ~6 min
+por dia (~3 h/mês — grátis em repositório público; contra as 2000 min/mês do
+tier gratuito se for privado). O TMDB não cobra. O que cresce de verdade é o
+Neon, porque a passada escreve em `titles` todo dia.
 
 > Suspender a máquina significa cold start de alguns segundos na primeira
 > requisição. O shell do Pages é estático e aparece na hora, então o usuário vê

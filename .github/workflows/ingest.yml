@@ -1,0 +1,51 @@
+name: ingestão diária (tmdb /changes)
+
+# O relógio é daqui; a execução é no Fly.
+#
+# O passo roda `fly console`, que cria uma máquina efêmera a partir da imagem
+# do último release e a destrói quando o comando termina. A máquina nasce
+# dentro do app, então herda os secrets do app: DATABASE_URL e TMDB_READ_TOKEN
+# NÃO passam pelo GitHub. O único secret usado aqui é o FLY_API_TOKEN, que já
+# existe para o deploy.
+#
+# Por que não a máquina agendada do Fly (`--schedule daily`): ela é criada uma
+# vez, fora do `fly deploy`, e fica presa na imagem daquele dia. Meses depois a
+# ingestão roda código velho e ninguém percebe — que é o mesmo apodrecimento
+# que esta tarefa existe para evitar. Aqui a imagem é sempre a do último
+# release, e a falha chega como run vermelho em vez de silêncio.
+#
+# Por que não Actions com a DATABASE_URL de produção nos secrets: seria a
+# credencial do banco num terceiro lugar, legível por qualquer workflow do
+# repositório. Esta forma não precisa dela.
+
+on:
+  schedule:
+    # 06:00 UTC = 03:00 em São Paulo. O /changes fala do dia anterior, então
+    # rodar de madrugada é ler um dia já fechado.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+# A janela de rate limit do http.ts é estado de módulo, logo por processo:
+# duas ingestões simultâneas são duas janelas contra a mesma cota do TMDB.
+# Sem cancel-in-progress — um disparo manual espera a vez, não atropela.
+concurrency: ingest-tmdb
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    # A passada é de minutos (~120 requisições de lista + até 500 detalhes da
+    # fila fria). O teto existe para não deixar máquina efêmera pendurada.
+    timeout-minutes: 30
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: /changes do dia + fila fria
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl console --app watchlytics-api \
+            --command "node apps/api/src/ingest/changes.ts" | tee ingest.log
+      # O comando imprime "fim em Ns | ..." só quando chega ao fim. O grep é a
+      # rede contra um flyctl que devolva 0 sem ter rodado nada — mesmo truque
+      # do "seed é idempotente" no deploy.yml.
+      - name: a passada terminou
+        run: grep -q '^fim em' ingest.log
