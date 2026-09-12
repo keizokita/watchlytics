@@ -526,6 +526,31 @@ real de graça.
 | β6.4 | Match e notificação na tela | Os dois curtem o mesmo título e cada um vê o match. Dê um like ANTES do aceite para exercitar o cruzamento retroativo do E4 |
 | β6.5 | Perfil público do outro | `/u/<handle>` do outro, com o piso de 10 assistidos respeitado |
 
+> **β6.2 a β6.5 foram dirigidas localmente em 2026-09-12**, por
+> `driver.mjs social`: duas contas, duas sessões simultâneas em contextos de
+> navegação separados do mesmo Chrome, 23 asserções verdes num banco criado do
+> zero. Nada disso substitui a passada com Google real — o objetivo era o
+> contrário, chegar antes dela para que uma falha lá seja configuração do
+> Google e não defeito de código.
+>
+> O que ficou provado *pela tela*, e não só na suíte: a porta de idade cobrada
+> nas duas contas antes de qualquer outra coisa; as duas sessões rotacionando o
+> próprio refresh alternadamente, três vezes cada, sem que o C3 leia nenhuma
+> como replay (as duas seguem sem `revoked_at`); busca por handle, pedido,
+> aceite e as três listas certas dos dois lados; o like dado ANTES do aceite
+> virando match forte no cruzamento retroativo do E4, com uma notificação
+> agregada por pessoa; o badge aparecendo para quem não estava olhando e
+> zerando ao abrir a aba; e o `/u/<handle>` do outro passando de 404 (perfil
+> privado) para "9 titles watched · stats unlock at 10" e só então, com o
+> décimo assistido marcado na tela, para o agregado.
+>
+> **O que só o Google prova, e continua aberto: a β6.1 inteira.** O `sub` não se
+> falsifica daqui, então as contas do driver nascem no banco como o OAuth as
+> deixaria — sem `birth_year` — em vez de nascerem pelo OAuth. Ficam sem prova:
+> o handle derivado do local-part sem colidir, a linha em `consents` com a
+> `CONSENT_VERSION` corrente, e o primeiro cadastro real batendo na porta de
+> idade.
+
 **Atenção — o badge leva até 60s.** `NotificationsBadge` faz poll de
 `/v1/notifications` a cada 60 segundos (`Friends.tsx:435`), e só a aba de avisos
 zera na hora. Notificação que "não chegou" em 10 segundos é o intervalo do poll,
