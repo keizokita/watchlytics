@@ -450,10 +450,19 @@ Nada disso é opcional: sem os três, convidar alguém é irresponsável ou ileg
 > (GDPR art. 4(7), LGPD art. 5º VI). O encarregado da LGPD fica dispensado —
 > agente de tratamento de pequeno porte não precisa indicar um (Res. CD/ANPD nº
 > 2/2022), precisa manter canal com o titular, e o canal é o mesmo e-mail. O
-> representante na UE não é exigido porque o beta não é oferecido na UE, no EEE
-> nem no Reino Unido, e isso é verificável: no modo Testing cada testador entra
-> por e-mail digitado à mão numa lista de no máximo 100. Contagem de
+> representante na UE fica dispensado pelo art. 27(2)(a) — tratamento ocasional,
+> sem categoria especial em larga escala e improvável de gerar risco. Contagem de
 > `[PREENCHER]` nos dois documentos: **zero**.
+>
+> **β1.4 trocou o motivo dessa dispensa em 2026-09-12**, e a troca importa. O
+> texto dizia que o representante não era exigido porque o beta "não é oferecido
+> na UE, no EEE nem no Reino Unido" — e doze linhas abaixo a mesma política diz
+> cobrir o GDPR para quem está lá, cita art. 6(1) em toda finalidade e manda
+> reclamar na autoridade nacional do país da pessoa. As duas afirmações não valem
+> juntas: se o serviço não é oferecido na UE, o GDPR não alcança e a política
+> inteira promete uma lei que não se aplica. A dispensa continua existindo, pelo
+> motivo certo — e ela cai quando o beta crescer, o que a redação antiga não
+> deixava ver.
 >
 > **O que continua aberto:** publicar a tela de consentimento do Google, que é
 > do usuário. Para 10 a 30 pessoas a lista de test users resolve sem esse custo.
