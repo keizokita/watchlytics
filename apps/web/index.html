@@ -83,6 +83,14 @@
         outline: 2px solid var(--fg);
         outline-offset: 2px;
       }
+      /* `:focus`, e não `:focus-visible`: o painel de aviso (Aviso.tsx) recebe
+         o foco por código, e o `:focus-visible` só casa depois de uma interação
+         de teclado — sem esta regra quem enxerga perderia o cursor de teclado
+         justamente quando ele foi movido por baixo dos panos. */
+      :where([tabindex="-1"]):focus {
+        outline: 2px solid var(--fg);
+        outline-offset: 3px;
+      }
 
       /* ─── deck ─────────────────────────────────────────────────────────── */
 
@@ -145,27 +153,26 @@
 
       .card {
         height: 100%;
-        padding: clamp(0.7rem, 5.5cqi, 1.25rem);
+        /* Em variável porque o véu do texto (.card-body::before) precisa
+           sangrar EXATAMENTE este padding para alcançar a borda do card. */
+        --card-pad: clamp(0.7rem, 5.5cqi, 1.25rem);
+        padding: var(--card-pad);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         gap: 0.75rem;
         overflow: hidden;
-        /* Duas pontas escuras, não uma: o topo carrega os chips e o rodapé
-           carrega o texto. Sem a parada de cima o chip fica sobre a parte clara
-           do fundo.
+        /* Só a ponta de cima: é a que tira o chip de cima da parte clara do
+           pôster. A de baixo saiu daqui e virou véu do bloco de texto — uma
+           parada em porcentagem não sabe onde o texto está.
 
-           A de baixo em 0.72 foi calibrada contra `gradient(id)`, que tem teto
-           de claridade por construção. Com pôster de verdade a premissa caiu, e
-           por isso o texto do card é --fg e não --muted: escurecer mais o
-           degradê fecharia o mesmo número comendo a imagem, que é justamente o
-           que o card existe para mostrar. */
-        background: linear-gradient(
-          rgb(0 0 0 / 0.38),
-          rgb(0 0 0 / 0) 28%,
-          rgb(0 0 0 / 0) 42%,
-          rgb(0 0 0 / 0.72)
-        );
+           Medido sobre pôster BRANCO, que é o teto de claridade de uma imagem:
+           com a rampa antiga (0.72 no fim do card) o título dava 2.36:1 numa
+           tela de 430x932 e 2.02:1 numa de 360x568, contra um piso de 4.5:1.
+           O forro `gradient(id)` escondia isso porque é escuro por construção,
+           e a fixture semeada não tem pôster: a premissa só cai com catálogo
+           de verdade. */
+        background: linear-gradient(rgb(0 0 0 / 0.38), rgb(0 0 0 / 0) 28%);
       }
 
       .card-top {
@@ -190,7 +197,26 @@
       .card-kind { letter-spacing: 0.09em; text-transform: uppercase; color: var(--fg); }
       .card-score { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
 
-      .card-body { display: grid; gap: 0.25rem; min-height: 0; }
+      /* O véu mora no BLOCO DE TEXTO, não numa porcentagem da altura do card.
+         Foi essa a causa do contraste reprovado: onde o texto começa depende da
+         tela (71% da altura em 430x932, 64.5% em 360x640, mais acima ainda em
+         360x568), então qualquer parada fixa deixa o título de fora em algum
+         tamanho. Ancorado no texto, o véu acompanha.
+
+         A primeira parada é em `rem`, não em `%`: a rampa ocupa exatamente a
+         sangria de 2.5rem acima do bloco, e da primeira linha para baixo o véu
+         já está cheio, seja qual for a altura do texto. */
+      .card-body { display: grid; gap: 0.25rem; min-height: 0; position: relative; }
+      .card-body::before {
+        content: "";
+        position: absolute;
+        inset: -2.5rem calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad));
+        background: linear-gradient(rgb(0 0 0 / 0), rgb(0 0 0 / 0.62) 2.5rem, rgb(0 0 0 / 0.82));
+        pointer-events: none;
+      }
+      /* O véu é posicionado e vem primeiro; sem isto ele pintaria POR CIMA das
+         linhas de texto, que não são posicionadas. */
+      .card-body > * { position: relative; }
       .card-title {
         margin: 0;
         font-size: clamp(1.05rem, 7.6cqi, 1.7rem);

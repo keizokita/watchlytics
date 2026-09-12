@@ -212,9 +212,17 @@ export function Deck({
                   : {})}
               >
                 {isTop && (
+                  // `aria-hidden`: os carimbos são o eco visual do gesto e
+                  // vivem no DOM com opacidade 0 o tempo todo. Opacidade zero
+                  // não esconde de leitor de tela — medido na auditoria, "LIKE"
+                  // e "PASS" apareciam como texto do card em todo card.
                   <>
-                    <span className="badge badge-like">{t.like}</span>
-                    <span className="badge badge-pass">{t.pass}</span>
+                    <span className="badge badge-like" aria-hidden="true">
+                      {t.like}
+                    </span>
+                    <span className="badge badge-pass" aria-hidden="true">
+                      {t.pass}
+                    </span>
                   </>
                 )}
                 <Card title={item} />

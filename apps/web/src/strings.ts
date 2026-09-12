@@ -76,6 +76,20 @@ export const t = {
   navDeck: "Deck",
   navLibrary: "Library",
   navFriends: "Friends",
+  /**
+   * Rótulo do par de abas. As três telas de conteúdo têm um grupo de botões que
+   * troca o recorte da lista; sem nome, o leitor de tela anuncia três botões
+   * soltos e não diz de que conjunto eles são.
+   */
+  libraryTabs: "Library sections",
+  friendTabs: "Friends sections",
+  /**
+   * Só para leitor de tela: quando o item muda de status ele SOME da lista
+   * aberta, e quem enxerga vê isso acontecer. Sem a frase, quem não vê fica com
+   * uma lista que encolheu sozinha.
+   */
+  movedToWatched: "Moved to Watched.",
+  movedToInterested: "Moved to Interested.",
   tabInterested: "Interested",
   tabWatched: "Watched",
   tabDiscarded: "Discarded",
@@ -178,6 +192,14 @@ export const t = {
   friendSearchPlaceholder: "handle",
   friendSearchAction: "Search",
   friendResults: "Results",
+  /**
+   * Só para leitor de tela. A lista de resultados aparece calada, e o botão de
+   * pedir amizade SOME da linha quando o pedido entra — quem enxerga vê as duas
+   * coisas, e sem estas frases quem não vê fica sem nenhuma das duas.
+   */
+  friendResultsCount: (n: number) => `${n} ${n === 1 ? "result" : "results"}.`,
+  friendRequestSent: "Friend request sent.",
+  friendRequestAccepted: "Friend request accepted.",
   /** Uma mensagem para os dois casos: termo curto e ninguém encontrado. */
   friendNoResults: (min: number) =>
     `Nobody to show. Search by handle, at least ${min} characters — never by email.`,

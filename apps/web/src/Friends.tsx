@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   friendsResponse,
   HANDLE_SEARCH_MIN,
@@ -9,6 +9,7 @@ import {
   type MatchEntry,
   type PublicUser,
 } from "@watchlytics/contract";
+import { Alerta } from "./Alerta.tsx";
 import { authedFetch } from "./session.ts";
 import { SCREEN_CSS } from "./screenCss.ts";
 import { mensagem } from "./errors.ts";
@@ -131,6 +132,20 @@ export function Friends() {
   const [avisos, setAvisos] = useState<Aviso[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** O que contar a quem não vê a linha mudar. Some da tela, existe no anúncio. */
+  const [anuncio, setAnuncio] = useState("");
+  /**
+   * Âncora do foco, igual à da biblioteca: o botão de pedir ou aceitar desmonta
+   * junto com a linha, e sem isto o foco volta para o começo do documento
+   * (medido na auditoria). O par de abas está sempre na tela.
+   */
+  const tabsRef = useRef<HTMLDivElement>(null);
+
+  /** Ação que apaga o próprio botão: anuncia o que houve e devolve o foco. */
+  const feito = (frase: string) => {
+    setAnuncio(frase);
+    tabsRef.current?.focus();
+  };
 
   const run = (fn: () => Promise<void>) => {
     setBusy(true);
@@ -180,6 +195,8 @@ export function Friends() {
     e.preventDefault();
     run(async () => {
       const url = `/v1/users?q=${encodeURIComponent(q.trim())}`;
+      // Limpa o aviso da ação anterior: quem manda na frase agora é a contagem.
+      setAnuncio("");
       setResults(userSearchResponse.parse(await pega(url)).items);
     });
   };
@@ -195,6 +212,7 @@ export function Friends() {
       // A lista de enviados é a confirmação: sem recarregar, o botão ficaria
       // oferecendo o mesmo pedido.
       await load();
+      feito(t.friendRequestSent);
     });
 
   const onAccept = (userId: string) =>
@@ -206,6 +224,7 @@ export function Friends() {
       // O aceite cruza os catálogos (E4): há match novo e aviso novo agora.
       await Promise.all([load(), loadComuns()]);
       dispatchEvent(new Event(ZEROU));
+      feito(t.friendRequestAccepted);
     });
 
   const maisComuns = () =>
@@ -245,13 +264,14 @@ export function Friends() {
       <style>{CSS}</style>
       <h1>{t.friends}</h1>
 
-      <div className="lib-tabs" role="tablist">
+      {/* Grupo de botões, não `role="tablist"`: ver o comentário do Library.tsx.
+          A promessa da aba é seta para navegar, e aqui a troca é pelo hash. */}
+      <div className="lib-tabs" role="group" aria-label={t.friendTabs} tabIndex={-1} ref={tabsRef}>
         {TABS.map((it) => (
           <button
             key={it.id}
             type="button"
-            role="tab"
-            aria-selected={tab === it.id}
+            aria-pressed={tab === it.id}
             onClick={() => {
               location.hash = `#/friends/${it.id}`;
             }}
@@ -261,13 +281,19 @@ export function Friends() {
         ))}
       </div>
 
+      {/* Só para leitor de tela: o resultado da busca e o que a ação fez. */}
+      <p className="sr-only" role="status">
+        {anuncio || (results === null ? "" : t.friendResultsCount(results.length))}
+      </p>
+
       {error && (
-        <div className="notice error">
+        // Sem `foco`: o painel se soma à tela e a busca continua no lugar.
+        <Alerta className="notice error">
           <p>{error}</p>
           <button type="button" className="link" onClick={recarregar}>
             {t.retry}
           </button>
-        </div>
+        </Alerta>
       )}
 
       {tab === "people" && (

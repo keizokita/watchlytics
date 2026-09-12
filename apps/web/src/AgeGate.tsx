@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MIN_AGE, type SessionUser } from "@watchlytics/contract";
 import { submitBirthYear, type AgeVerdict } from "./ageGate.ts";
+import { Alerta } from "./Alerta.tsx";
 import { mensagem } from "./errors.ts";
 import { setUser } from "./session.ts";
 import { PRIVACY_URL, t } from "./strings.ts";
@@ -35,11 +36,13 @@ export function AgeGate({ user }: { user: SessionUser }) {
   if (verdict?.kind === "refused") {
     return (
       <div className="onboarding age-gate">
-        {/* `role="alert"` porque a recusa é a resposta ao envio: quem usa leitor
-            de tela precisa ouvi-la sem ir procurar onde o formulário estava. */}
-        <p className="notice" role="alert">
+        {/* A recusa é a resposta ao envio, e é definitiva: quem usa leitor de
+            tela precisa ouvi-la sem ir procurar onde o formulário estava, e o
+            foco não pode cair no começo do documento junto com o formulário que
+            desmontou (medido na auditoria: virava o body). */}
+        <Alerta className="notice" foco>
           {t.ageGateRefused(verdict.minAge)}
-        </p>
+        </Alerta>
       </div>
     );
   }

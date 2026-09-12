@@ -6,6 +6,7 @@ import {
   type Title,
 } from "@watchlytics/contract";
 import { AgeGate } from "./AgeGate.tsx";
+import { Alerta } from "./Alerta.tsx";
 import { Deck } from "./Deck.tsx";
 import { Filters, toParams, type FeedFilters } from "./Filters.tsx";
 import { Friends, NotificationsBadge } from "./Friends.tsx";
@@ -207,12 +208,14 @@ function App() {
       {relaxed.includes("dislikes") && <p className="notice">{t.recycled}</p>}
 
       {error ? (
-        <div className="notice deck-slot error">
+        // `foco`: este painel nasce no lugar do deck, e com ele somem os
+        // botões Pass/Undo/Like — inclusive o que estava com o foco.
+        <Alerta className="notice deck-slot error" foco>
           <p>{error}</p>
           <button type="button" className="link" onClick={() => void more()}>
             {t.retry}
           </button>
-        </div>
+        </Alerta>
       ) : !ready ? (
         <p className="notice deck-slot loading">{t.loading}</p>
       ) : queue.length === 0 ? (
@@ -334,6 +337,8 @@ function Root() {
            conteúdo no topo: toda a folga vai para cima da atribuição. */
         .shell .attribution { margin-top: auto; }
         .shell nav { display: flex; gap: 0.5rem; }
+        /* Ver o comentário do <main> abaixo: marco na árvore, nada no layout. */
+        .shell main { display: contents; }
         /* Deslogada, a nav é só o botão de entrar, e ele tem que vir DEPOIS do
            que explica o app — senão a pessoa lê o call-to-action antes de
            saber para o que está entrando. */
@@ -386,19 +391,29 @@ function Root() {
         ) : null}
         <Login />
       </nav>
-      {user === undefined ? null : !user ? (
-        <SignedOut />
-      ) : user.needsAgeGate ? (
-        // β2 — antes de qualquer tela, e antes de qualquer requisição de dado:
-        // a idade é condição para a conta existir, não uma etapa do onboarding.
-        <AgeGate user={user} />
-      ) : inLibrary ? (
-        <Library />
-      ) : inFriends ? (
-        <Friends />
-      ) : (
-        <Home />
-      )}
+      {/* O <main> é o marco que faltava: a auditoria achou `navigation` e
+          `contentinfo` na árvore de acessibilidade e nada em volta do conteúdo,
+          então quem navega por marco não tinha como pular a chrome e cair na
+          tela. `display: contents` no CSS acima: o elemento existe para a
+          árvore e some do layout — os filhos continuam sendo itens de flex do
+          .shell, que é o que faz as margens `auto` dos filtros e do rodapé
+          funcionarem. */}
+      <main>
+        {user === undefined ? null : !user ? (
+          <SignedOut />
+        ) : user.needsAgeGate ? (
+          // β2 — antes de qualquer tela, e antes de qualquer requisição de
+          // dado: a idade é condição para a conta existir, não uma etapa do
+          // onboarding.
+          <AgeGate user={user} />
+        ) : inLibrary ? (
+          <Library />
+        ) : inFriends ? (
+          <Friends />
+        ) : (
+          <Home />
+        )}
+      </main>
 
       {/* Atribuição exigida pelos termos do TMDB. Fica no shell, e não numa
           tela "sobre", porque a condição é ser visível — tela que ninguém abre

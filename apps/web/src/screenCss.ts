@@ -30,7 +30,7 @@ export const SCREEN_CSS = `
      pílula do app em 16px; filtro, gênero e nota já são menores que isso. */
   font-size: 0.9rem;
 }
-.lib-tabs button[aria-selected="true"] { color: var(--fg); border-color: var(--fg); }
+.lib-tabs button[aria-pressed="true"] { color: var(--fg); border-color: var(--fg); }
 .lib-tabs button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
 
 /* Erro com ação: o texto e o "tentar de novo" empilham, centralizados. */
