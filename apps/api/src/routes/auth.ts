@@ -1,8 +1,10 @@
-import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { randomBytes, randomUUID } from "node:crypto";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   ageGateInput,
+  handleInput,
+  handleRegex,
   MIN_AGE,
   oauthExchange,
   oauthProvider,
@@ -10,6 +12,7 @@ import {
   type AgeGateResponse,
   type AuthResponse,
   type AuthTransport,
+  type HandleAvailability,
   type SessionUser,
 } from "@watchlytics/contract";
 import {
@@ -184,15 +187,24 @@ export const providers = {
 
 // ─── conta ──────────────────────────────────────────────────────────────────
 
-const handleSeed = (identity: ProviderIdentity) => {
-  const base = (identity.email?.split("@")[0] ?? identity.displayName ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .slice(0, 20);
-  return base.length >= 3 ? base : "user";
-};
-
-const suffix = () => Math.random().toString(36).slice(2, 6);
+/**
+ * β8 — handle provisório, e ele NÃO sai do e-mail.
+ *
+ * `email.split("@")[0]` era o que fazia `/u/keizokita1` devolver o e-mail de
+ * quem lesse o perfil: no caso comum `@gmail.com` completa o resto. O
+ * displayName do Google também está fora, e pela mesma razão — é o nome civil
+ * da pessoa, publicado em URL.
+ *
+ * Aleatório, não sequencial: `user_1`, `user_2` transformaria a lista de quem
+ * abandonou o fluxo em algo enumerável por quem só sabe contar. São 48 bits do
+ * `randomBytes`, o que torna a colisão um evento e não uma rotina — e o laço de
+ * inserção abaixo continua cobrindo o evento.
+ *
+ * Cabe nas regras do contrato de propósito (começa com letra, 17 dos 20
+ * caracteres, só `[a-z0-9_]`): quem abandonar o fluxo fica com um handle que a
+ * validação aceita, não com um que só o banco aguenta.
+ */
+const handleSeed = () => `user_${randomBytes(6).toString("hex")}`;
 
 /**
  * Encontra a conta por (provider, provider_user_id) ou cria uma nova.
@@ -225,16 +237,16 @@ async function findOrCreateUser(
 
   try {
     return await db.transaction(async (tx) => {
-      const seed = handleSeed(identity);
       let userId: string | undefined;
 
       // Handle é único no banco; ON CONFLICT DO NOTHING evita abortar a
-      // transação e o sufixo aleatório resolve a colisão sem consulta prévia.
+      // transação, e sortear outro resolve a colisão sem consulta prévia.
       for (let i = 0; i < 5 && !userId; i++) {
+        const seed = handleSeed();
         const [row] = await tx
           .insert(users)
           .values({
-            handle: i === 0 ? seed : `${seed}-${suffix()}`,
+            handle: seed,
             displayName: identity.displayName ?? seed,
             email: identity.email,
             avatarUrl: identity.avatarUrl,
@@ -291,8 +303,9 @@ async function loadUser(userId: string): Promise<SessionUser> {
   //
   // Quem BLOQUEIA enquanto isto for true é o `requireUserId` (β2): esta rota e
   // a `/v1/auth/age` são as duas que respondem com a porta fechada.
-  // β8: quem BLOQUEIA enquanto `needsHandle` for true é a trilha A. Aqui só
-  // reporta — conta existente continua usando o app até a porta entrar.
+  // β8: quem BLOQUEIA enquanto `needsHandle` for true é o `requireUserId`,
+  // igual à idade. Esta rota reporta e não bloqueia, senão o cliente ficaria
+  // sem saber por que foi bloqueado.
   const { birthYear, handleChosen, ...user } = row;
   return {
     ...user,
@@ -542,11 +555,12 @@ export function registerAuth(app: FastifyInstance): void {
   /**
    * Rota protegida de verdade: é por ela que o cliente sabe quem ele é.
    *
-   * Fora da porta de idade de propósito: é ela que devolve `needsAgeGate`, e
-   * bloqueá-la deixaria o cliente sem saber por que foi bloqueado.
+   * Fora das duas portas de propósito: é ela que devolve `needsAgeGate` e
+   * `needsHandle`, e bloqueá-la deixaria o cliente sem saber por que foi
+   * bloqueado.
    */
   app.get("/v1/auth/me", async (req) =>
-    loadUser(await requireUserId(req, { ageGate: false })),
+    loadUser(await requireUserId(req, { ageGate: false, handleGate: false })),
   );
 
   /**
@@ -564,7 +578,10 @@ export function registerAuth(app: FastifyInstance): void {
    * dado pessoal de menor declarado, que é o oposto do que a política promete.
    */
   app.post("/v1/auth/age", async (req, reply): Promise<AgeGateResponse | { error: string }> => {
-    const userId = await requireUserId(req, { ageGate: false });
+    // `handleGate: false` porque a idade vem ANTES do handle: com a porta do
+    // handle valendo aqui, ninguém conseguiria responder a idade, e a fila
+    // inteira travaria na primeira conta nova.
+    const userId = await requireUserId(req, { ageGate: false, handleGate: false });
 
     const parsed = ageGateInput.safeParse(req.body);
     if (!parsed.success) {
@@ -587,4 +604,112 @@ export function registerAuth(app: FastifyInstance): void {
 
     return { ok: true, minAge: MIN_AGE };
   });
+
+  /**
+   * β8 — a escolha do handle.
+   *
+   * `handleGate: false` porque é esta a rota que fecha a porta; a porta de
+   * idade continua valendo, e é o que garante a ordem: quem ainda não
+   * respondeu a idade recebe 403 aqui e vai responder aquela primeiro.
+   *
+   * Escolhe UMA vez, e o `eq(handleChosen, false)` no WHERE é o que sustenta
+   * isso — mesma razão do `isNull` da porta de idade. Trocar depois quebraria
+   * `/u/<handle>` já compartilhado e liberaria o handle antigo para outra
+   * pessoa ocupar; vira slice própria quando alguém pedir.
+   */
+  app.post("/v1/auth/handle", async (req, reply): Promise<SessionUser | { error: string }> => {
+    const userId = await requireUserId(req, { handleGate: false });
+
+    // Validação na borda com o MESMO schema que a tela usa: formato, tamanho e
+    // lista de reservados moram no contrato para as duas pontas não divergirem.
+    const parsed = handleInput.safeParse(req.body);
+    if (!parsed.success) {
+      reply.code(400);
+      return { error: "handle inválido" };
+    }
+
+    let escolheu: { id: string }[];
+    try {
+      escolheu = await db
+        .update(users)
+        .set({ handle: parsed.data.handle, handleChosen: true })
+        .where(and(eq(users.id, userId), eq(users.handleChosen, false)))
+        .returning({ id: users.id });
+    } catch (e) {
+      // A corrida entre duas contas pedindo o mesmo handle se resolve AQUI, no
+      // índice único, e não numa consulta prévia: entre o "está livre" e o
+      // UPDATE cabe a escrita da outra conta, e as duas passariam. A constraint
+      // é a única fonte da verdade que não tem essa janela.
+      if (!violouUnico(e)) throw e;
+      reply.code(409);
+      return { error: "handle indisponível" };
+    }
+
+    if (!escolheu.length) {
+      reply.code(409);
+      return { error: "o handle já foi escolhido" };
+    }
+
+    // O cliente precisa do `needsHandle` novo para sair da tela: devolver a
+    // sessão inteira evita um GET /v1/auth/me logo em seguida.
+    return loadUser(userId);
+  });
+
+  /**
+   * β8 — disponibilidade, para a tela responder enquanto se digita.
+   *
+   * É oráculo de enumeração por natureza: quem quiser mapear handles existentes
+   * consegue perguntando muitas vezes. Daí o limite POR IP, o mesmo das rotas
+   * que emitem token — o limite por conta não serve aqui, porque uma conta só
+   * escolhe uma vez e o custo de criar contas é de quem ataca.
+   *
+   * Tomado e reservado devolvem o mesmo `available: false`. Distinguir não
+   * ajuda quem escolhe e entrega de graça a lista de reservados.
+   */
+  app.get<{ Querystring: { handle?: string } }>(
+    "/v1/auth/handle/available",
+    async (req, reply): Promise<HandleAvailability | { error: string }> => {
+      // O limite ANTES da autenticação: quem já estourou o teto não paga uma
+      // consulta ao banco para descobrir isso.
+      limitByIp(req);
+      await requireUserId(req, { handleGate: false });
+
+      // `typeof` e não `?? ""`: `?handle=a&handle=b` chega como array, e o tipo
+      // declarado acima não impede isso — quem manda a query é o cliente.
+      const bruto = req.query.handle;
+      const handle = typeof bruto === "string" ? bruto.toLowerCase() : "";
+
+      // Formato errado é erro de quem chamou; reservado e tomado são resposta
+      // legítima da rota, e por isso não entram neste 400.
+      if (!handleRegex.test(handle)) {
+        reply.code(400);
+        return { error: "handle inválido" };
+      }
+
+      const reservado = !handleInput.safeParse({ handle }).success;
+      if (reservado) return { handle, available: false };
+
+      // `lower(handle)` porque a unicidade ignora caixa, e é o índice
+      // `users_handle_lower` que responde esta consulta.
+      const [tomado] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(sql`lower(${users.handle}) = ${handle}`)
+        .limit(1);
+
+      return { handle, available: !tomado };
+    },
+  );
 }
+
+/**
+ * Violação de unicidade do Postgres. É o retorno normal da corrida entre dois
+ * pedidos do mesmo handle, não uma falha do servidor: vira 409, nunca 500.
+ *
+ * Olha o `cause` porque o drizzle embrulha o erro do driver num
+ * `DrizzleQueryError`, e o `code` mora no de dentro.
+ */
+const violouUnico = (e: unknown) => {
+  const erro = e as { code?: unknown; cause?: { code?: unknown } } | null;
+  return erro?.code === "23505" || erro?.cause?.code === "23505";
+};

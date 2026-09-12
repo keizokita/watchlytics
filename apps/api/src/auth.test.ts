@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import test from "node:test";
-import { eq, inArray } from "drizzle-orm";
-import { authResponse, MIN_AGE, sessionUser } from "@watchlytics/contract";
+import { eq, inArray, sql } from "drizzle-orm";
+import {
+  authResponse,
+  handleRegex,
+  MIN_AGE,
+  sessionUser,
+} from "@watchlytics/contract";
 import { ACCESS_TTL_S, signAccess, verifyAccess } from "./auth.ts";
 import { db, pg } from "./db/client.ts";
 import { consents, identities, sessions, swipes, titles, users } from "./db/schema.ts";
@@ -186,7 +192,7 @@ test("email igual em subs diferentes NÃO deduplica a conta", async () => {
   created.push(a.user.id, b.user.id);
 
   assert.notEqual(a.user.id, b.user.id, "duas contas, não uma");
-  assert.notEqual(a.user.handle, b.user.handle, "handle colidiu e ganhou sufixo");
+  assert.notEqual(a.user.handle, b.user.handle, "cada conta sorteia o seu");
 });
 
 test("transporte nativo devolve o refresh no corpo e não põe cookie", async () => {
@@ -473,26 +479,30 @@ test("β2 — conta sem ano não usa o app, mas enxerga a própria porta", async
   assert.equal((await refresh(token)).statusCode, 401, "e revogou de verdade");
 });
 
-test("β2 — maior de idade passa, e passa para o app inteiro", async () => {
+test("β2 — maior de idade passa a porta da idade, e para na do handle", async () => {
   const { user } = await loginNative("sub-porta-abre");
 
   const res = await responderIdade(user.id, new Date().getFullYear() - 30);
   assert.equal(res.statusCode, 200, res.body);
   assert.deepEqual(res.json(), { ok: true, minAge: MIN_AGE });
 
+  // β8 mudou o que vem DEPOIS da idade: o app não abre direto, abre a segunda
+  // porta. Quem prova que ela também abre é o teste do β8 mais abaixo.
   const aberta = await app.inject({
     method: "GET",
     url: "/v1/feed",
     headers: como(user.id),
   });
-  assert.equal(aberta.statusCode, 200, "com ano gravado o feed responde");
+  assert.equal(aberta.statusCode, 403, "com ano gravado sobra a porta do handle");
 
   const eu = await app.inject({
     method: "GET",
     url: "/v1/auth/me",
     headers: como(user.id),
   });
-  assert.equal(sessionUser.parse(eu.json()).needsAgeGate, false);
+  const sessao = sessionUser.parse(eu.json());
+  assert.equal(sessao.needsAgeGate, false);
+  assert.equal(sessao.needsHandle, true, "a porta que sobrou é a do handle");
 });
 
 test("β2 — menor não entra, e a conta some inteira do banco", async () => {
@@ -586,5 +596,293 @@ test("β2 — ano fora do formato é 400, não 500", async () => {
   for (const birthYear of ["mil novecentos", 1899, new Date().getFullYear() + 1, 19.5]) {
     const res = await responderIdade(user.id, birthYear as number);
     assert.equal(res.statusCode, 400, `${birthYear} devia ser 400`);
+  }
+});
+
+// ─── β8: o handle é escolhido, não derivado do e-mail ───────────────────────
+
+/**
+ * O defeito que o β8 fecha: `handleSeed` montava o handle com
+ * `email.split("@")[0]`, e o perfil público publica o handle em `/u/<handle>`.
+ * Quem lia o handle deduzia o e-mail — no caso comum, `@gmail.com` completa o
+ * resto.
+ *
+ * Handle de teste sorteado: os arquivos de teste rodam em paralelo no mesmo
+ * banco, e um handle fixo colidiria com a rodada do vizinho.
+ */
+const novoHandle = () => `t${randomBytes(4).toString("hex")}`;
+
+/** Conta com a porta da idade já respondida — só a do handle fica de pé. */
+async function contaComIdade(sub: string) {
+  const { user, refresh: token } = await loginNative(sub);
+  const res = await responderIdade(user.id, new Date().getFullYear() - 30);
+  assert.equal(res.statusCode, 200, res.body);
+  return { user, refresh: token };
+}
+
+const escolherHandle = (userId: string, handle: unknown) =>
+  app.inject({
+    method: "POST",
+    url: "/v1/auth/handle",
+    headers: como(userId),
+    payload: { handle },
+  });
+
+const disponibilidade = (userId: string, handle: string, ip = freshIp()) =>
+  app.inject({
+    method: "GET",
+    url: `/v1/auth/handle/available?handle=${encodeURIComponent(handle)}`,
+    headers: { ...como(userId), "cf-connecting-ip": ip },
+  });
+
+test("β8 — o handle do login não sai do e-mail nem do nome", async () => {
+  const res = await login({ sub: "sub-handle-neutro", email: "ana.silva@gmail.com" });
+  const { user } = authResponse.parse(res.json());
+  created.push(user.id);
+
+  // O local-part inteiro, e cada pedaço dele: era assim que o e-mail vazava.
+  for (const vazamento of ["ana.silva", "anasilva", "ana", "silva", "gmail"]) {
+    assert.ok(
+      !user.handle.includes(vazamento),
+      `"${vazamento}" não pode aparecer em ${user.handle}`,
+    );
+  }
+  // displayName do Google é o nome civil da pessoa, e também não entra.
+  assert.ok(!user.handle.includes("test"), `nome do provedor em ${user.handle}`);
+
+  // E o que sobra continua sendo um handle válido pelas regras do contrato:
+  // quem abandonar o fluxo fica com um que a validação aceita.
+  assert.match(user.handle, handleRegex);
+  assert.equal(sessionUser.parse(user).needsHandle, true, "gerado não é escolhido");
+
+  // E-mail continua guardado na conta: ele é informativo, o que mudou é que
+  // ele não é mais publicado como handle.
+  const [linha] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, user.id));
+  assert.equal(linha?.email, "ana.silva@gmail.com");
+});
+
+test("β8 — dois logins seguidos não sorteiam o mesmo handle", async () => {
+  const a = authResponse.parse((await login({ sub: "sub-sorteio-a" })).json());
+  const b = authResponse.parse((await login({ sub: "sub-sorteio-b" })).json());
+  created.push(a.user.id, b.user.id);
+  assert.notEqual(a.user.handle, b.user.handle);
+});
+
+test("β8 — sem handle escolhido não usa o app, mas enxerga a própria porta", async () => {
+  const { user, refresh: token } = await contaComIdade("sub-handle-fechado");
+
+  const fechada = await app.inject({
+    method: "GET",
+    url: "/v1/feed",
+    headers: como(user.id),
+  });
+  assert.equal(fechada.statusCode, 403, "sem handle escolhido, rota autenticada é 403");
+
+  const eu = await app.inject({
+    method: "GET",
+    url: "/v1/auth/me",
+    headers: como(user.id),
+  });
+  assert.equal(eu.statusCode, 200, "/me responde com a porta fechada");
+  assert.equal(sessionUser.parse(eu.json()).needsHandle, true);
+
+  // A rota de disponibilidade é o apoio da tela de escolha: fechá-la deixaria
+  // a pessoa escolhendo às cegas dentro da única tela que ela enxerga.
+  assert.equal((await disponibilidade(user.id, novoHandle())).statusCode, 200);
+
+  // E sair continua possível, pelo mesmo motivo do β2.
+  const saiu = await app.inject({
+    method: "POST",
+    url: "/v1/auth/logout",
+    payload: { refresh: token },
+  });
+  assert.equal(saiu.statusCode, 204, "logout não passa pela porta do handle");
+});
+
+test("β8 — escolher abre o app e devolve a sessão já sem a porta", async () => {
+  const { user } = await contaComIdade("sub-handle-escolhe");
+  const handle = novoHandle();
+
+  const res = await escolherHandle(user.id, handle);
+  assert.equal(res.statusCode, 200, res.body);
+  const sessao = sessionUser.parse(res.json());
+  assert.equal(sessao.handle, handle);
+  assert.equal(sessao.needsHandle, false, "a resposta já serve para sair da tela");
+
+  const aberta = await app.inject({
+    method: "GET",
+    url: "/v1/feed",
+    headers: como(user.id),
+  });
+  assert.equal(aberta.statusCode, 200, "com as duas portas abertas o feed responde");
+
+  const [linha] = await db
+    .select({ handle: users.handle, handleChosen: users.handleChosen })
+    .from(users)
+    .where(eq(users.id, user.id));
+  assert.equal(linha?.handle, handle);
+  assert.equal(linha?.handleChosen, true);
+});
+
+test("β8 — o handle se escolhe uma vez só", async () => {
+  const { user } = await contaComIdade("sub-handle-uma-vez");
+  const primeiro = novoHandle();
+  assert.equal((await escolherHandle(user.id, primeiro)).statusCode, 200);
+
+  // Trocar quebraria `/u/<handle>` já compartilhado e liberaria o antigo para
+  // outra pessoa ocupar. Não é 200 silencioso: quem pediu precisa saber.
+  const segundo = await escolherHandle(user.id, novoHandle());
+  assert.equal(segundo.statusCode, 409, segundo.body);
+
+  const [linha] = await db
+    .select({ handle: users.handle })
+    .from(users)
+    .where(eq(users.id, user.id));
+  assert.equal(linha?.handle, primeiro, "o handle gravado é o primeiro");
+});
+
+test("β8 — handle tomado é recusado ignorando caixa", async () => {
+  const dona = await contaComIdade("sub-handle-dona");
+  const outra = await contaComIdade("sub-handle-outra");
+  const handle = novoHandle();
+
+  assert.equal((await escolherHandle(dona.user.id, handle)).statusCode, 200);
+
+  // @Ana e @ana não podem ser duas contas: a busca compara em lower e passaria
+  // a ter duas respostas certas, inclusive a do perfil público.
+  const res = await escolherHandle(outra.user.id, handle.toUpperCase());
+  assert.equal(res.statusCode, 409, res.body);
+
+  const eu = await app.inject({
+    method: "GET",
+    url: "/v1/auth/me",
+    headers: como(outra.user.id),
+  });
+  assert.equal(
+    sessionUser.parse(eu.json()).needsHandle,
+    true,
+    "quem perdeu continua devendo a escolha",
+  );
+});
+
+test("β8 — duas contas pedindo o mesmo handle ao mesmo tempo: uma só ganha", async () => {
+  const a = await contaComIdade("sub-handle-corrida-a");
+  const b = await contaComIdade("sub-handle-corrida-b");
+  const handle = novoHandle();
+
+  // A corrida se resolve no índice único, não numa consulta prévia: entre o
+  // "está livre" e o UPDATE cabe a escrita da outra conta.
+  const [ra, rb] = await Promise.all([
+    escolherHandle(a.user.id, handle),
+    escolherHandle(b.user.id, handle),
+  ]);
+
+  const codigos = [ra.statusCode, rb.statusCode].sort();
+  assert.deepEqual(codigos, [200, 409], `${ra.body} | ${rb.body}`);
+
+  const donos = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(sql`lower(${users.handle}) = ${handle}`);
+  assert.equal(donos.length, 1, "um dono, e o banco é quem decidiu qual");
+});
+
+test("β8 — formato inválido e reservado são 400, não 500", async () => {
+  const { user } = await contaComIdade("sub-handle-invalido");
+
+  for (const handle of ["ab", "1abc", "Ana!", "a".repeat(21), "com espaço", 42, null]) {
+    const res = await escolherHandle(user.id, handle);
+    assert.equal(res.statusCode, 400, `${String(handle)} devia ser 400`);
+  }
+
+  // Reservado colide com rota (`/u`, `/me`) ou induz a erro sobre quem fala.
+  for (const handle of ["admin", "support", "api"]) {
+    assert.equal((await escolherHandle(user.id, handle)).statusCode, 400, handle);
+  }
+
+  const eu = await app.inject({
+    method: "GET",
+    url: "/v1/auth/me",
+    headers: como(user.id),
+  });
+  assert.equal(sessionUser.parse(eu.json()).needsHandle, true, "nada foi gravado");
+});
+
+test("β8 — disponibilidade: livre, tomado e reservado", async () => {
+  const { user } = await contaComIdade("sub-handle-disponivel");
+  const handle = novoHandle();
+
+  const livre = await disponibilidade(user.id, handle);
+  assert.equal(livre.statusCode, 200, livre.body);
+  assert.deepEqual(livre.json(), { handle, available: true });
+
+  assert.equal((await escolherHandle(user.id, handle)).statusCode, 200);
+
+  const tomado = await disponibilidade(user.id, handle.toUpperCase());
+  assert.deepEqual(
+    tomado.json(),
+    { handle, available: false },
+    "tomado ignorando caixa, e o eco volta normalizado",
+  );
+
+  // Reservado devolve o MESMO `available: false` de tomado: distinguir não
+  // ajuda quem escolhe e entrega de graça a lista de reservados.
+  const reservado = await disponibilidade(user.id, "admin");
+  assert.deepEqual(reservado.json(), { handle: "admin", available: false });
+
+  // Formato errado é erro de quem chamou, e aí sim tem resposta própria.
+  for (const ruim of ["ab", "1abc", "Ana!"]) {
+    assert.equal((await disponibilidade(user.id, ruim)).statusCode, 400, ruim);
+  }
+});
+
+test("β8 — disponibilidade é limitada por IP: é oráculo de enumeração", async () => {
+  const { user } = await contaComIdade("sub-handle-enumera");
+  const ip = freshIp();
+
+  let last = 0;
+  for (let i = 0; i < 21; i++) {
+    last = (await disponibilidade(user.id, novoHandle(), ip)).statusCode;
+    if (i < 20) assert.equal(last, 200, `requisição ${i + 1} ainda dentro do teto`);
+  }
+  assert.equal(last, 429, "a 21ª do mesmo IP é barrada");
+
+  assert.equal(
+    (await disponibilidade(user.id, novoHandle())).statusCode,
+    200,
+    "outro IP não paga pelo vizinho",
+  );
+});
+
+test("β8 — a ordem das portas: idade primeiro, handle depois", async () => {
+  // Conta recém-criada: sem ano e sem handle escolhido. Pedir handle agora
+  // seria pedir escolha a uma conta que a porta seguinte pode apagar.
+  const { user } = await loginNative("sub-handle-ordem");
+
+  const escolha = await escolherHandle(user.id, novoHandle());
+  assert.equal(escolha.statusCode, 403, "a porta da idade responde antes");
+
+  assert.equal(
+    (await disponibilidade(user.id, novoHandle())).statusCode,
+    403,
+    "e a de disponibilidade junto",
+  );
+
+  // Respondida a idade, a porta do handle passa a ser a que responde.
+  assert.equal((await responderIdade(user.id, new Date().getFullYear() - 30)).statusCode, 200);
+  assert.equal((await escolherHandle(user.id, novoHandle())).statusCode, 200);
+});
+
+test("β8 — sem token não se escolhe handle nem se consulta disponibilidade", async () => {
+  for (const url of ["/v1/auth/handle", "/v1/auth/handle/available?handle=qualquer"]) {
+    const res = await app.inject({
+      method: url.includes("available") ? "GET" : "POST",
+      url,
+      payload: { handle: "qualquer" },
+    });
+    assert.equal(res.statusCode, 401, url);
   }
 });

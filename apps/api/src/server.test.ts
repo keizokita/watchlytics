@@ -21,8 +21,13 @@ const USER = "00000000-0000-4000-8000-0000000000f5";
 
 await db
   .insert(users)
-  .values({ id: USER, handle: "server-test", displayName: "S5", birthYear: 1990 })
-  .onConflictDoNothing();
+  .values({ id: USER, handle: "server-test", displayName: "S5", birthYear: 1990, handleChosen: true })
+  // DoUpdate e não DoNothing: a linha pode ter sobrado de uma rodada
+  // anterior às portas, e fixture com porta fechada é 403 em todo teste.
+  .onConflictDoUpdate({
+    target: users.id,
+    set: { birthYear: 1990, handleChosen: true },
+  });
 
 /**
  * O que este teste guarda: que a resposta do feed continua satisfazendo o

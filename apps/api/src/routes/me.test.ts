@@ -60,11 +60,17 @@ async function seed() {
     .insert(users)
     .values([
       // β2 — `birthYear` é a porta de idade já respondida: sem ano, 403.
-      { id: LEFT, handle: "c6-esquerda", displayName: "Esquerda", birthYear: 1990 },
-      { id: USER, handle: "c6-alvo", displayName: "Alvo", email: "alvo@exemplo.test", birthYear: 1990 },
-      { id: RIGHT, handle: "c6-direita", displayName: "Direita", birthYear: 1990 },
+      // β8 — e `handleChosen`, a do handle: sem ela, 403 também.
+      { id: LEFT, handle: "c6-esquerda", displayName: "Esquerda", birthYear: 1990, handleChosen: true },
+      { id: USER, handle: "c6-alvo", displayName: "Alvo", email: "alvo@exemplo.test", birthYear: 1990, handleChosen: true },
+      { id: RIGHT, handle: "c6-direita", displayName: "Direita", birthYear: 1990, handleChosen: true },
     ])
-    .onConflictDoNothing();
+    // DoUpdate e não DoNothing: a linha pode ter sobrado de uma rodada
+    // anterior às portas, e fixture com porta fechada é 403 em todo teste.
+    .onConflictDoUpdate({
+      target: users.id,
+      set: { birthYear: 1990, handleChosen: true },
+    });
 
   await db
     .insert(identities)

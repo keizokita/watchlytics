@@ -190,6 +190,20 @@ export function clientIp(req: FastifyRequest): string {
  * seria uma conta sem idade usando o app. `false` dispensa a PORTA, nunca a
  * conta: as duas rotas continuam exigindo que o dono do token exista.
  *
+ * β8 — a porta do handle fecha no MESMO ponto, e pela mesma razão: um guard por
+ * rota seria o mesmo código quinze vezes, e a décima sexta rota nasceria sem
+ * ele.
+ *
+ * A ordem entre as duas é deliberada e não é simetria: idade é avaliada
+ * PRIMEIRO. Quem ainda não respondeu a idade pode ser recusado e ter a conta
+ * apagada no passo seguinte, e pedir handle antes disso é pedir escolha a uma
+ * conta que talvez não exista em um minuto.
+ *
+ * `handleGate: false` é para as rotas que precisam funcionar com ela fechada:
+ * `/v1/auth/me` (como o cliente descobre), `/v1/auth/handle` e
+ * `/v1/auth/handle/available` (a escolha e o apoio dela), e `/v1/auth/age`, que
+ * vem antes na fila. O logout não passa por aqui: não é autenticado por JWT.
+ *
  * ponytail: uma consulta pela PK em toda requisição autenticada. O alternativo
  * seria carimbar a idade no access token e não consultar nada — mas aí quem
  * passa pela porta continua bloqueado até o token expirar (15 min), porque
@@ -199,7 +213,7 @@ export function clientIp(req: FastifyRequest): string {
  */
 export async function requireUserId(
   req: FastifyRequest,
-  opts?: { ageGate?: boolean },
+  opts?: { ageGate?: boolean; handleGate?: boolean },
 ): Promise<string> {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) throw unauthorized();
@@ -212,7 +226,7 @@ export async function requireUserId(
   }
 
   const [row] = await db
-    .select({ birthYear: users.birthYear })
+    .select({ birthYear: users.birthYear, handleChosen: users.handleChosen })
     .from(users)
     .where(eq(users.id, userId));
 
@@ -224,6 +238,11 @@ export async function requireUserId(
 
   if (opts?.ageGate !== false && row.birthYear === null) {
     throw httpError(403, "porta de idade pendente");
+  }
+
+  // Depois da idade, nunca antes: ver a nota de ordem acima.
+  if (opts?.handleGate !== false && !row.handleChosen) {
+    throw httpError(403, "escolha de handle pendente");
   }
   return userId;
 }
