@@ -12,6 +12,7 @@ import { buildServer } from "../server.ts";
  *   2. o piso de 10 assistidos vale igual no perfil público (PLAN §8.3)
  *   3. as OG tags existem e são o que o crawler lê — não é SPA vazia
  *   4. display_name do usuário sai ESCAPADO no HTML
+ *   5. o resumo pluraliza ("1 day", não "1 days")
  *
  * Usuários próprios: os arquivos de teste rodam em paralelo.
  */
@@ -110,6 +111,11 @@ test("D5 — no piso o preview traz título, descrição e og:url", async () => 
   assert.match(html, /<meta property="og:url" content="[^"]*\/u\/perfil-publico">/);
   assert.match(html, /<meta property="og:type" content="profile">/);
   assert.match(html, new RegExp(`${STATS_MIN_WATCHED} titles watched`));
+  // Plural de verdade: com o piso de 10 assistidos o total de horas arredonda
+  // para UM dia, e era aí que o preview dizia "1 days of screen time" — a
+  // primeira frase que outra pessoa lê do app, no card do WhatsApp.
+  assert.doesNotMatch(html, /\b1 days\b/);
+  assert.doesNotMatch(html, /\b1 titles\b/);
 
   // Sem og:image de propósito: não há pôster, e imagem quebrada no preview é
   // pior que preview de texto. Se um dia entrar, este assert cai junto.

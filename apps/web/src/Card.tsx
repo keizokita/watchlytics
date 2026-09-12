@@ -22,7 +22,15 @@ export function Card({ title: item }: { title: Title }) {
         <span className="card-kind">
           {item.type === "movie" ? t.movie : t.series}
         </span>
-        <span className="card-score" aria-label={t.voteHint(item.voteAverage)}>
+        {/* `role="img"`: sem papel, o <span> é `generic`, e a ARIA proíbe nome
+            em elemento genérico — medido na auditoria, o leitor lia só "8.7" e
+            a escala se perdia. Com o papel, o nome vale e o número vira o
+            texto alternativo dele. */}
+        <span
+          className="card-score"
+          role="img"
+          aria-label={t.voteHint(item.voteAverage)}
+        >
           {item.voteAverage.toFixed(1)}
         </span>
       </div>

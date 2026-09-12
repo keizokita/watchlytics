@@ -6,6 +6,7 @@ import {
   type OnboardingDeck,
   type Title,
 } from "@watchlytics/contract";
+import { Alerta } from "./Alerta.tsx";
 import { Deck } from "./Deck.tsx";
 import { mensagem } from "./errors.ts";
 import { t } from "./strings.ts";
@@ -90,7 +91,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
   if (error) {
     return (
-      <div className="notice deck-slot error">
+      <Alerta className="notice deck-slot error" foco>
         <p>{error}</p>
         {/* `load` e não `save`: refazer a carga é o que devolve a tela ao
             estado certo, inclusive quando quem falhou foi o PATCH dos gêneros
@@ -98,7 +99,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         <button type="button" className="link" onClick={() => void load()}>
           {t.retry}
         </button>
-      </div>
+      </Alerta>
     );
   }
   if (!state) return <p className="notice deck-slot loading">{t.loading}</p>;

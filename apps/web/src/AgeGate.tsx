@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { MIN_AGE, type SessionUser } from "@watchlytics/contract";
 import { submitBirthYear, type AgeVerdict } from "./ageGate.ts";
+import { Alerta } from "./Alerta.tsx";
 import { mensagem } from "./errors.ts";
-import { setUser } from "./session.ts";
+import { setAccessToken, setUser } from "./session.ts";
 import { PRIVACY_URL, t } from "./strings.ts";
 
 /**
@@ -21,28 +22,40 @@ import { PRIVACY_URL, t } from "./strings.ts";
  * "sem segunda chance na mesma sessão" é requisito, não detalhe de UI. Morre no
  * reload, que é quando a sessão também morre: o servidor apagou a dele na
  * recusa, então entrar de novo recomeça tudo do lado dele.
+ *
+ * Quem lê isto agora é o SHELL, não este componente: na recusa a sessão local
+ * é jogada fora, e sem sessão o `AgeGate` nem monta.
  */
 let refusedMinAge: number | null = null;
 
+/** Para o shell: `null` enquanto ninguém foi recusado nesta aba. */
+export const recusaDaPorta = (): number | null => refusedMinAge;
+
+/**
+ * A tela de quem foi recusado. Mora fora do `AgeGate` porque ela sobrevive à
+ * sessão: a conta foi apagada no servidor, e manter o usuário local só para
+ * poder pintar este aviso fazia a nav continuar dizendo "Signed in as @handle"
+ * e oferecendo "Sign out" ao lado da frase que diz que não há nada aqui.
+ */
+export function AgeGateRecusa({ minAge }: { minAge: number }) {
+  return (
+    <div className="onboarding age-gate">
+      {/* A recusa é a resposta ao envio, e é definitiva: quem usa leitor de
+          tela precisa ouvi-la sem ir procurar onde o formulário estava, e o
+          foco não pode cair no começo do documento junto com o formulário que
+          desmontou (medido na auditoria: virava o body). */}
+      <Alerta className="notice" foco>
+        {t.ageGateRefused(minAge)}
+      </Alerta>
+    </div>
+  );
+}
+
 export function AgeGate({ user }: { user: SessionUser }) {
   const [year, setYear] = useState("");
-  const [verdict, setVerdict] = useState<AgeVerdict | null>(
-    refusedMinAge === null ? null : { kind: "refused", minAge: refusedMinAge },
-  );
+  const [verdict, setVerdict] = useState<AgeVerdict | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  if (verdict?.kind === "refused") {
-    return (
-      <div className="onboarding age-gate">
-        {/* `role="alert"` porque a recusa é a resposta ao envio: quem usa leitor
-            de tela precisa ouvi-la sem ir procurar onde o formulário estava. */}
-        <p className="notice" role="alert">
-          {t.ageGateRefused(verdict.minAge)}
-        </p>
-      </div>
-    );
-  }
 
   const onSubmit = async () => {
     setBusy(true);
@@ -56,7 +69,16 @@ export function AgeGate({ user }: { user: SessionUser }) {
         setUser({ ...user, needsAgeGate: false });
         return;
       }
-      if (next.kind === "refused") refusedMinAge = next.minAge;
+      // Recusado: a conta acabou de ser apagada no servidor, então a sessão
+      // local não representa mais nada. Jogar fora é o que tira da tela o
+      // "Signed in as @handle" e o "Sign out" de uma conta que não existe; o
+      // aviso da recusa passa a ser do shell, que o lê de `recusaDaPorta`.
+      if (next.kind === "refused") {
+        refusedMinAge = next.minAge;
+        setAccessToken(null);
+        setUser(null);
+        return;
+      }
       setVerdict(next);
     } catch (e) {
       // Falhar não é ser recusado: o formulário fica, e a pessoa tenta de novo.

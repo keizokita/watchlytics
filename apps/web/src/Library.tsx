@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   discardedResponse,
   GENRE_NAME_BY_ID,
@@ -12,6 +12,7 @@ import {
   type SessionUser,
   type Title,
 } from "@watchlytics/contract";
+import { Alerta } from "./Alerta.tsx";
 import { authedFetch } from "./session.ts";
 import { SCREEN_CSS } from "./screenCss.ts";
 import { mensagem } from "./errors.ts";
@@ -209,7 +210,7 @@ function Account() {
     <section className="lib-account">
       <h2>{t.account}</h2>
       <p className="lib-locked">{t.accountHint}</p>
-      {error && <p className="notice error">{error}</p>}
+      {error && <Alerta className="notice error">{error}</Alerta>}
 
       {me && (
         <>
@@ -248,6 +249,19 @@ function Account() {
 
 export function Library() {
   const [tab, setTab] = useState<Tab>("interested");
+  /**
+   * O que contar a quem não vê a lista. Mudar o status tira o item da aba
+   * aberta; quem enxerga vê a linha sumir, e esta frase é o equivalente.
+   */
+  const [movido, setMovido] = useState("");
+  /**
+   * Âncora do foco. O botão que a pessoa acabou de apertar desmonta junto com o
+   * item, e sem isto o foco volta para o começo do documento — medido na
+   * auditoria: `document.activeElement` virava o body, e em uma lista de vinte
+   * itens o caminho de volta é Tab desde a primeira tela. O par de abas está
+   * sempre lá, e é o degrau de onde a lista recomeça.
+   */
+  const tabsRef = useRef<HTMLDivElement>(null);
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
   const [discards, setDiscards] = useState<Title[]>([]);
   const [stats, setStats] = useState<ProfileStats | null>(null);
@@ -294,8 +308,15 @@ export function Library() {
       // Sem mutação otimista: aqui não há gesto esperando a tela, e o item
       // muda de aba — recarregar é mais barato que reconciliar duas listas.
       await load();
+
+      // Mudou de status é mudou de aba: o item sai desta lista. Só aí há o que
+      // anunciar, e só aí o foco precisa de um lugar para onde ir.
+      if (status !== tab) {
+        setMovido(status === "watched" ? t.movedToWatched : t.movedToInterested);
+        tabsRef.current?.focus();
+      }
     },
-    [load],
+    [load, tab],
   );
 
   const count = tab === "discarded" ? discards.length : entries.length;
@@ -310,15 +331,20 @@ export function Library() {
     <div className="lib">
       <style>{CSS}</style>
 
-      <div className="lib-tabs" role="tablist">
+      {/* Grupo de botões, e não `role="tablist"`. Com o papel de aba o leitor de
+          tela promete seta para andar entre elas e um painel do outro lado do
+          `aria-controls`; medido na auditoria, ArrowRight não fazia nada e cada
+          aba era uma parada de Tab. Botão de dois estados é o que esta tela faz
+          de verdade — e é assim que ela se anuncia agora. */}
+      <div className="lib-tabs" role="group" aria-label={t.libraryTabs} tabIndex={-1} ref={tabsRef}>
         {TABS.map((it) => (
           <button
             key={it.id}
             type="button"
-            role="tab"
-            aria-selected={tab === it.id}
+            aria-pressed={tab === it.id}
             onClick={() => {
               setReady(false);
+              setMovido("");
               setTab(it.id);
             }}
           >
@@ -327,15 +353,22 @@ export function Library() {
         ))}
       </div>
 
+      {/* Só para leitor de tela: o que aconteceu com o item que saiu da lista. */}
+      <p className="sr-only" role="status">
+        {movido}
+      </p>
+
       {stats && <Stats stats={stats} />}
 
       {error && (
-        <div className="notice error">
+        // Sem `foco`: aqui o painel se SOMA à tela, e quem estava numa nota ou
+        // num botão da lista continua onde estava.
+        <Alerta className="notice error">
           <p>{error}</p>
           <button type="button" className="link" onClick={() => void load()}>
             {t.retry}
           </button>
-        </div>
+        </Alerta>
       )}
       {!ready && <p className="notice">{t.loading}</p>}
 
