@@ -76,7 +76,8 @@ derruba no fim.
 |---|---|
 | `driver.mjs api` | Sobe o Fastify **em processo** e bate nas rotas com `app.inject()`. Sem porta, sem servidor. É o caminho para PR que mexe em `apps/api/src/`. |
 | `driver.mjs web` | Garante api:3000 + vite:5173 (subindo o que faltar), **planta uma sessão e cumpre o onboarding** de um usuário descartável, dirige o Chrome headless pelo deck, tira dois prints e confere os swipes no banco. Desfaz as duas coisas no fim. |
-| `driver.mjs all` | Os dois, nessa ordem. Padrão. |
+| `driver.mjs social` | **β6** — duas contas com sessões simultâneas, em contextos de navegação separados. Porta de idade, rotação de refresh, amizade, match, notificação e perfil público, tudo pela tela. Cria as duas contas e as apaga no fim. |
+| `driver.mjs all` | `api` e `web`, nessa ordem. Padrão. O `social` fica de fora: ele leva ~40s e sobe dois contextos. |
 
 Flags do `web`: `--url` (padrão `http://localhost:5173`), `--wait <seletor>`
 (padrão `.deck-card`), `--out <arquivo.png>`.
@@ -111,6 +112,30 @@ Prints → `/tmp/watchlytics-run/web.png` (deck inicial) e `web-depois.png`
 
 O último ✔ é o que fecha o circuito: clique no DOM → `POST /v1/swipes` →
 linha no Postgres. O driver apaga essas linhas no fim (veja Gotchas).
+
+### `social` — o loop entre duas contas (β6)
+
+```
+✔ β2 a porta de idade fecha as duas contas antes de qualquer tela — links de nav: 0 e 0
+✔ β2 as duas contas passam a porta pela tela, e só então o app monta — 2/2 com ano gravado
+✔ β6.2 cada sessão rotacionou o próprio refresh, sem tocar na outra (C3) — 3 e 3 hashes distintos
+✔ β6.2 nenhuma rotação foi lida como replay — as duas sessões seguem vivas — 2/2 sem revoked_at
+✔ β6.3 o pedido grava o par normalizado e quem pediu (E2) — pending, pedido por ana-…
+✔ β6.3 as três listas ficam certas dos DOIS lados
+✔ β6.4 o aceite cruza os catálogos e casa o título curtido antes (E4) — força 3
+✔ β6.4 uma notificação agregada por pessoa, não uma por título (E4)
+✔ β6.5 abaixo de 10 assistidos o agregado nem é calculado (D3)
+✔ β6.5 o décimo assistido, marcado na tela, abre o agregado do perfil
+```
+
+São 23 asserções, e nenhuma delas é um print: o que vale é o estado depois da
+ação — a linha no Postgres, ou a lista que a OUTRA conta passou a enxergar.
+
+As duas contas nascem sem `birth_year`, como o OAuth as deixaria, e respondem a
+porta de idade pela tela. O deck de cada uma nasce com o catálogo inteiro
+decidido menos UM título: sem isso não há como fazer as duas curtirem o mesmo
+card, porque a ordem do feed tem ruído por requisito (A4). O like vem ANTES do
+aceite de propósito — é o que dá ao E4 algo retroativo para cruzar.
 
 Quando falha, o driver despeja o log dos servidores que ele subiu. `✘ deck
 renderizou` junto de `✘ console sem erro — … 500 … /v1/feed` é banco fora do
@@ -205,6 +230,26 @@ sujar nada.
 - **`npm run dev:*` não repassa SIGTERM.** Matar o pid do npm deixa o node/vite
   vivo segurando a porta. O driver sobe com `detached: true` e mata o grupo
   (`process.kill(-pid)`); na mão, `fuser -k 3000/tcp 5173/tcp`.
+- **Na fixture, três asserções do `web` NÃO passam, e não é regressão.** Banco
+  recém-semeado tem os 94 títulos do `seed/titles.json`, e nenhum deles tem
+  `poster_url` nem `cast_names` — o elenco (I1.2) e as duas do pôster (B4) só
+  ficam verdes contra o catálogo ingerido do TMDB. Conferido no `driver.mjs` de
+  `origin/main` em 2026-09-12, num `wl_b6` criado do zero. A saída verde acima é
+  a do banco de desenvolvimento. Pela mesma razão, "feed puxa do topo do
+  catálogo" pisca com 94 títulos: a mediana fica perto demais do topo.
+- **Outra sessão na mesma porta é o erro mais caro daqui.** Há vários worktrees
+  nesta máquina, cada um com o seu banco. Se a api de outro já estiver em :3000,
+  o driver reusa — e a sessão que ele plantou não existe para quem responde.
+  Duas conferências cobrem isso: `mesmoBanco` bate em `/v1/auth/me` com um
+  access assinado (nunca com o refresh, que rotacionaria o cookie do navegador),
+  e o `garantirServidores` confere que quem atende a `--url` serve o `id="root"`
+  deste app. **Não dá para subir o vite noutra porta pelo `spawn`**: o npm come o
+  `--port` e passa `5174` como RAIZ do servidor, que responde 404 em tudo. Suba
+  na mão (`npx vite --port 5174 --strictPort` em `apps/web`) e passe `--url`.
+- **`innerText` vem com o `text-transform` aplicado.** `.lib h2` é uppercase no
+  `screenCss.ts`, então o "Results" do `strings.ts` chega como "RESULTS". Casar
+  texto de tela sem normalizar a caixa dá seletor que não acha nada e uma espera
+  de 10s culpando a requisição, que tinha respondido.
 - **`chromium-cli` não existe nesta máquina.** O driver fala CDP direto no
   `google-chrome` pelo `WebSocket` global do Node — sem Playwright, sem `ws`, e
   `npm install` não muda por causa dele.
@@ -230,5 +275,10 @@ sujar nada.
 - **`nvm is not compatible with the npm config "prefix" option`**: acontece
   depois de rodar `npx` em alguns shells. Contorne sem nvm:
   `export PATH="$HOME/.nvm/versions/node/v25.4.0/bin:$PATH"`.
+- **`a api de http://localhost:3000 não enxerga o banco deste worktree`**: outra
+  sessão subiu a api na mesma porta, com outro `DATABASE_URL`. Espere ela
+  terminar ou derrube a dela (`fuser -k 3000/tcp`) — e confira antes de que tipo
+  de processo é: `readlink /proc/<pid>/cwd` diz de qual worktree ele saiu.
+- **`responde, mas não é o app deste worktree`**: o mesmo, do lado do vite.
 - **Tela com `error: feed respondeu 500`**: api de pé, Postgres não.
   `npm run db:up` e o `pg_isready`.

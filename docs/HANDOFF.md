@@ -24,7 +24,7 @@ HTML renderizado no servidor. Toda decisão de arquitetura protege esse caminho.
 O `git log` é documentação de verdade aqui: cada commit explica a decisão, não
 só a mudança. Vale ler antes de propor refazer algo.
 
-## Estado: 39 de 39 tarefas (+ trilhas de ingestão: 3 de 7)
+## Estado: 39 de 39 tarefas (+ trilhas de ingestão: 7 de 7)
 
 | Trilha | | |
 |---|---|---|
@@ -39,12 +39,14 @@ só a mudança. Vale ler antes de propor refazer algo.
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
 repetir; o LIKE vira coleção com abas e estatísticas.
 
-**135 testes** (108 API + 27 web), `npm run check` limpo nos três pacotes e as
-asserções do `driver.mjs` verdes (recontado em `main` em 2026-09-11).
-A trilha **I** (catálogo real, BACKLOG §5) tem a fase serial fechada: I0.1
-(régua) e I0.2 (migration 0003 + `castNames` no contrato). **`schema.ts` e
-`contract/index.ts` estão CONGELADOS** — I1 e I2 podem ser paralelizadas, e
-quem precisar de coluna nova fala antes em vez de editar.
+**160 testes** (133 API + 27 web), `npm run check` limpo nos três pacotes e as
+asserções do `driver.mjs` verdes, `api` e `social` (recontado em `main` em
+2026-09-12, na integração das quatro branches).
+A trilha **I** (catálogo real, BACKLOG §5) fechou inteira: I0.1 (régua), I0.2
+(migration 0003 + `castNames` no contrato), I1 (elenco) e I2 (catálogo vivo).
+**`schema.ts` e `contract/index.ts` continuam CONGELADOS** — quem precisar de
+coluna nova fala antes em vez de editar. Só a I3 (AniList) segue aberta, e de
+propósito: nenhum dos campos dela tem tela que mostre.
 
 ## Ambiente — o que custa caro redescobrir
 
@@ -109,9 +111,16 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 1. **Veredito do gesto no celular.** Uma pergunta em aberto que reverte
    decisão: o gesto tem peso? (senão, `framer-motion` se justifica). A outra —
    "o card convence sem pôster?" — perdeu o objeto: agora há pôster.
-2. **Uma segunda pessoa no app** (β6). O loop social nunca rodou entre duas
-   contas distintas de gente diferente, e não há como provar isso sozinho: a
-   suíte cobre três identidades, mas identidade de teste não aceita convite.
+2. **Uma segunda conta Google** (β6.1, e só ela). Não precisa de outra pessoa —
+   precisa de um segundo `sub` do Google, que é uma conta a mais no mesmo
+   navegador anônimo.
+
+   O resto da checklist saiu daqui em 2026-09-12: `driver.mjs social` dirige
+   β6.2 a β6.5 com duas contas em contextos de navegação separados, 23 asserções
+   verdes (reconferidas na integração, num banco criado do zero). Fica aberto só
+   o que o Google prova: handle derivado do local-part sem colidir, a linha em
+   `consents` com a `CONSENT_VERSION` corrente, e o primeiro cadastro real
+   batendo na porta de idade.
 
 **Saiu desta lista em 2026-09-09:** "conferir o login no Network do DevTools".
 Os quatro elos foram medidos de fora e o caminho está inteiro — ver o bloco
@@ -237,9 +246,10 @@ sem ida e volta.
    nomeados pelo aviso, e o shim não existe mais. O que falta é publicar a tela
    de consentimento do Google ou cadastrar os testadores no modo Testing (teto
    de 100, só e-mail listado).
-2. **β6 — o loop social entre duas contas reais** (§Bloqueado 2). Amizade,
-   match e notificação estão testados entre três identidades na suíte, mas
-   nunca rodaram entre duas PESSOAS. Precisa da segunda conta Google do item 1.
+2. **β6.1 — o primeiro cadastro por OAuth de verdade** (§Bloqueado 2). Amizade,
+   match, notificação e perfil público já rodaram PELA TELA entre duas contas
+   (`driver.mjs social`); o que falta é a entrada pelo Google, que é a segunda
+   conta do item 1 — não uma segunda pessoa.
 3. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
 
@@ -256,5 +266,18 @@ A trilha I saiu do caminho: a I1 fechou inteira em 2026-09-10, passada incluída
 Rodou pelo topo do score primeiro (é o índice parcial `titles_sem_elenco`
 funcionando), então o deck tinha elenco muito antes do fim. Os 61 sem elenco não
 são falha: antologia (`Black Mirror`) e animação sem diálogo (`Flow`), e nenhum
-404. A I2 continua aberta e **não** bloqueia o beta — em doze meses o catálogo
-não teria nenhum título do ano, e duas semanas de beta cabem folgadas nisso.
+404.
+
+A I2 fechou em 2026-09-12 e entrou junto das outras três na integração do mesmo
+dia. `npm run ingest:changes` atualiza só a interseção entre o que o TMDB marcou
+como alterado e o nosso catálogo — reproduzido numa cópia dos 9834 títulos de
+produção: 239s, 10067 ids listados, 1300 nossos atualizados, zero inserção, zero
+exclusão e **zero uuid trocado**. O elenco da I1 sobrevive à atualização: o
+`UPDATE` não lista `cast_names` nem `credits_synced_at`.
+
+O pull-through da I2.2 é FILA, não leitura que escreve — nada fora de
+`src/ingest/` importa o módulo e nenhuma rota mudou. Medido com os 9834 títulos
+marcados como frios: `/v1/feed` respondeu em 33ms e 26ms, sem uma chamada ao
+TMDB. O agendamento diário **não** foi feito: "diário" aqui é o comando ser
+barato o bastante para rodar todo dia, e pôr isso no `fly.toml` é operação contra
+produção.

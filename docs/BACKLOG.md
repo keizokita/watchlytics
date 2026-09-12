@@ -285,12 +285,77 @@ Sem isto o catálogo apodrece: em doze meses não tem nenhum título do ano.
 
 | id | Tarefa | Pronto quando |
 |---|---|---|
-| I2.1 | `/changes` diário: atualiza só o que o TMDB marcou como alterado | Roda em minutos, não horas |
-| I2.2 | Pull-through de `synced_at > 30d` | Título frio se atualiza sozinho ao ser lido |
-| I2.3 | Retomada da carga inicial | Morreu em 2003, recomeça em 2003 e não em 1970 |
+| I2.1 ✅ | `/changes` diário: atualiza só o que o TMDB marcou como alterado | Roda em minutos, não horas — 152s sobre 9830 títulos |
+| I2.2 ✅ | Pull-through de `synced_at > 30d` | Título frio volta para a fila ao ser lido; a fila é derivada de `swipes`, e a leitura não espera rede |
+| I2.3 ✅ | Retomada da carga inicial | Morreu em 2003, recomeça em 2003 e não em 1970 |
 
 **Possui:** `apps/api/src/ingest/changes.ts` + teste · `apps/api/src/ingest/state.ts`
 **Não toca:** `tmdb.ts` (parte pura, compartilhada), `Card.tsx`, rotas.
+
+> **I2 fechou em 2026-09-12.** Um comando novo (`npm run ingest:changes`), o
+> `state.ts` com as duas chaves de `ingest_state`, e o `upsert()` que era privado
+> do `run.ts` virando `ingest/upsert.ts` — pela mesma razão que o `get()` saiu
+> dele no I0.2: a I2.1 grava exatamente os mesmos campos pela exatamente mesma
+> porta, e a alternativa era uma segunda cópia da escrita para divergir no
+> primeiro campo novo.
+>
+> **I2.1, medido no banco `wl_i2` com os 9830 títulos de produção copiados:**
+> a janela de 2026-09-11 a 2026-09-12 levou **152s** — 6905 ids listados pelo
+> TMDB (5187 filmes, 1718 séries), dos quais **838 eram nossos** (647 + 191), e
+> os 838 foram atualizados. Zero inserção, zero exclusão, catálogo continua
+> 9830 e os uuids conferidos contra o banco de origem não mudaram. Rodar de novo
+> no mesmo dia custa 0 requisição: o cursor já está em hoje.
+>
+> O que faz caber em minutos é buscar o detalhe só da INTERSEÇÃO. Os ~12 mil ids
+> que o TMDB altera por dia, buscados um a um, seriam ~12 min só de rede por dia
+> e cresceriam com o acervo deles, não com o nosso.
+>
+> **Título NOVO não entra pelo `/changes`, de propósito.** Para saber se um id
+> desconhecido passa na régua seria preciso buscar o detalhe dele — os mesmos 12
+> mil por dia que o desenho existe para não buscar. Crescer é trabalho da carga
+> do `/discover`, que filtra por votos na própria consulta e agora é retomável.
+> Foi medido: revarrer 2023–2026 com a régua 800 levou 9s e trouxe **4 títulos
+> de 2026** que cruzaram os 800 votos desde a carga de 2026-09-08.
+>
+> **I2.2 é fila, não leitura que escreve.** O caminho óbvio — o feed vê
+> `synced_at` velho e busca no TMDB — transformaria um GET de 20 cards em até 20
+> chamadas a um terceiro dentro da requisição, e o feed passaria a ter a latência
+> e a disponibilidade do TMDB, mais contenção de lock em `titles` na hora do
+> pico. Então a leitura não busca: quem foi lido deixa rastro em `swipes`, e o
+> rastro É a fila — frio há mais de 30 dias ∩ swipado nos últimos 7, o mais
+> recém-visto primeiro, e o resto do frio por score quando sobra orçamento.
+> Nenhuma tabela nova. O preço é a demora: o título frio lido hoje fica fresco na
+> próxima passada, não neste swipe. Para pôster e sinopse, um dia não é nada.
+> Verificado com 30 títulos frios e `--frios 5`: degelaram os 3 de score 0 que
+> tinham swipe de 2h atrás e só depois os 2 de score mais alto.
+>
+> **I2.3 guarda o último ano CONCLUÍDO, não o ano em andamento** — ano
+> interrompido no meio tem que ser refeito inteiro, que é idempotente e custa
+> minutos; pular um ano meio carregado deixa um buraco que nada mais fecha.
+> Junto do ano vai a régua (`2000-2026/800/80/50`): sem isso, rodar
+> `--min-votes 300` depois de uma carga com 800 retomaria em 2003 como se os anos
+> anteriores já tivessem sido varridos com 300, e o catálogo teria duas metades
+> de critérios diferentes parecendo completo. Carga completa recomeça do início
+> em vez de virar comando que não faz nada — é assim que título novo entra.
+>
+> **Dois carimbos sem escrita, que é o que evita fila eterna:** título que saiu
+> do TMDB (404) e título que voltou sem pôster levam `synced_at = now()` sem
+> upsert. Sem o carimbo eles reentram na fila fria toda passada, gastando a mesma
+> requisição todo dia. É a lição do `credits_synced_at` na I1.1 — "buscado e
+> rejeitado" não é "nunca buscado". E nenhum dos dois apaga: as FKs são
+> `ON DELETE CASCADE` e um `DELETE` levaria swipe, biblioteca e match junto.
+>
+> **A régua de votos não é reaplicada na atualização** (`MIN_VOTES_REFRESCO = 0`).
+> Ela é portão de entrada, escolhido na I0.1 justamente porque o lado que se
+> corrige sem apagar dado de usuário é o apertado. Os outros portões do
+> `normalize` continuam valendo: sem pôster ou sem sinopse o card quebra.
+>
+> **O que NÃO foi feito:** o agendamento. "Diário" aqui é o comando ser barato o
+> bastante para rodar todo dia, não um cron — pôr o `/changes` no `fly.toml` é
+> operação contra produção e está fora de trilha de agente. Também não entrou
+> `runtime_minutes`, que o detalhe do TMDB traz de graça e o `/discover` não:
+> nenhuma tela mostra duração, e preencher só pela I2.1 deixaria a coluna cheia
+> para os títulos que mudaram e vazia para o resto.
 
 ### I3 — Enriquecimento de anime (AniList) · **opcional, e eu não faria agora**
 
@@ -385,10 +450,19 @@ Nada disso é opcional: sem os três, convidar alguém é irresponsável ou ileg
 > (GDPR art. 4(7), LGPD art. 5º VI). O encarregado da LGPD fica dispensado —
 > agente de tratamento de pequeno porte não precisa indicar um (Res. CD/ANPD nº
 > 2/2022), precisa manter canal com o titular, e o canal é o mesmo e-mail. O
-> representante na UE não é exigido porque o beta não é oferecido na UE, no EEE
-> nem no Reino Unido, e isso é verificável: no modo Testing cada testador entra
-> por e-mail digitado à mão numa lista de no máximo 100. Contagem de
+> representante na UE fica dispensado pelo art. 27(2)(a) — tratamento ocasional,
+> sem categoria especial em larga escala e improvável de gerar risco. Contagem de
 > `[PREENCHER]` nos dois documentos: **zero**.
+>
+> **β1.4 trocou o motivo dessa dispensa em 2026-09-12**, e a troca importa. O
+> texto dizia que o representante não era exigido porque o beta "não é oferecido
+> na UE, no EEE nem no Reino Unido" — e doze linhas abaixo a mesma política diz
+> cobrir o GDPR para quem está lá, cita art. 6(1) em toda finalidade e manda
+> reclamar na autoridade nacional do país da pessoa. As duas afirmações não valem
+> juntas: se o serviço não é oferecido na UE, o GDPR não alcança e a política
+> inteira promete uma lei que não se aplica. A dispensa continua existindo, pelo
+> motivo certo — e ela cai quando o beta crescer, o que a redação antiga não
+> deixava ver.
 >
 > **O que continua aberto:** publicar a tela de consentimento do Google, que é
 > do usuário. Para 10 a 30 pessoas a lista de test users resolve sem esse custo.
@@ -525,6 +599,31 @@ real de graça.
 | β6.3 | Amizade ponta a ponta pela tela | A busca B pelo handle e pede; B vê em "Friend requests" e aceita; as três listas ficam certas dos DOIS lados |
 | β6.4 | Match e notificação na tela | Os dois curtem o mesmo título e cada um vê o match. Dê um like ANTES do aceite para exercitar o cruzamento retroativo do E4 |
 | β6.5 | Perfil público do outro | `/u/<handle>` do outro, com o piso de 10 assistidos respeitado |
+
+> **β6.2 a β6.5 foram dirigidas localmente em 2026-09-12**, por
+> `driver.mjs social`: duas contas, duas sessões simultâneas em contextos de
+> navegação separados do mesmo Chrome, 23 asserções verdes num banco criado do
+> zero. Nada disso substitui a passada com Google real — o objetivo era o
+> contrário, chegar antes dela para que uma falha lá seja configuração do
+> Google e não defeito de código.
+>
+> O que ficou provado *pela tela*, e não só na suíte: a porta de idade cobrada
+> nas duas contas antes de qualquer outra coisa; as duas sessões rotacionando o
+> próprio refresh alternadamente, três vezes cada, sem que o C3 leia nenhuma
+> como replay (as duas seguem sem `revoked_at`); busca por handle, pedido,
+> aceite e as três listas certas dos dois lados; o like dado ANTES do aceite
+> virando match forte no cruzamento retroativo do E4, com uma notificação
+> agregada por pessoa; o badge aparecendo para quem não estava olhando e
+> zerando ao abrir a aba; e o `/u/<handle>` do outro passando de 404 (perfil
+> privado) para "9 titles watched · stats unlock at 10" e só então, com o
+> décimo assistido marcado na tela, para o agregado.
+>
+> **O que só o Google prova, e continua aberto: a β6.1 inteira.** O `sub` não se
+> falsifica daqui, então as contas do driver nascem no banco como o OAuth as
+> deixaria — sem `birth_year` — em vez de nascerem pelo OAuth. Ficam sem prova:
+> o handle derivado do local-part sem colidir, a linha em `consents` com a
+> `CONSENT_VERSION` corrente, e o primeiro cadastro real batendo na porta de
+> idade.
 
 **Atenção — o badge leva até 60s.** `NotificationsBadge` faz poll de
 `/v1/notifications` a cada 60 segundos (`Friends.tsx:435`), e só a aba de avisos
