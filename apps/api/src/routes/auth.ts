@@ -280,6 +280,7 @@ async function loadUser(userId: string): Promise<SessionUser> {
       avatarUrl: users.avatarUrl,
       isPublic: users.isPublic,
       birthYear: users.birthYear,
+      handleChosen: users.handleChosen,
     })
     .from(users)
     .where(eq(users.id, userId));
@@ -290,8 +291,14 @@ async function loadUser(userId: string): Promise<SessionUser> {
   //
   // Quem BLOQUEIA enquanto isto for true é o `requireUserId` (β2): esta rota e
   // a `/v1/auth/age` são as duas que respondem com a porta fechada.
-  const { birthYear, ...user } = row;
-  return { ...user, needsAgeGate: birthYear === null };
+  // β8: quem BLOQUEIA enquanto `needsHandle` for true é a trilha A. Aqui só
+  // reporta — conta existente continua usando o app até a porta entrar.
+  const { birthYear, handleChosen, ...user } = row;
+  return {
+    ...user,
+    needsAgeGate: birthYear === null,
+    needsHandle: !handleChosen,
+  };
 }
 
 // ─── sessão ─────────────────────────────────────────────────────────────────
