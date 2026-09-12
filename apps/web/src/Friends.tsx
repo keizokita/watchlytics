@@ -470,11 +470,33 @@ export function NotificationsBadge() {
     };
   }, []);
 
-  if (unread === 0) return null;
+  /**
+   * Uma frase faz os dois trabalhos. Ela entra no nome do link ("Friends, 2
+   * unread notifications"), que é quem diz o número para quem chega pelo
+   * teclado; e é região viva, que é quem avisa quando o número muda com a
+   * página aberta — antes disso o aviso chegava só como um badge que mudava de
+   * número no canto, e quem não vê a tela não tinha nenhum sinal.
+   *
+   * A região fica montada mesmo com zero: região viva que nasce junto com o
+   * texto não tem mudança para anunciar.
+   *
+   * E o `aria-label` do badge continua onde estava: medido, texto em
+   * `role="status"` NÃO entra no nome do link que o contém, então sem ele o
+   * link voltaria a se chamar só "Friends" e quem chega pelo teclado perderia
+   * o número. Um diz quantos são quando se passa por ali; o outro avisa quando
+   * o número muda.
+   */
   return (
-    <span className="nav-badge" aria-label={t.alertsBadge(unread)}>
-      {unread > 9 ? "9+" : unread}
-    </span>
+    <>
+      <span className="sr-only" role="status">
+        {unread > 0 ? t.alertsBadge(unread) : ""}
+      </span>
+      {unread > 0 && (
+        <span className="nav-badge" aria-label={t.alertsBadge(unread)}>
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+    </>
   );
 }
 
