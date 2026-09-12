@@ -658,3 +658,19 @@ contrato congelado, sem ida e volta. O P0 inteiro está em `main` e no ar.
 **Fora das trilhas, e são do usuário:** publicar a tela de consentimento do
 Google (ou cadastrar os testadores — o modo Testing tem teto de 100 e só admite
 e-mail listado), e convidar as pessoas.
+
+### Achados da verificação de produção (medidos em 2026-09-12)
+
+Medidos de fora, contra produção no ar, somente leitura e sem sessão. Os dois
+são da mesma página — o perfil público, que é o link que circula — e por isso
+tocam direto o β6.
+
+| issue | Achado | Medido |
+|---|---|---|
+| [#37](https://github.com/keizokita/watchlytics/issues/37) | O perfil público não tem caminho de volta para o app | Caminhada de Tab com zero paradas; o HTML servido (1.086 bytes) não tem nenhuma tag `<a>`; "Watchlytics" no rodapé é `StaticText` |
+| [#38](https://github.com/keizokita/watchlytics/issues/38) | O perfil público não declara `og:image` | `grep -c 'og:image'` = 0 no HTML servido; `twitter:card=summary`, sem imagem no preview |
+
+Medido junto, e passou: nenhum estouro horizontal elemento a elemento nas duas
+telas públicas em 320, 360, 430 e 1280 de largura; console limpo nas duas; e o
+`index.html` servido em produção é idêntico ao de `main`, com a diferença das
+duas linhas que o Vite troca — ou seja, a auditoria de acessibilidade está no ar.
