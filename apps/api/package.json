@@ -11,7 +11,8 @@
     "dev": "node --env-file-if-exists=.env --watch src/server.ts",
     "test": "LOG_LEVEL=silent DATABASE_URL=\"${DATABASE_URL_TEST:-postgres://dev:dev@localhost:5433/watchlytics_test}\" node --env-file-if-exists=.env --test \"src/**/*.test.ts\"",
     "ingest": "node --env-file-if-exists=.env src/ingest/run.ts",
-    "ingest:credits": "node --env-file-if-exists=.env src/ingest/credits.ts"
+    "ingest:credits": "node --env-file-if-exists=.env src/ingest/credits.ts",
+    "ingest:changes": "node --env-file-if-exists=.env src/ingest/changes.ts"
   },
   "dependencies": {
     "@watchlytics/contract": "*",
