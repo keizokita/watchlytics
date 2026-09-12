@@ -35,7 +35,7 @@
         /* Altura que NÃO é do deck: padding do body, nav, filtros em duas
            linhas, a folga do deck-wrap e a fileira de botões. É o que impede
            o `overflow: clip` de cortar algo — veja `.deck`. */
-        --deck-reserve: 19.5rem;
+        --deck-reserve: 20.125rem;
         /* Largura do deck em um lugar só: o fantasma do estado "carregando"
            precisa da mesma medida, e duas fórmulas iguais divergem. */
         --deck-w: min(22rem, 88vw, max(11rem, calc((100dvh - var(--deck-reserve)) * 2 / 3)));
@@ -115,10 +115,11 @@
            página rola mesmo.
 
            A reserva é fixa porque CSS não mede quantas linhas os filtros
-           ocuparam; 19.5rem é o caso de duas linhas, que é o que acontece de
+           ocuparam; 20.125rem é o caso de duas linhas, que é o que acontece de
            360px de largura para cima. Subiu de 17rem quando filtros e botões
            passaram a respeitar o alvo de toque de 44px (--tap) e o aviso de
-           login ganhou linha própria na nav. */
+           login ganhou linha própria na nav, e de 19.5rem quando os links da
+           nav passaram a respeitar o mesmo alvo — 10px a mais de chrome. */
         width: var(--deck-w);
         aspect-ratio: 2 / 3;
       }

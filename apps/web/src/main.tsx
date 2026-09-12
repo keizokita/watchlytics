@@ -5,7 +5,7 @@ import {
   type FeedResponse,
   type Title,
 } from "@watchlytics/contract";
-import { AgeGate } from "./AgeGate.tsx";
+import { AgeGate, AgeGateRecusa, recusaDaPorta } from "./AgeGate.tsx";
 import { Alerta } from "./Alerta.tsx";
 import { Deck } from "./Deck.tsx";
 import { Filters, toParams, type FeedFilters } from "./Filters.tsx";
@@ -309,6 +309,12 @@ function Root() {
 
   const inLibrary = hash.startsWith("#/library");
   const inFriends = hash.startsWith("#/friends");
+  /**
+   * Recusado na porta de idade: a conta foi apagada e a sessão local, jogada
+   * fora. O shell é quem pinta o aviso, porque ele é a única parte que
+   * sobrevive a não haver mais usuário nenhum.
+   */
+  const recusa = recusaDaPorta();
 
   return (
     <div className="shell">
@@ -343,7 +349,15 @@ function Root() {
            que explica o app — senão a pessoa lê o call-to-action antes de
            saber para o que está entrando. */
         .shell nav.below { order: 2; }
+        /* --tap, e não a altura que o padding der: os links da nav eram os
+           únicos alvos interativos do app abaixo do piso de 44px que o resto
+           respeita (medidos em 34px de altura na auditoria). Passam o mínimo
+           AA de 24x24 da WCAG 2.5.8, mas são o controle mais usado da tela, e
+           a régua aqui é a do app. Os 10px que isto acrescenta entram na
+           --deck-reserve. */
         .shell nav a {
+          display: inline-flex; align-items: center;
+          min-height: var(--tap);
           padding: 0.4rem 0.9rem; border-radius: var(--r-pill); text-decoration: none;
           color: var(--muted); font-size: 0.9rem; font-weight: 600;
         }
@@ -369,28 +383,33 @@ function Root() {
           outline: 2px solid var(--fg); outline-offset: 3px; border-radius: 4px;
         }
       `}</style>
-      <nav className={user ? undefined : "below"}>
-        {/* Sem sessão as três telas são 401: link que não leva a lugar nenhum
-            é pior que link ausente.
+      {/* Recusado, a nav some inteira — inclusive o botão de entrar. Oferecer
+          "Sign in" a quem acabou de ser recusado seria oferecer a volta pela
+          porta que acabou de fechar. */}
+      {recusa === null && (
+        <nav className={user ? undefined : "below"}>
+          {/* Sem sessão as três telas são 401: link que não leva a lugar nenhum
+              é pior que link ausente.
 
-            β2 — e com a porta de idade aberta a nav também sai: "não passa da
-            tela" inclui não contornar por um link. */}
-        {user && !user.needsAgeGate ? (
-          <>
-            <a href="#/" aria-current={inLibrary || inFriends ? undefined : "page"}>
-              {t.navDeck}
-            </a>
-            <a href="#/library" aria-current={inLibrary ? "page" : undefined}>
-              {t.navLibrary}
-            </a>
-            <a href="#/friends" aria-current={inFriends ? "page" : undefined}>
-              {t.navFriends}
-              <NotificationsBadge />
-            </a>
-          </>
-        ) : null}
-        <Login />
-      </nav>
+              β2 — e com a porta de idade aberta a nav também sai: "não passa da
+              tela" inclui não contornar por um link. */}
+          {user && !user.needsAgeGate ? (
+            <>
+              <a href="#/" aria-current={inLibrary || inFriends ? undefined : "page"}>
+                {t.navDeck}
+              </a>
+              <a href="#/library" aria-current={inLibrary ? "page" : undefined}>
+                {t.navLibrary}
+              </a>
+              <a href="#/friends" aria-current={inFriends ? "page" : undefined}>
+                {t.navFriends}
+                <NotificationsBadge />
+              </a>
+            </>
+          ) : null}
+          <Login />
+        </nav>
+      )}
       {/* O <main> é o marco que faltava: a auditoria achou `navigation` e
           `contentinfo` na árvore de acessibilidade e nada em volta do conteúdo,
           então quem navega por marco não tinha como pular a chrome e cair na
@@ -399,7 +418,9 @@ function Root() {
           .shell, que é o que faz as margens `auto` dos filtros e do rodapé
           funcionarem. */}
       <main>
-        {user === undefined ? null : !user ? (
+        {recusa !== null ? (
+          <AgeGateRecusa minAge={recusa} />
+        ) : user === undefined ? null : !user ? (
           <SignedOut />
         ) : user.needsAgeGate ? (
           // β2 — antes de qualquer tela, e antes de qualquer requisição de

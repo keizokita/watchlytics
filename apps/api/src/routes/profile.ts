@@ -64,15 +64,18 @@ const escape = (s: string) =>
       ]!,
   );
 
-/** "142 titles watched · 9 days watched · Drama, Sci-Fi & Comedy" */
+/** "142 titles watched · 9 days of screen time · Drama, Sci-Fi & Comedy" */
 function summary(stats: ProfileStats): string {
-  const parts = [`${stats.watchedCount} titles watched`];
+  const plural = (n: number, palavra: string) => `${n} ${palavra}${n === 1 ? "" : "s"}`;
+  const parts = [plural(stats.watchedCount, "title") + " watched"];
   if (!stats.aggregates) {
     parts.push(`stats unlock at ${STATS_MIN_WATCHED}`);
     return parts.join(" · ");
   }
   const days = Math.round(stats.aggregates.estimatedMinutes / 60 / 24);
-  if (days > 0) parts.push(`${days} days of screen time`);
+  // Singular quando é um: este texto vai no preview que outra pessoa recebe no
+  // WhatsApp, e "1 days of screen time" é a primeira coisa que ela lê do app.
+  if (days > 0) parts.push(`${plural(days, "day")} of screen time`);
   const genres = stats.aggregates.topGenres
     .map((g) => GENRE_NAME_BY_ID.get(g.genreId))
     .filter((n): n is string => Boolean(n));
