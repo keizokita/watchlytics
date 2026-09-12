@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "handle_chosen" boolean DEFAULT false NOT NULL;

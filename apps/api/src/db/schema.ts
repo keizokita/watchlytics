@@ -47,6 +47,15 @@ export const users = pgTable(
    * que fazer com isso; o banco não presume idade de ninguém.
    */
   birthYear: smallint("birth_year"),
+  /**
+   * β8 — `false` enquanto o handle for o gerado automaticamente.
+   *
+   * Coluna separada em vez de `handle` nullable: o handle é NOT NULL porque
+   * toda rota que o usa (busca, perfil público, notificação) precisaria tratar
+   * o nulo. A conta sempre tem um handle; o que esta coluna diz é se a PESSOA
+   * escolheu, e é isso que a porta cobra.
+   */
+  handleChosen: boolean("handle_chosen").notNull().default(false),
   preferredGenres: smallint("preferred_genres").array(),
     tasteVector: vector("taste_vector", { dimensions: TASTE_VECTOR_DIM }),
     createdAt: createdAt(),

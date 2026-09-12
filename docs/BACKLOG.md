@@ -674,3 +674,43 @@ Medido junto, e passou: nenhum estouro horizontal elemento a elemento nas duas
 telas públicas em 320, 360, 430 e 1280 de largura; console limpo nas duas; e o
 `index.html` servido em produção é idêntico ao de `main`, com a diferença das
 duas linhas que o Vite troca — ou seja, a auditoria de acessibilidade está no ar.
+
+---
+
+## 7. β8 — o handle é escolhido, não derivado do e-mail
+
+**Classificação: defeito de privacidade, P0, bloqueia o convite.** Não é feature.
+
+`handleSeed` (routes/auth.ts) monta o handle a partir de `email.split("@")[0]`.
+`keizokita1@gmail.com` vira `@keizokita1`, e o perfil público publica isso em
+`/u/keizokita1`. Quem vê o handle deduz o e-mail — no caso comum, `@gmail.com`
+completa o resto. O PLAN §8 promete "busca só por handle, nunca por email"; o
+handle derivado do e-mail anula a promessa por outro caminho.
+
+**Por que antes do beta e não depois:** handle compartilhado vira imutável na
+prática. Trocar depois quebra link `/u/<handle>` já enviado e quebra notificação,
+que carrega o handle como texto pronto (ver comentário em `friends.ts:126`).
+Com um usuário real custa zero; com trinta, custa migração e link morto.
+
+### Decisões
+
+| | |
+|---|---|
+| **Quando escolher** | Logo após a porta de idade, antes de qualquer tela do app. Idade primeiro: não faz sentido escolher handle em conta que pode ser apagada em seguida |
+| **Fallback não pode vazar** | Quem abandonar o fluxo no meio não pode ficar com handle derivado de e-mail. A geração automática deixa de usar o e-mail — passa a ser neutra |
+| **Trocar depois** | **Não no v1.** Escolhe uma vez. Permitir troca quebra `/u/<handle>` compartilhado e deixa handle livre para alguém ocupar. Vira slice própria quando alguém pedir |
+| **Contas existentes** | `handle_chosen = false` para todas. Na próxima entrada, escolhem |
+
+### Regras do handle
+
+3 a 20 caracteres, `[a-z0-9_]`, começa com letra. Unicidade sem diferenciar
+maiúscula. Lista de reservados bloqueada — `u`, `me`, `api`, `admin`, `support`
+e afins colidem com rota ou induzem a erro.
+
+### Trilhas
+
+| Trilha | Escopo | Possui | Não toca |
+|---|---|---|---|
+| **serial** | migration + contrato, congelados depois | `schema.ts`, `contract/index.ts` | — |
+| **A** | backend: escolher, checar disponibilidade, bloquear até escolher, parar de derivar do e-mail | `apps/api/src/auth.ts`, `apps/api/src/routes/auth.ts` | web, docs |
+| **B** | a tela da escolha no fluxo de entrada | `apps/web/src/**` | backend |

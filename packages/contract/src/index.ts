@@ -252,6 +252,13 @@ export const sessionUser = z.object({
    * atravessa a fronteira da API em nenhuma direção além da resposta do gate.
    */
   needsAgeGate: z.boolean(),
+  /**
+   * β8 — `true` enquanto o handle ainda for o gerado automaticamente.
+   *
+   * A ordem das portas é idade e depois handle: não faz sentido pedir handle a
+   * quem pode ser recusado pela idade no passo seguinte.
+   */
+  needsHandle: z.boolean(),
 });
 export type SessionUser = z.infer<typeof sessionUser>;
 
@@ -382,3 +389,48 @@ export const ageGateResponse = z.object({
   minAge: z.number().int(),
 });
 export type AgeGateResponse = z.infer<typeof ageGateResponse>;
+
+// ─── handle escolhido (β8) ──────────────────────────────────────────────────
+
+/**
+ * Regras do handle, e elas moram no contrato porque as DUAS pontas precisam da
+ * mesma: a tela valida enquanto se digita, a API valida de novo na borda.
+ * Divergir significa erro que só aparece depois de submeter.
+ *
+ * Começa com letra para o handle nunca parecer id numérico, e para `/u/123` não
+ * competir com rota futura.
+ */
+export const HANDLE_MIN = 3;
+export const HANDLE_MAX = 20;
+export const handleRegex = /^[a-z][a-z0-9_]{2,19}$/;
+
+/**
+ * Reservados. `u` e `me` colidem com caminho que já existe; o resto induz a
+ * erro sobre quem está falando.
+ */
+export const HANDLE_RESERVED = [
+  "u", "me", "api", "v1", "admin", "root", "support", "help", "watchlytics",
+  "about", "legal", "privacy", "terms", "login", "logout", "settings", "null",
+] as const;
+
+export const handleInput = z.object({
+  handle: z
+    .string()
+    .toLowerCase()
+    .regex(handleRegex, "3 a 20 caracteres, começa com letra, só a-z 0-9 _")
+    .refine((h) => !HANDLE_RESERVED.includes(h as (typeof HANDLE_RESERVED)[number]), {
+      message: "handle reservado",
+    }),
+});
+export type HandleInput = z.infer<typeof handleInput>;
+
+/**
+ * `available: false` cobre tomado E reservado de propósito: dizer qual dos dois
+ * não ajuda quem escolhe e transforma a rota em oráculo de enumeração melhor
+ * do que ela já é.
+ */
+export const handleAvailability = z.object({
+  handle: z.string(),
+  available: z.boolean(),
+});
+export type HandleAvailability = z.infer<typeof handleAvailability>;
