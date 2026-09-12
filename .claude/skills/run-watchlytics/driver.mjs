@@ -2,10 +2,13 @@
 /**
  * Driver do run-watchlytics: como um agente dirige este app sem uma janela.
  *
- * Duas camadas, porque é nelas que os PRs mexem:
- *   api  — sobe o Fastify em processo e bate nas rotas com app.inject(),
- *          sem porta e sem servidor de verdade. Segundos, não minutos.
- *   web  — sobe api + vite, dirige um Chrome headless por CDP e tira print.
+ * Três camadas, porque é nelas que os PRs mexem:
+ *   api    — sobe o Fastify em processo e bate nas rotas com app.inject(),
+ *            sem porta e sem servidor de verdade. Segundos, não minutos.
+ *   web    — sobe api + vite, dirige um Chrome headless por CDP e tira print.
+ *   social — duas contas ao mesmo tempo, em contextos de navegação separados:
+ *            é o β6, o único caminho para provar amizade, match e notificação,
+ *            que não existem com uma identidade só.
  *
  * Sem dependência nova: o WebSocket é o global do Node ≥22, o navegador é o
  * google-chrome do sistema. `npm install` não muda por causa deste arquivo.
@@ -158,7 +161,7 @@ async function cmdApi() {
  * porta e anunciar a URL no stderr — sem isso, duas execuções em paralelo
  * brigam pela 9222.
  */
-async function openChrome() {
+async function openBrowser() {
   const profile = mkdtempSync(join(tmpdir(), "watchlytics-chrome-"));
   const chrome = spawn("google-chrome", [
     "--headless=new",
@@ -192,17 +195,15 @@ async function openChrome() {
 
   let nextId = 0;
   const pending = new Map();
-  const errors = [];
   /**
-   * URLs pedidas, acumuladas pelo CDP.
+   * Um balde de erros e de requisições POR ABA, chaveado pelo sessionId.
    *
-   * Não dá para usar `performance.getEntriesByType("resource")`: aquela lista é
-   * do DOCUMENTO, e o vite força um page reload na primeira execução depois de
-   * um arquivo mudar — o que zerava a timeline no meio da medição e reprovava
-   * código bom, com um zero redondo. Aqui os eventos vão se somando e o reload
-   * não apaga nada. Exige `Network.enable` antes do navigate.
+   * Era um array só, e bastava enquanto o driver tinha uma aba. O `social`
+   * dirige duas ao mesmo tempo: com um array compartilhado, o console de uma
+   * conta cairia na asserção da outra. O modo flatten põe o `sessionId` em
+   * todo evento, que é a chave.
    */
-  const requests = [];
+  const abas = new Map();
 
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
@@ -212,11 +213,14 @@ async function openChrome() {
       msg.error ? p.reject(new Error(JSON.stringify(msg.error))) : p.resolve(msg.result);
       return;
     }
+    const aba = abas.get(msg.sessionId);
+    if (!aba) return;
+
     if (msg.method === "Network.requestWillBeSent") {
-      requests.push(msg.params.request.url);
+      aba.requests.push(msg.params.request.url);
     }
     if (msg.method === "Runtime.exceptionThrown") {
-      errors.push(msg.params.exceptionDetails.exception?.description ?? "exception");
+      aba.errors.push(msg.params.exceptionDetails.exception?.description ?? "exception");
     }
     // `warning` junto de `error`: a falha de flush da fila de swipes é um
     // console.warn (swipeQueue.ts:104), e só com `error` ela saía verde aqui
@@ -225,11 +229,11 @@ async function openChrome() {
       msg.method === "Runtime.consoleAPICalled" &&
       (msg.params.type === "error" || msg.params.type === "warning")
     ) {
-      errors.push(msg.params.args.map((a) => a.value ?? a.description).join(" "));
+      aba.errors.push(msg.params.args.map((a) => a.value ?? a.description).join(" "));
     }
     if (msg.method === "Log.entryAdded" && msg.params.entry.level === "error") {
       // A url vem fora do text; sem ela, "Failed to load resource" não diz o quê.
-      errors.push(`${msg.params.entry.text} ${msg.params.entry.url ?? ""}`.trim());
+      aba.errors.push(`${msg.params.entry.text} ${msg.params.entry.url ?? ""}`.trim());
     }
   };
 
@@ -240,40 +244,77 @@ async function openChrome() {
       ws.send(JSON.stringify({ id, method, params, sessionId }));
     });
 
-  const { targetId } = await send("Target.createTarget", { url: "about:blank" });
-  // flatten: as respostas da aba voltam pela MESMA conexão, com sessionId.
-  const { sessionId } = await send("Target.attachToTarget", { targetId, flatten: true });
-
-  const page = {
-    errors,
-    requests,
-    cmd: (method, params) => send(method, params, sessionId),
-    close: () => {
-      ws.close();
-      chrome.kill();
-    },
+  const fechar = () => {
+    ws.close();
+    chrome.kill();
   };
 
-  await page.cmd("Page.enable");
-  await page.cmd("Runtime.enable");
-  await page.cmd("Log.enable");
-  // Deck.tsx lê prefers-reduced-motion UMA vez, no mount: emular depois do
-  // navigate não adianta. Com reduce o FLY_MS de 260ms vira 0 e o card troca
-  // na hora — o driver não fica adivinhando quanto esperar pela animação.
-  await page.cmd("Emulation.setEmulatedMedia", {
-    features: [{ name: "prefers-reduced-motion", value: "reduce" }],
-  });
-  // Retrato por padrão: é um app de swipe, e o card é `aspect-ratio: 2/3`.
-  // `--viewport LxA` troca para conferir desktop, onde sobra altura e as
-  // decisões de alinhamento vertical aparecem.
-  const [w, h] = arg("--viewport", "430x932").split("x").map(Number);
-  await page.cmd("Emulation.setDeviceMetricsOverride", {
-    width: w,
-    height: h,
-    deviceScaleFactor: 2,
-    mobile: w < 700,
-  });
+  /**
+   * Uma aba, com `errors` e `requests` próprios.
+   *
+   * As URLs pedidas vêm do CDP e NÃO de `performance.getEntriesByType`: aquela
+   * lista é do DOCUMENTO, e o vite força um page reload na primeira execução
+   * depois de um arquivo mudar — a timeline zerava no meio da medição e
+   * reprovava código bom, com um zero redondo. Aqui os eventos vão se somando e
+   * o reload não apaga nada. Exige `Network.enable` antes do navigate.
+   *
+   * `isolada` abre um CONTEXTO de navegação próprio: cookie, localStorage e
+   * sessionStorage separados. É o que permite duas contas vivas no mesmo
+   * Chrome — duas abas comuns dividiriam o cookie de refresh, e a segunda
+   * sessão sobrescreveria a primeira.
+   */
+  async function novaAba({ isolada = false } = {}) {
+    const browserContextId = isolada
+      ? (await send("Target.createBrowserContext")).browserContextId
+      : undefined;
+    const { targetId } = await send("Target.createTarget", {
+      url: "about:blank",
+      browserContextId,
+    });
+    // flatten: as respostas da aba voltam pela MESMA conexão, com sessionId.
+    const { sessionId } = await send("Target.attachToTarget", { targetId, flatten: true });
 
+    const balde = { errors: [], requests: [] };
+    abas.set(sessionId, balde);
+
+    const page = {
+      errors: balde.errors,
+      requests: balde.requests,
+      cmd: (method, params) => send(method, params, sessionId),
+      close: () => send("Target.closeTarget", { targetId }),
+    };
+
+    await page.cmd("Page.enable");
+    await page.cmd("Runtime.enable");
+    await page.cmd("Log.enable");
+    // Deck.tsx lê prefers-reduced-motion UMA vez, no mount: emular depois do
+    // navigate não adianta. Com reduce o FLY_MS de 260ms vira 0 e o card troca
+    // na hora — o driver não fica adivinhando quanto esperar pela animação.
+    await page.cmd("Emulation.setEmulatedMedia", {
+      features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+    });
+    // Retrato por padrão: é um app de swipe, e o card é `aspect-ratio: 2/3`.
+    // `--viewport LxA` troca para conferir desktop, onde sobra altura e as
+    // decisões de alinhamento vertical aparecem.
+    const [w, h] = arg("--viewport", "430x932").split("x").map(Number);
+    await page.cmd("Emulation.setDeviceMetricsOverride", {
+      width: w,
+      height: h,
+      deviceScaleFactor: 2,
+      mobile: w < 700,
+    });
+
+    return page;
+  }
+
+  return { novaAba, close: fechar };
+}
+
+/** Uma aba só — o caso de `api`, `web` e `shot`. Fechá-la fecha o navegador. */
+async function openChrome() {
+  const browser = await openBrowser();
+  const page = await browser.novaAba();
+  page.close = browser.close;
   return page;
 }
 
@@ -400,6 +441,51 @@ function spawnGroup(script, log) {
   return child;
 }
 
+/**
+ * Sobe o que ainda não estiver de pé, e só isso: rodar com a api já aberta num
+ * terminal é o caso normal de quem está mexendo no app. O que este comando
+ * subiu vai para `started`, que é quem o `finally` derruba.
+ */
+async function garantirServidores(url, started, log) {
+  const up = async (u) => {
+    try {
+      await fetch(u, { signal: AbortSignal.timeout(1500) });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (!(await up(`${API}/health`))) {
+    console.log("subindo a api…");
+    started.push(spawnGroup("dev:api", log));
+    await waitForHttp(`${API}/health`);
+  }
+  if (!(await up(url))) {
+    console.log("subindo o vite…");
+    started.push(spawnGroup("dev:web", log));
+    await waitForHttp(url);
+  }
+
+  // Quem atende pode não ser este app. O `up()` acima só prova que ALGUÉM
+  // respondeu, e nesta máquina há mais de um worktree: o vite de outra sessão
+  // na mesma porta faz o driver dirigir o app do vizinho, contra o banco dele,
+  // e reprovar com "o seletor não apareceu" — que é verdade e não ajuda.
+  //
+  // Sem `--port` no spawn de propósito: `npm run dev:web -- --port 5174` não
+  // chega no vite (o npm come a flag e passa "5174" como RAIZ do servidor, que
+  // responde 404 em tudo). Quem precisa de outra porta sobe o vite na mão e
+  // passa `--url` — este comando reusa o que já estiver de pé.
+  const html = await (await fetch(url)).text();
+  if (!html.includes('id="root"')) {
+    throw new Error(
+      `${url} responde, mas não é o app deste worktree. Outra sessão está na ` +
+        "porta: suba o vite noutra (`npx vite --port 5174` em apps/web) e rode " +
+        "com `--url http://localhost:5174`, ou espere ela terminar.",
+    );
+  }
+}
+
 async function cmdWeb() {
   const url = arg("--url", WEB);
   const selector = arg("--wait", ".deck-card");
@@ -411,26 +497,8 @@ async function cmdWeb() {
   /** Quantos swipes o onboarding custou — a linha de base da checagem final. */
   let base = 0;
 
-  const up = async (u) => {
-    try {
-      await fetch(u, { signal: AbortSignal.timeout(1500) });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
   try {
-    if (!(await up(`${API}/health`))) {
-      console.log("subindo a api…");
-      started.push(spawnGroup("dev:api", log));
-      await waitForHttp(`${API}/health`);
-    }
-    if (!(await up(url))) {
-      console.log("subindo o vite…");
-      started.push(spawnGroup("dev:web", log));
-      await waitForHttp(url);
-    }
+    await garantirServidores(url, started, log);
 
     const page = await openChrome();
     try {
@@ -581,7 +649,7 @@ async function cmdWeb() {
  * `delete from users` cascateia sessão e swipes.
  */
 async function abrirSessao(page) {
-  const { newRefreshToken, REFRESH_TTL_S } = await import(
+  const { newRefreshToken, REFRESH_TTL_S, signAccess } = await import(
     join(ROOT, "apps/api/src/auth.ts")
   );
   const userId = crypto.randomUUID();
@@ -601,6 +669,8 @@ async function abrirSessao(page) {
               ${new Date(Date.now() + REFRESH_TTL_S * 1000)}, 'driver.mjs')`;
   });
 
+  await mesmoBanco(userId, signAccess(userId));
+
   // Path=/v1/auth é o mesmo do routes/auth.ts: o cookie não vai em mais nada.
   await page.cmd("Network.setCookie", {
     name: "wl_refresh",
@@ -612,6 +682,33 @@ async function abrirSessao(page) {
   return userId;
 }
 
+
+/**
+ * A api que atende :3000 é a DESTE worktree?
+ *
+ * Custa uma requisição e evita a falha mais cara que este driver produz. O
+ * `garantirServidores` reusa o que já estiver de pé — o caso normal de quem
+ * está com a api aberta num terminal —, mas outro worktree na mesma máquina
+ * também atende :3000, com OUTRO banco. Aí a sessão que acabou de ser plantada
+ * não existe para quem responde, o `resume()` leva 401, e o sintoma é a tela de
+ * entrada com um `.deck-card` que nunca aparece: 30s de timeout dizendo "o
+ * seletor não apareceu", que é verdade e não ajuda em nada.
+ *
+ * O access token vai assinado em vez do refresh do cookie de propósito: usar o
+ * refresh aqui o ROTACIONARIA, e o navegador ficaria com um token velho —
+ * replay, na leitura correta do C3, e a sessão morreria por causa da sonda.
+ */
+async function mesmoBanco(userId, access) {
+  const res = await fetch(`${API}/v1/auth/me`, {
+    headers: { authorization: `Bearer ${access}` },
+  });
+  if (res.ok) return;
+  throw new Error(
+    `a api de ${API} não enxerga o banco deste worktree (${res.status} em /v1/auth/me ` +
+      `para o usuário ${userId}). Outra sessão subiu a api na mesma porta? ` +
+      "Derrube a dela (`fuser -k 3000/tcp`) ou espere ela terminar.",
+  );
+}
 
 /**
  * Passa o usuário do run pelo portão do onboarding (D4).
@@ -670,26 +767,8 @@ async function cmdShot() {
   const log = [];
   let usuario = null;
 
-  const up = async (u) => {
-    try {
-      await fetch(u, { signal: AbortSignal.timeout(1500) });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
   try {
-    if (!(await up(`${API}/health`))) {
-      console.log("subindo a api…");
-      started.push(spawnGroup("dev:api", log));
-      await waitForHttp(`${API}/health`);
-    }
-    if (!(await up(WEB))) {
-      console.log("subindo o vite…");
-      started.push(spawnGroup("dev:web", log));
-      await waitForHttp(WEB);
-    }
+    await garantirServidores(WEB, started, log);
 
     const page = await openChrome();
     try {
@@ -719,6 +798,568 @@ async function cmdShot() {
   }
 }
 
+// ─── social: duas contas, duas sessões, o loop do β6 pela tela ──────────────
+
+/**
+ * β6 — amizade, match e notificação entre DUAS contas, dirigidos pela tela.
+ *
+ * Por que um comando novo e não mais asserções no `web`: o `web` prova o deck
+ * de UMA conta, e nada do que é social existe com uma identidade só. Duas abas
+ * comuns não serviriam — elas dividem o cookie de refresh, e a segunda sessão
+ * sobrescreveria a primeira. Cada conta ganha um contexto de navegação próprio
+ * (`novaAba({ isolada: true })`), que é o mesmo que dois navegadores.
+ *
+ * O que este comando NÃO prova é o β6.1: o `sub` do Google não se falsifica
+ * daqui, então as contas nascem no banco como o OAuth as deixaria — sem
+ * `birth_year`, que é o que faz a porta de idade (β2) ser cobrada pela tela em
+ * vez de contornada por SQL.
+ *
+ * Print não vale como prova aqui. Toda asserção lê o ESTADO depois da ação: a
+ * linha no Postgres, ou a lista que a outra conta passou a enxergar.
+ */
+
+/** Ano que passa na porta: qualquer um com MIN_AGE ou mais serve. */
+const ANO_ADULTO = 1990;
+
+/** Quantas vezes cada sessão rotaciona o refresh na prova do β6.2. */
+const RECARGAS = 2;
+
+/** Rótulos da tela que as asserções procuram (apps/web/src/strings.ts). */
+const TELA = {
+  amigos: "Your friends",
+  pedidos: "Friend requests",
+  enviados: "Sent",
+  resultados: "Results",
+  aceitar: "Accept",
+  adicionar: "Add friend",
+  abaPessoas: "People",
+  abaComum: "In common",
+  abaAvisos: "Alerts",
+};
+
+/** `evaluate` que devolve null em vez de explodir: durante um reload o contexto morre. */
+const talvez = async (page, expr) => {
+  try {
+    return await evaluate(page, expr);
+  } catch {
+    return null;
+  }
+};
+
+const corpo = (page) => talvez(page, "document.body.innerText");
+
+/**
+ * Clica pelo TEXTO, nunca por posição — é a convenção do resto do driver.
+ *
+ * Sem caixa porque `innerText` devolve o texto RENDERIZADO: `.lib h2` tem
+ * `text-transform: uppercase` (screenCss.ts), então o "Results" do
+ * strings.ts chega aqui como "RESULTS". Comparar cru daria um seletor que não
+ * acha nada e uma espera de 10s dizendo que a busca não respondeu — quando ela
+ * tinha respondido, e estava na tela.
+ */
+async function clicar(page, seletor, texto) {
+  const achou = await evaluate(
+    page,
+    `(() => {
+       const alvo = ${JSON.stringify(texto)}.trim().toLowerCase();
+       const el = [...document.querySelectorAll(${JSON.stringify(seletor)})]
+         .find((e) => e.innerText.trim().toLowerCase() === alvo);
+       if (!el) return false;
+       el.click();
+       return true;
+     })()`,
+  );
+  if (!achou) throw new Error(`"${texto}" não está em ${seletor}`);
+}
+
+/**
+ * Escreve num campo controlado pelo React.
+ *
+ * `Input.insertText` e não `el.value = …`: a atribuição direta não dispara o
+ * `onChange`, então o estado do componente continua vazio e o botão de enviar
+ * segue desabilitado — a tela ficaria certa e o app não teria recebido nada.
+ */
+async function digitar(page, seletor, valor) {
+  await evaluate(page, `document.querySelector(${JSON.stringify(seletor)}).focus()`);
+  await page.cmd("Input.insertText", { text: String(valor) });
+}
+
+/**
+ * Recarrega e espera o documento NOVO.
+ *
+ * A marca existe porque `Page.reload` volta antes de a página trocar: o
+ * `waitFor` acharia o seletor no DOM velho e a asserção passaria sobre a tela
+ * anterior. A marca morre com o documento, então ela sumir é a prova de que o
+ * React montou de novo — e, de quebra, de que o `resume()` do Login.tsx rodou e
+ * rotacionou o refresh (C3).
+ */
+async function recarregar(page, seletor) {
+  await evaluate(page, "window.__b6 = 1");
+  await page.cmd("Page.reload");
+  await until(
+    () =>
+      talvez(
+        page,
+        `!window.__b6 && !!document.querySelector(${JSON.stringify(seletor)})`,
+      ),
+    (v) => v === true,
+    "o documento novo montar",
+    30_000,
+  );
+}
+
+/** O que a nav mostra: é ela que some com a porta de idade fechada. */
+const LINK_AMIGOS = '.shell nav a[href="#/friends"]';
+
+/** Handles de uma seção da tela de amigos, na ordem em que ela os mostra. */
+const handlesDaSecao = (page, titulo) =>
+  evaluate(
+    page,
+    `(() => {
+       const alvo = ${JSON.stringify(titulo)}.trim().toLowerCase();
+       const h = [...document.querySelectorAll('.lib h2')]
+         .find((e) => e.innerText.trim().toLowerCase() === alvo);
+       if (!h) return [];
+       return [...h.parentElement.querySelectorAll('.lib-list .lib-meta')]
+         .map((e) => e.innerText.trim());
+     })()`,
+  );
+
+/** As três listas do critério do β6.3, como a TELA as mostra. */
+async function tresListas(page) {
+  return {
+    amigos: await handlesDaSecao(page, TELA.amigos),
+    entrando: await handlesDaSecao(page, TELA.pedidos),
+    saindo: await handlesDaSecao(page, TELA.enviados),
+  };
+}
+
+const soAmigo = (l, handle) =>
+  l.amigos.join(",") === `@${handle}` && l.entrando.length === 0 && l.saindo.length === 0;
+
+/** Texto de cada linha de lista — serve para avisos e para títulos em comum. */
+const linhasDaLista = (page) =>
+  evaluate(
+    page,
+    `[...document.querySelectorAll('.lib-list li')].map((l) => l.innerText.replace(/\\s+/g, ' ').trim())`,
+  );
+
+const badge = (page) =>
+  talvez(page, `document.querySelector('.nav-badge')?.innerText ?? null`);
+
+/** Abre a tela de amigos na aba pedida, clicando — a aba vive no hash (E6). */
+async function abaDeAmigos(page, nome) {
+  await evaluate(page, `location.hash = "#/friends"`);
+  await waitFor(page, ".lib-tabs");
+  await clicar(page, ".lib-tabs button", nome);
+  await sleep(100);
+}
+
+/** Conta como o OAuth a deixaria: sem ano de nascimento, com sessão de verdade. */
+async function criarConta(sql, nome) {
+  const { newRefreshToken, REFRESH_TTL_S } = await import(
+    join(ROOT, "apps/api/src/auth.ts")
+  );
+  const userId = crypto.randomUUID();
+  const sessionId = crypto.randomUUID();
+  const handle = `${nome}-${userId.slice(0, 8)}`;
+  const { token, hash } = newRefreshToken(sessionId);
+
+  await sql`
+    insert into users (id, handle, display_name)
+    values (${userId}, ${handle}, ${nome})`;
+  await sql`
+    insert into sessions (id, user_id, refresh_token_hash, expires_at, user_agent)
+    values (${sessionId}, ${userId}, ${hash},
+            ${new Date(Date.now() + REFRESH_TTL_S * 1000)}, 'driver.mjs social')`;
+
+  return { userId, sessionId, handle, nome, token };
+}
+
+/**
+ * Deixa UM título no deck da conta, e o mesmo para as duas.
+ *
+ * O match precisa do MESMO título curtido pelos dois lados, e a ordem do feed
+ * tem ruído por requisito (A4) — não dá para saber qual card estará no topo.
+ * Em vez de swipar até achar, a conta nasce com o catálogo inteiro decidido
+ * menos um: o card do topo passa a ser o mesmo dos dois lados, e o Like que
+ * interessa é o único que sobra. De quebra isto cumpre o onboarding (D4), que
+ * conta swipes.
+ *
+ * LIKE e não descarte: o feed exclui o curtido para sempre, enquanto o
+ * descartado volta em 180 dias (A2). E como estes swipes NÃO passam pela rota,
+ * eles não viram entrada de catálogo — a biblioteca de cada conta continua
+ * sendo só o que a tela gravou, que é o que o match vai cruzar.
+ */
+const deckDeUmTitulo = (sql, userId, titleId) => sql`
+  insert into swipes (user_id, title_id, direction)
+  select ${userId}, t.id, 1 from titles t where t.id <> ${titleId}`;
+
+/** Assistidos de fixture, para o piso do β6.5 ficar a UM clique de distância. */
+const assistidosDeFixture = (sql, userId, exceto, quantos) => sql`
+  insert into library_entries (user_id, title_id, status, watched_at)
+  select ${userId}, t.id, 'watched', now() from titles t
+  where t.id <> ${exceto} order by t.score desc limit ${quantos}`;
+
+async function cmdSocial() {
+  const url = arg("--url", WEB);
+  const started = [];
+  const log = [];
+  const postgres = (await import("postgres")).default;
+  const { STATS_MIN_WATCHED } = await import("@watchlytics/contract");
+  // Conexão própria e uma só: db/client.ts é singleton e o `all` já pode ter
+  // chamado pg.end() nele.
+  const sql = postgres(process.env["DATABASE_URL"]);
+  let contas = [];
+  let browser = null;
+
+  try {
+    await garantirServidores(url, started, log);
+
+    // O título vem do banco, nunca escrito à mão: `titles.id` é defaultRandom e
+    // refazer o seed troca todos (SKILL.md).
+    const [alvo] = await sql`select id, title from titles order by score desc limit 1`;
+
+    const a = await criarConta(sql, "ana");
+    const b = await criarConta(sql, "bruno");
+    contas = [a.userId, b.userId];
+    const sessoes = [a.sessionId, b.sessionId];
+    const par = a.userId < b.userId ? [a.userId, b.userId] : [b.userId, a.userId];
+
+    for (const c of [a, b]) await deckDeUmTitulo(sql, c.userId, alvo.id);
+    await assistidosDeFixture(sql, a.userId, alvo.id, STATS_MIN_WATCHED - 1);
+
+    browser = await openBrowser();
+    const abrir = async (conta) => {
+      const page = await browser.novaAba({ isolada: true });
+      await page.cmd("Network.enable");
+      await page.cmd("Network.setCookie", {
+        name: "wl_refresh",
+        value: conta.token,
+        domain: "localhost",
+        path: "/v1/auth",
+        httpOnly: true,
+      });
+      return page;
+    };
+    const pa = await abrir(a);
+    const pb = await abrir(b);
+
+    // ── β2 · a porta de idade, nas duas contas ────────────────────────────
+    for (const p of [pa, pb]) {
+      await p.cmd("Page.navigate", { url });
+      await waitFor(p, ".age-gate");
+    }
+    const semNav = await Promise.all(
+      [pa, pb].map((p) => evaluate(p, "document.querySelectorAll('.shell nav a').length")),
+    );
+    ok(
+      "β2 a porta de idade fecha as duas contas antes de qualquer tela",
+      semNav.every((n) => n === 0),
+      `links de nav: ${semNav.join(" e ")}`,
+    );
+
+    for (const p of [pa, pb]) {
+      await digitar(p, ".age-gate input", ANO_ADULTO);
+      await clicar(p, ".age-gate button", "Continue");
+      await waitFor(p, LINK_AMIGOS);
+    }
+    const [{ comIdade }] = await sql`
+      select count(*)::int as "comIdade" from users
+      where id in ${sql(contas)} and birth_year is not null`;
+    ok(
+      "β2 as duas contas passam a porta pela tela, e só então o app monta",
+      comIdade === 2,
+      `${comIdade}/2 com ano gravado`,
+    );
+
+    // ── β6.2 · duas sessões vivas, cada uma rotacionando o próprio refresh ─
+    const hashes = new Map(sessoes.map((id) => [id, new Set()]));
+    const anotar = async () => {
+      for (const r of await sql`
+        select id, refresh_token_hash from sessions where id in ${sql(sessoes)}`) {
+        hashes.get(r.id).add(r.refresh_token_hash);
+      }
+    };
+    await anotar(); // a primeira carga já rotacionou uma vez de cada lado
+
+    // Alternado de propósito: é isto que põe a rotação de uma sessão ENTRE
+    // duas da outra, que é o padrão que um detector de replay ingênuo derruba.
+    for (let i = 0; i < RECARGAS; i++) {
+      for (const p of [pa, pb]) {
+        await recarregar(p, LINK_AMIGOS);
+        await anotar();
+      }
+    }
+
+    const giros = sessoes.map((id) => hashes.get(id).size);
+    ok(
+      "β6.2 cada sessão rotacionou o próprio refresh, sem tocar na outra (C3)",
+      giros.every((n) => n === RECARGAS + 1),
+      `${giros.join(" e ")} hashes distintos, esperado ${RECARGAS + 1} de cada`,
+    );
+
+    const vivas = await sql`
+      select id from sessions where id in ${sql(sessoes)} and revoked_at is null`;
+    ok(
+      "β6.2 nenhuma rotação foi lida como replay — as duas sessões seguem vivas",
+      vivas.length === 2,
+      `${vivas.length}/2 sem revoked_at`,
+    );
+
+    const shells = await Promise.all([corpo(pa), corpo(pb)]);
+    ok(
+      "β6.2 e as duas telas continuam autenticadas, cada uma na sua conta",
+      shells[0].includes(`@${a.handle}`) && shells[1].includes(`@${b.handle}`),
+      `@${a.handle} e @${b.handle}`,
+    );
+
+    // ── β6.4 (primeira metade) · o like vem ANTES do aceite ───────────────
+    // É o que o E4 tem para cruzar depois: sem like anterior, o aceite não
+    // teria nada retroativo a casar e a prova seria do E3, não do E4.
+    for (const p of [pa, pb]) {
+      await evaluate(p, `location.hash = ""`);
+      await waitFor(p, ".deck-card");
+      await clicar(p, ".actions button", "Like");
+    }
+
+    const curtiram = () => sql`
+      select user_id from library_entries
+      where title_id = ${alvo.id} and user_id in ${sql(contas)}`;
+    let entradas = [];
+    try {
+      entradas = await until(
+        curtiram,
+        (r) => r.length === 2,
+        "a fila dos dois navegadores dar flush do like",
+        20_000,
+      );
+    } catch {
+      entradas = await curtiram();
+    }
+    ok(
+      "as duas contas curtiram o MESMO título pelo deck",
+      entradas.length === 2,
+      `${alvo.title} — ${entradas.length}/2 entradas de catálogo`,
+    );
+
+    const cedo = await sql`
+      select 1 from matches where user_a = ${par[0]} and user_b = ${par[1]}`;
+    ok(
+      "sem amizade não há match, mesmo com o título curtido dos dois lados (E3)",
+      cedo.length === 0,
+      `${cedo.length} linhas em matches`,
+    );
+
+    // ── β6.3 · amizade ponta a ponta pela tela ────────────────────────────
+    await abaDeAmigos(pa, TELA.abaPessoas);
+    await digitar(pa, ".friend-search input", b.handle);
+    await clicar(pa, ".friend-search button", "Search");
+    const achados = await until(
+      () => handlesDaSecao(pa, TELA.resultados),
+      (r) => r.length > 0,
+      "a busca por handle responder",
+    );
+    ok(
+      "β6.3 a busca acha o outro pelo handle (E1)",
+      achados.includes(`@${b.handle}`),
+      achados.join(" ") || "nenhum resultado",
+    );
+
+    await clicar(pa, ".lib-list button", TELA.adicionar);
+    const pedido = await until(
+      () => sql`
+        select user_a, user_b, requested_by, status from friendships
+        where user_a = ${par[0]} and user_b = ${par[1]}`,
+      (r) => r.length === 1,
+      "o pedido de amizade chegar ao banco",
+    );
+    ok(
+      "β6.3 o pedido grava o par normalizado e quem pediu (E2)",
+      pedido[0].status === "pending" &&
+        pedido[0].requested_by === a.userId &&
+        pedido[0].user_a < pedido[0].user_b,
+      `${pedido[0].status}, pedido por ${a.handle}`,
+    );
+
+    const enviados = await until(
+      () => handlesDaSecao(pa, TELA.enviados),
+      (l) => l.length > 0,
+      "a lista de enviados do A recarregar",
+    );
+    await abaDeAmigos(pb, TELA.abaPessoas);
+    const recebidos = await handlesDaSecao(pb, TELA.pedidos);
+    ok(
+      "β6.3 um lado vê o pedido em Sent e o outro em Friend requests",
+      enviados.includes(`@${b.handle}`) && recebidos.includes(`@${a.handle}`),
+      `${enviados.join(" ")} · ${recebidos.join(" ")}`,
+    );
+
+    await clicar(pb, ".lib-list button", TELA.aceitar);
+    await until(
+      () => handlesDaSecao(pb, TELA.amigos),
+      (l) => l.includes(`@${a.handle}`),
+      "o aceite recarregar as listas do B",
+    );
+    // O A não estava olhando: a tela dele só sabe do aceite quando recarrega,
+    // que é exatamente o que a outra pessoa faz do outro lado do mundo.
+    await recarregar(pa, ".lib-tabs");
+
+    const listas = { a: await tresListas(pa), b: await tresListas(pb) };
+    ok(
+      "β6.3 as três listas ficam certas dos DOIS lados",
+      soAmigo(listas.a, b.handle) && soAmigo(listas.b, a.handle),
+      JSON.stringify(listas),
+    );
+
+    // ── β6.4 · match retroativo e notificação agregada ────────────────────
+    const [casado] = await sql`
+      select strength from matches
+      where user_a = ${par[0]} and user_b = ${par[1]} and title_id = ${alvo.id}`;
+    ok(
+      "β6.4 o aceite cruza os catálogos e casa o título curtido antes (E4)",
+      casado?.strength === 3,
+      casado ? `força ${casado.strength}` : "nenhum match",
+    );
+
+    const avisos = await sql`
+      select user_id, type, payload from notifications where user_id in ${sql(contas)}`;
+    ok(
+      "β6.4 uma notificação agregada por pessoa, não uma por título (E4)",
+      avisos.length === 2 &&
+        avisos.every((n) => n.type === "friend_matches" && n.payload.count === 1),
+      `${avisos.length} avisos: ${avisos.map((n) => `${n.type}/${n.payload.count}`).join(" ")}`,
+    );
+
+    ok(
+      "β6.4 o badge aparece para quem não estava olhando (E6)",
+      (await badge(pa)) === "1",
+      `badge do A: ${(await badge(pa)) ?? "ausente"}`,
+    );
+
+    await clicar(pa, ".lib-tabs button", TELA.abaAvisos);
+    const lidos = await until(
+      () => linhasDaLista(pa),
+      (l) => l.length > 0,
+      "a aba de avisos carregar",
+    );
+    ok(
+      "β6.4 o aviso chega escrito na tela, com handle e contagem",
+      lidos.some((l) => l.includes(`@${b.handle}`) && l.includes("1 title")),
+      lidos[0] ?? "lista vazia",
+    );
+    ok(
+      "β6.4 o badge zera ao abrir a aba (E6)",
+      (await until(() => badge(pa), (v) => v === null, "o badge cair")) === null,
+    );
+
+    for (const [p, eu, outro] of [
+      [pa, a, b],
+      [pb, b, a],
+    ]) {
+      await clicar(p, ".lib-tabs button", TELA.abaComum);
+      const comuns = await until(
+        () => linhasDaLista(p),
+        (l) => l.length > 0,
+        `a aba de títulos em comum do ${eu.nome} carregar`,
+      );
+      ok(
+        `β6.4 ${eu.nome} vê o título em comum com @${outro.handle} (E5)`,
+        comuns.some((l) => l.includes(alvo.title) && l.includes(`@${outro.handle}`)),
+        comuns[0] ?? "lista vazia",
+      );
+    }
+
+    // O console é conferido AQUI, e não no fim: o β6.5 sai do app de propósito
+    // para ler um perfil privado, e o 404 dele é a resposta certa — contá-lo
+    // como erro de console faria a asserção reprovar justamente o acerto.
+    for (const [p, c] of [
+      [pa, a],
+      [pb, b],
+    ]) {
+      const reais = p.errors.filter((e) => !/favicon/i.test(e));
+      ok(`console sem erro na sessão de ${c.nome}`, reais.length === 0, reais.join(" | "));
+    }
+
+    // ── β6.5 · perfil público do outro, com o piso de assistidos ──────────
+    const perfilDoA = async (marca) => {
+      // Query só para o navegador não reaproveitar o documento anterior.
+      await pb.cmd("Page.navigate", { url: `${url}/u/${a.handle}?v=${marca}` });
+      await waitFor(pb, "body");
+      return (await corpo(pb)) ?? "";
+    };
+
+    ok(
+      "β6.5 perfil privado não existe nem para o amigo (D5)",
+      (await perfilDoA(0)).includes("No public profile"),
+      "404 antes do clique em Public profile",
+    );
+
+    await evaluate(pa, `location.hash = "#/library"`);
+    await waitFor(pa, ".lib-public input");
+    await evaluate(pa, `document.querySelector('.lib-public input').click()`);
+    await until(
+      () => sql`select is_public from users where id = ${a.userId}`,
+      (r) => r[0]?.is_public === true,
+      "o perfil do A virar público",
+    );
+
+    const fechado = await perfilDoA(1);
+    ok(
+      `β6.5 abaixo de ${STATS_MIN_WATCHED} assistidos o agregado nem é calculado (D3)`,
+      fechado.includes(`${STATS_MIN_WATCHED - 1} titles watched`) &&
+        fechado.includes(`stats unlock at ${STATS_MIN_WATCHED}`),
+      fechado.split("\n").filter(Boolean).slice(-2).join(" · "),
+    );
+
+    // O décimo assistido é marcado na TELA — é ele que cruza o piso.
+    //
+    // Sem clicar em "Interested": é a aba inicial do Library.tsx, e clicar na
+    // aba JÁ selecionada deixa a tela em "Loading…" para sempre — o clique faz
+    // `setReady(false)` mas o `tab` não muda, então o efeito que recarrega não
+    // reentra. É defeito do app, não do driver, e está no relatório do β6.
+    await until(
+      () => talvez(pa, `document.querySelectorAll('.lib-list .lib-move').length`),
+      (n) => n > 0,
+      "o título curtido aparecer em Interested",
+    );
+    await evaluate(
+      pa,
+      `(() => {
+         const li = [...document.querySelectorAll('.lib-list li')]
+           .find((l) => l.querySelector('strong')?.innerText.trim() === ${JSON.stringify(alvo.title)});
+         li.querySelector('.lib-move').click();
+       })()`,
+    );
+    const assistidos = await until(
+      () => sql`
+        select count(*)::int as n from library_entries
+        where user_id = ${a.userId} and status = 'watched'`,
+      (r) => r[0].n >= STATS_MIN_WATCHED,
+      "o décimo assistido ser gravado",
+    );
+
+    const aberto = await perfilDoA(2);
+    ok(
+      "β6.5 o décimo assistido, marcado na tela, abre o agregado do perfil",
+      aberto.includes(`${STATS_MIN_WATCHED} titles watched`) &&
+        !aberto.includes("stats unlock"),
+      `${assistidos[0].n} assistidos · ${aberto.split("\n").filter(Boolean).at(-2) ?? ""}`,
+    );
+  } finally {
+    // A cascata leva sessão, swipes, catálogo, amizade, match e notificação.
+    if (contas.length) await sql`delete from users where id in ${sql(contas)}`;
+    await sql.end();
+    browser?.close();
+    for (const c of started) {
+      try {
+        process.kill(-c.pid, "SIGTERM");
+      } catch {}
+    }
+    if (process.exitCode) console.log(log.join(""));
+  }
+}
+
 // ─── entrada ────────────────────────────────────────────────────────────────
 
 const cmd = process.argv[2] ?? "all";
@@ -734,6 +1375,7 @@ try {
 if (cmd === "api") await cmdApi();
 else if (cmd === "web") await cmdWeb();
 else if (cmd === "shot") await cmdShot();
+else if (cmd === "social") await cmdSocial();
 else if (cmd === "all") {
   console.log("── api ──");
   await cmdApi();
@@ -741,7 +1383,7 @@ else if (cmd === "all") {
   await cmdWeb();
 } else {
   console.error(
-    "uso: driver.mjs [api|web|shot|all] [--url U] [--wait SEL] [--out P] [--sessao]",
+    "uso: driver.mjs [api|web|shot|social|all] [--url U] [--wait SEL] [--out P] [--sessao]",
   );
   process.exit(2);
 }
