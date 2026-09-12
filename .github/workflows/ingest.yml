@@ -42,7 +42,12 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
+          # `--vm-size` explícito: sem ele o `fly console` monta a máquina
+          # efêmera sem o tipo de CPU e morre com "invalid CPU kind ''" antes de
+          # rodar qualquer coisa. O `[[vm]]` do fly.toml diz `size =
+          # "shared-cpu-1x"`, mas o console não lê esse campo — quem deploya lê.
           flyctl console --app watchlytics-api \
+            --vm-size shared-cpu-1x \
             --command "node apps/api/src/ingest/changes.ts" | tee ingest.log
       # O comando imprime "fim em Ns | ..." só quando chega ao fim. O grep é a
       # rede contra um flyctl que devolva 0 sem ter rodado nada — mesmo truque
