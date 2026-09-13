@@ -1,4 +1,4 @@
-import { desc, eq, or } from "drizzle-orm";
+import { desc, eq, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { GENRE_IDS, genreId } from "@watchlytics/contract";
@@ -145,9 +145,12 @@ export function meRoutes(app: FastifyInstance): void {
 
   /**
    * Exclusão real, não `deleted_at`: PLAN §8.4 proíbe soft-delete de PII
-   * fingindo ser exclusão. Uma linha só porque as oito tabelas que apontam para
-   * `users` são todas `ON DELETE CASCADE` — o teste é quem prova isso, e é por
-   * isso que ele conta tabela por tabela em vez de confiar no schema.
+   * fingindo ser exclusão. As oito tabelas que apontam para `users` são todas
+   * `ON DELETE CASCADE`, então elas saem sozinhas — o teste é quem prova isso,
+   * e é por isso que ele conta tabela por tabela em vez de confiar no schema.
+   *
+   * A cascata não é o suficiente porque nem toda cópia dos meus dados mora numa
+   * linha minha: ver a varredura de `notifications` abaixo.
    *
    * O §8.4 também pede revogar o token do provedor. Não há o que revogar: o
    * OAuth troca o código por identidade e descarta os tokens do Google na hora
@@ -156,10 +159,26 @@ export function meRoutes(app: FastifyInstance): void {
   app.delete("/v1/me", async (req, reply) => {
     const userId = await requireUserId(req);
 
-    const gone = await db
-      .delete(users)
-      .where(eq(users.id, userId))
-      .returning({ id: users.id });
+    const gone = await db.transaction(async (tx) => {
+      const rows = await tx
+        .delete(users)
+        .where(eq(users.id, userId))
+        .returning({ id: users.id });
+      if (rows.length === 0) return rows;
+
+      // A cascata só alcança linha que é minha. O aviso de match do outro lado
+      // é dele, e guarda uma cópia do meu handle no payload (`friends.ts` grava
+      // assim de propósito, para a tela não fazer um fetch por linha). Sem esta
+      // varredura o handle de uma conta apagada continua aparecendo na lista de
+      // avisos de quem foi meu amigo — o §8.4 não admite essa sobra.
+      // ponytail: varredura sequencial, `payload->>'friendId'` não tem índice.
+      // Exclusão de conta é rara; se doer, índice de expressão nessa chave.
+      await tx
+        .delete(notifications)
+        .where(sql`${notifications.payload}->>'friendId' = ${userId}`);
+
+      return rows;
+    });
 
     if (gone.length === 0) {
       reply.code(404);
