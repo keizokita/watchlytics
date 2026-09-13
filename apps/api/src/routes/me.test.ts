@@ -21,7 +21,8 @@ import { buildServer } from "../server.ts";
 /**
  * O que este arquivo guarda (C6, PLAN §8.4 e §8.5):
  *   1. a exclusão é REAL e em cascata — nenhuma linha sobra em tabela nenhuma
- *   2. apagar a minha conta não apaga a conta de quem é meu amigo
+ *   2. apagar a minha conta não apaga a conta de quem é meu amigo — mas apaga a
+ *      cópia do meu handle que o aviso dele guarda no payload
  *   3. o export abre como JSON e traz catálogo, swipes, amigos e matches
  *   4. o export não vaza credencial (hash de refresh não é dado pessoal)
  *
@@ -121,6 +122,24 @@ async function seed() {
   await db
     .insert(notifications)
     .values({ userId: USER, type: "match", payload: { titleId: two } });
+
+  // O outro lado do mesmo match: a linha é do LEFT, mas o payload guarda uma
+  // cópia do handle do USER (é assim que `friends.ts` grava, para a tela não
+  // fazer um fetch por linha). Nenhuma FK aponta daqui para o USER, então a
+  // cascata passa longe — quem tem que varrer é a rota.
+  await db.insert(notifications).values({
+    userId: LEFT,
+    type: "match",
+    payload: { friendId: USER, friendHandle: "c6-alvo", titleId: two },
+  });
+}
+
+/** Avisos de OUTRAS pessoas que carregam uma cópia do handle de `id`. */
+async function avisosSobre(id: string): Promise<number> {
+  const rows = (await db.execute(
+    sql`select count(*) as n from notifications where payload->>'friendId' = ${id}`,
+  )) as unknown as Record<string, unknown>[];
+  return Number(rows[0]!["n"]);
 }
 
 /**
@@ -208,6 +227,10 @@ test("C6 — DELETE /v1/me apaga em cascata, sem sobrar linha em tabela nenhuma"
   for (const [tabela, n] of Object.entries(antes)) {
     assert.ok(n > 0, `o teste precisa de linha em ${tabela} para provar algo`);
   }
+  assert.ok(
+    (await avisosSobre(USER)) > 0,
+    "o teste precisa do aviso do amigo para provar que a varredura roda",
+  );
 
   const res = await inject({ method: "DELETE", url: "/v1/me" });
   assert.equal(res.statusCode, 204);
@@ -217,6 +240,15 @@ test("C6 — DELETE /v1/me apaga em cascata, sem sobrar linha em tabela nenhuma"
     depois,
     Object.fromEntries(Object.keys(antes).map((k) => [k, 0])),
     "exclusão real: PLAN §8.4 proíbe soft-delete de PII fingindo ser exclusão",
+  );
+
+  // `rowsFor` só conta linha ancorada no meu id, e é cego para a cópia que vive
+  // no payload de um aviso alheio. Sem esta asserção o handle de uma conta
+  // apagada continua na lista de avisos de quem foi amigo dela.
+  assert.equal(
+    await avisosSobre(USER),
+    0,
+    "exclusão alcança a cópia do handle no aviso do amigo, não só as linhas minhas",
   );
 
   // O cookie de refresh do navegador aponta para uma sessão que não existe mais.
