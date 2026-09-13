@@ -599,10 +599,10 @@ e o que continua valendo só pela suíte.
 | id | O que provar | Pronto quando |
 |---|---|---|
 | β6.1 | Conta nova entra por OAuth | ✅ 2026-09-13 — `@keizoteste` nasceu pelo Google em produção: aviso de consentimento visível no clique que cria, porta de idade cobrada e, logo atrás, a porta do handle (§7). A ordem das portas foi observada na tela, não inferida |
-| β6.2 | Duas sessões vivas ao mesmo tempo | Navegadores (ou dispositivos) diferentes, cada um rotacionando o próprio cookie de refresh sem derrubar o outro. O C3 trata reuso de refresh como replay e revoga a sessão inteira: duas sessões legítimas não podem disparar isso |
-| β6.3 | Amizade ponta a ponta pela tela | A busca B pelo handle e pede; B vê em "Friend requests" e aceita; as três listas ficam certas dos DOIS lados |
-| β6.4 | Match e notificação na tela | Os dois curtem o mesmo título e cada um vê o match. Dê um like ANTES do aceite para exercitar o cruzamento retroativo do E4 |
-| β6.5 | Perfil público do outro | `/u/<handle>` do outro, com o piso de 10 assistidos respeitado |
+| β6.2 ✅ local | Duas sessões vivas ao mesmo tempo | Navegadores (ou dispositivos) diferentes, cada um rotacionando o próprio cookie de refresh sem derrubar o outro. O C3 trata reuso de refresh como replay e revoga a sessão inteira: duas sessões legítimas não podem disparar isso |
+| β6.3 ✅ local | Amizade ponta a ponta pela tela | A busca B pelo handle e pede; B vê em "Friend requests" e aceita; as três listas ficam certas dos DOIS lados |
+| β6.4 ✅ local | Match e notificação na tela | Os dois curtem o mesmo título e cada um vê o match. Dê um like ANTES do aceite para exercitar o cruzamento retroativo do E4 |
+| β6.5 ✅ local | Perfil público do outro | `/u/<handle>` do outro, com o piso de 10 assistidos respeitado |
 
 > **β6.2 a β6.5 foram dirigidas localmente em 2026-09-12**, por
 > `driver.mjs social`: duas contas, duas sessões simultâneas em contextos de
@@ -809,3 +809,266 @@ conta, e `/u/keizokita1` — o handle que saía do e-mail — passou a 404. O cu
 declarado acima aconteceu de verdade, e foi o previsto: o link antigo morreu.
 Vale como prova parcial da β6.1 (§6), e não como prova inteira: a conta já
 existia, então `consents` e a porta de idade seguem sem passada real.
+
+---
+
+## 8. β9 — a varredura funcional, e o que falta para convidar
+
+> Medido em 2026-09-13. O `driver.mjs all` passou inteiro; além dele, dez fluxos
+> que ele não cobre foram dirigidos por CDP num Chrome headless: deslogado,
+> porta de idade (formulário, recusa de conta nova e recusa de conta com
+> histórico), onboarding, deck com undo e filtros, biblioteca com as três abas e
+> a seção de conta, amigos com busca e pedido, exclusão da conta pela tela, e as
+> três telas a 360px. Junto: 136 testes, `npm run check` e
+> `npm run build -w @watchlytics/web`, todos verdes.
+>
+> **A varredura rodou num worktree 60 commits atrás do `main`** — a branch
+> `beta/porta-de-idade-apaga-conta`, que já estava mesclada (`ccada75`). Cada
+> achado de tela foi reconferido contra o `main` antes de virar tarefa aqui, e
+> os quatro sobreviveram. O que ela **não** exercitou é a porta do handle (§7),
+> que não existia naquele worktree: é a β9.7.
+
+### Os achados
+
+| id | Achado | Onde | Bloqueia o convite? |
+|---|---|---|---|
+| β9.1 | A porta de idade nunca mostra o aviso que o app escreveu para ela | `apps/web/src/AgeGate.tsx:135` | **sim** |
+| β9.2 | A tela de recusa continua anunciando "Signed in as @handle" | `apps/web/src/main.tsx` | não |
+| β9.3 | O checkbox do perfil público sai azul do navegador | `apps/web/index.html` | não |
+| β9.4 | O link do perfil público sai na cor default do agente | `apps/web/src/screenCss.ts` | não |
+| β9.5 | Visita deslogada sempre registra um 401 no console | ferramenta | não |
+| β9.6 ✅ | Apagar a conta deixa o handle dela no aviso de quem foi amigo | `apps/api/src/routes/me.ts` | não, mas quebrava a promessa do §8.4 |
+| β9.7 | A porta do handle nunca foi varrida fora do `driver.mjs` | — | não |
+| β9.8 | `driver.mjs handle` termina vermelho por um fetch abortado pelo reload | `driver.mjs` | não |
+
+**β9.1 — o aviso do app é código morto.** O campo é
+`<input type="number" min={1900} max={ano}>`, e a validação nativa do navegador
+cancela o submit antes de o `onSubmit` rodar. Medido com `12` no campo:
+`checkValidity()` false, **zero** `POST /v1/auth/age`, nenhum `.notice.error` no
+DOM. O que a pessoa vê é a bolha do navegador, **no idioma dele** — aqui saiu
+`"O valor deve ser maior ou igual a 1900."` numa interface toda em inglês. O
+`t.ageGateInvalid` e o `role="alert"` que existem para leitor de tela nunca
+aparecem, e o ramo `{ kind: "invalid" }` do `ageGate.ts` é inalcançável pela
+tela: `min`/`max` do HTML espelham o intervalo do zod, então não sobra valor que
+passe num e reprove no outro. `ageGate.test.ts` cobre o ramo, então a suíte fica
+verde enquanto a tela não tem o comportamento.
+
+Bloqueia o convite porque esta é a porta legal do produto (β2, COPPA e GDPR): é
+a única tela em que o app fala sozinho com quem ele pode ter que recusar, e hoje
+quem fala é o navegador. **Pronto quando** digitar `12` e enviar mostrar
+`t.ageGateInvalid` na tela, com o `role="alert"`, em qualquer idioma de
+navegador. O caminho barato é tirar `min`/`max` do input — o zod continua
+guardando o intervalo, e é ele quem já decide — ou `noValidate` no `<form>`.
+
+**β9.2 — o cabeçalho contradiz a recusa.** Depois da recusa a conta foi apagada
+no servidor (β2.1) e o texto diz *"there is nothing here for you to come back
+to"*, mas o shell segue mostrando "Signed in as @handle" e o botão de sair. O
+botão em si não quebra: clicar não produz erro de console. **Pronto quando** a
+tela de recusa não anunciar sessão nenhuma.
+
+**β9.3 — `accent-color` medido: `auto`.** O `accent-color: var(--like)` existe
+só no `<progress>` do contador de onboarding (`index.html:523`). O checkbox
+"Public profile" fica com o azul do agente no meio do tema escuro. Uma linha em
+`.lib-public input`.
+
+**β9.4 — o link do perfil público mede `rgb(158, 158, 255)`**, que é o default
+do agente em tema escuro, contra `rgb(154, 160, 173)` da nav. `.shell nav a`,
+`.consent a` e `.age-gate a` têm cor; `.lib-account a` não tem.
+
+**β9.5 — o 401 do visitante não é regressão.** `POST /v1/auth/refresh` responde
+401 para quem não tem cookie, e o navegador registra
+`Failed to load resource … 401`. É o `resume()` do `Login.tsx` perguntando por
+uma sessão que pode não existir — o cookie é `httpOnly`, o cliente não tem como
+saber antes de perguntar. **O `driver.mjs` nunca viu isso porque planta sessão
+antes de navegar.** É o único erro de console em toda a navegação, e qualquer
+asserção de "console limpo" numa tela deslogada reprova por comportamento
+esperado. **Pronto quando** o filtro existir na ferramenta, ao lado do que já
+ignora o `favicon.ico`.
+
+**β9.6 — a cascata não alcança a cópia que mora no payload.** `friends.ts` grava
+`payload: { friendId, friendHandle, … }` nas duas notificações que existem —
+`match` (linhas 142 e 152) e `friend_matches` (391 e 396) —, de propósito, para
+a tela não fazer um fetch por linha. Mas **nenhuma FK aponta dessas linhas para
+a pessoa citada no payload**: a linha é de quem recebe o aviso, e o `ON DELETE
+CASCADE` só alcança linha ancorada no id de quem some. Conferido em
+`origin/main`: o `DELETE /v1/me` é um `delete(users)` e nada mais. Depois dele o
+handle da conta apagada continua na caixa de avisos de quem foi amigo dela.
+
+Não bloqueia o convite — depende de alguém apagar a conta **e** ter tido match
+—, mas é a promessa do PLAN §8.4 e da política de privacidade: exclusão real,
+não meia-exclusão. Entre os achados desta leva é o único que deixa PII de pé.
+
+**Fechou em 2026-09-13**, pelo [PR #59](https://github.com/keizokita/watchlytics/pull/59)
+(`eac518c`, mesclado em `28e5792`): o `DELETE` passa a rodar em transação e
+varre `notifications` por `payload->>'friendId'` — uma varredura só para os dois
+formatos de payload, que coincidem nessa chave. 145 testes da api verdes e
+`tsc --noEmit` limpo; a asserção nova falha quando o `me.ts` é removido, então
+ela morde. Conferido daqui em `origin/main`, não aceito de relato.
+
+Havia um patch órfão do mesmo conteúdo parado no working tree compartilhado
+(mtime de 11/set, sem commit em branch nenhuma). Ele agora é redundante e pode
+ser descartado. **Lição que ele deixou:** replantar diff de branch velha com
+`git diff origin/main -- <arquivo>` está errado — esse delta inclui *desfazer* o
+que `main` mudou no arquivo desde então, e no `me.test.ts` ele revertia o
+fixture do β8, deixando o arquivo inteiro em 403. O certo é o delta contra a
+base da branch (`git diff <base> -- <arquivo>`) aplicado com `git apply -3`.
+
+O critério era: apagar uma conta que teve match não deixar o handle dela em
+notificação nenhuma, provado por asserção que conta linhas em `notifications`.
+O teste de cascata antigo conta tabela por tabela e é cego para o payload, que é
+exatamente por isso que o defeito passou — cobertura que mede a forma errada
+aprova o defeito com a mesma confiança com que aprovaria o conserto.
+
+**Continua aberto** o outro lado da mesma regra: o `recusar()` do `auth.ts:383`
+apaga a conta sem a varredura. Hoje não produz sobra — só apaga quem tem zero
+swipes, e sem swipe não há como ser `friendId` de aviso nenhum —, mas as duas
+portas de exclusão têm que sair com a mesma regra.
+
+**β9.7 — a porta do handle não foi varrida.** O `driver.mjs handle` tem 31
+asserções (§7), e elas rodam. O que não aconteceu é a varredura exploratória
+fora do driver: recusa de handle ocupado vista pela tela, o que o cabeçalho
+mostra enquanto a porta está fechada, e a porta a 360px. **Pronto quando** a
+mesma varredura da β9 passar pela porta do handle.
+
+**β9.8 — o `all` termina vermelho, e não é o app.** A última asserção do
+`cmdHandle`, `console sem erro além do 409 da corrida`, reprova com
+`TypeError: Failed to fetch` em `Onboarding.tsx`. **Reproduz 2 em 2**, não é
+intermitente. A causa é ordem, não defeito de produto: o passo anterior recarrega
+a página para provar que a porta não reabre, e o `fetch` de
+`/v1/onboarding/deck` que o app acabou de disparar é abortado pela navegação —
+o aborto entra no balde de erros que a asserção seguinte lê. O mesmo padrão
+apareceu na varredura da β9 e foi resolvido lá navegando para `about:blank`
+antes de zerar o balde.
+
+**β9.5 e β9.8 são o mesmo defeito de fundo, e vale consertar de uma vez.** O
+balde de console acumula tudo que o navegador reporta, inclusive o que o próprio
+roteiro causou — o 401 do visitante deslogado e o aborto do reload. Allowlist por
+mensagem trata os dois como casos separados e cresce a cada achado novo; filtrar
+por **origem no tempo** (ignorar o que chegou entre uma navegação do driver e o
+primeiro paint seguinte) resolve a classe. Crédito da observação a outra sessão.
+
+**Pronto quando** o `driver.mjs all` terminar verde num banco de desenvolvimento
+com dado real, sem que a asserção tenha ficado cega: ela precisa continuar
+reprovando um erro que o app produza sozinho, e isso se prova plantando um.
+
+Duas coisas foram consertadas aqui em 2026-09-13, junto com a β9.0a, porque sem
+elas o `all` nem chegava nessa asserção:
+
+- **O `cmdHandle` plantava o handle literal `keizokita1`**, que existe de verdade
+  no banco de desenvolvimento — é a conta do dono, de quando o handle saía do
+  e-mail. O insert morria em `users_handle_unique` e o comando inteiro caía.
+  Passava só em banco de agente, que é onde a tarefa foi escrita: "database
+  próprio por agente" também esconde colisão com dado real. Agora o handle leva
+  sufixo por execução, e as duas asserções que citavam o literal saem da mesma
+  variável.
+- **O banco de desenvolvimento estava três migrations atrás** (`0003`, `0004` e
+  `0005`): `handle_chosen` não existia, e qualquer conta de fixture morria no
+  insert. `npm run migrate` resolveu — as três são aditivas.
+
+### Ainda abertas, medidas antes desta varredura
+
+Nenhuma foi refutada agora. Continuam valendo como estão escritas.
+
+| issue | O quê | Bloqueia o convite? |
+|---|---|---|
+| [#42](https://github.com/keizokita/watchlytics/issues/42) | Nem o Pages nem a API mandam CSP ou HSTS | **sim**, a parte que não quebra nada |
+| [#37](https://github.com/keizokita/watchlytics/issues/37) | O perfil público não tem caminho de volta para o app | não, mas é o link que circula |
+| [#38](https://github.com/keizokita/watchlytics/issues/38) | O perfil público não declara `og:image` | não, mesmo motivo |
+| [#40](https://github.com/keizokita/watchlytics/issues/40) | `driver.mjs social`: duas asserções de console reprovam com catálogo real | não |
+| [#41](https://github.com/keizokita/watchlytics/issues/41) | `driver.mjs api`: a asserção do topo do feed é intermitente na fixture de 94 | não |
+
+O #42 entra como bloqueio pela metade que ele mesmo propõe: `Strict-Transport-Security`
+e `X-Content-Type-Options` na API não têm como quebrar nada e a API serve HTML
+(`GET /u/:handle`). A CSP fica para depois do convite, com
+`Content-Security-Policy-Report-Only` primeiro — uma CSP errada quebra em
+produção de um jeito que o teste local não pega.
+
+### Fase serial — antes de spawnar
+
+Não há migration desta vez: **nenhuma tarefa da β9 pede coluna nova**, e
+`schema.ts` e `contract/index.ts` seguem congelados. O que é serial são dois
+itens de coordenação.
+
+| id | Tarefa | Por que é serial |
+|---|---|---|
+| β9.0a ✅ | `driver.mjs` lê `WL_API_PORT`/`WL_WEB_PORT`, como `tools/a11y` já lê os dele | Toda trilha vai querer rodar o driver, e duas sessões nas portas 3000/5173 medem a branch da outra. A sonda `mesmoBanco` avisa, mas só depois de falhar |
+| β9.0b · parcial | Limpar o working tree compartilhado: o diff órfão saiu; falta tirar a árvore de cima de uma branch mesclada | Enquanto a árvore principal estiver parada em `beta/porta-de-idade-apaga-conta` com diff sem dono, toda sessão que chegar vai gastar a mesma meia hora descobrindo de quem é. Perguntado às três sessões vivas em 2026-09-13: não era de nenhuma |
+
+> **A β9.0b é descarte, e descarte se faz reversível.** O diff parado no tree
+> compartilhado foi conferido contra `origin/main` em 2026-09-13 e é subconjunto
+> estrito do que entrou: a única diferença é que o `eac518c` ganhou um comentário
+> `ponytail:` nomeando o teto (varredura sequencial, `payload->>'friendId'` sem
+> índice). Nada se perdia ao descartá-lo — mas a árvore é compartilhada, então a
+> conferência tinha que ser na hora, e o descarte tinha que ser reversível.
+>
+> **Feito em 2026-09-13, com autorização do usuário:** o diff foi para
+> `git stash push -- <arquivos>` e **não** para um `git checkout --` (mtimes
+> conferidos antes: ninguém havia escrito por cima), a worktree `wl-me-sweep`
+> saiu, e a branch `fix/apagar-conta-varre-aviso-do-amigo` foi apagada local e
+> remota — `eac518c` segue alcançável por `origin/main`. Reverter o descarte é
+> `git stash pop`. Conferido daqui depois de feito.
+>
+> **Falta a outra metade:** a árvore principal continua em
+> `beta/porta-de-idade-apaga-conta`, em `dc7191a`, com `main` mais de sessenta
+> commits à frente. Trocar a branch de uma árvore compartilhada é do usuário —
+> outra sessão pode estar trabalhando nela agora.
+>
+> **β9.0a fechou em 2026-09-13**, junto com as duas correções descritas na β9.8.
+> Medido rodando `driver.mjs all` inteiro em `WL_API_PORT=3001 WL_WEB_PORT=5174`
+> contra o banco de desenvolvimento: `api` e `web` verdes, `handle` com as 31
+> asserções verdes e só a última reprovando (é a β9.8). O `vite` sobe direto do
+> `node_modules/.bin`, com `--strictPort` e `cwd` em `apps/web` — pelo `npm run`
+> a flag `--port` não chega no vite, e da raiz o vite serve o repositório em vez
+> do app.
+
+### Trilhas
+
+Disjuntas por arquivo, e **cada uma implanta sozinha** — nenhuma feature desta
+leva é metade de outra trilha. É a lição do β8 (§7) aplicada na hora de fatiar,
+e não na hora de mesclar.
+
+| Trilha | Escopo | Possui | Não toca |
+|---|---|---|---|
+| **P — porta de idade** | β9.1, β9.2 | `apps/web/src/AgeGate.tsx` (CSS incluso), `ageGate.ts` + teste, o ramo `needsAgeGate` de `main.tsx` | backend, CSS de outras telas |
+| **V — tema** | β9.3, β9.4 | o bloco de CSS de `apps/web/index.html`, `apps/web/src/screenCss.ts` | `.tsx` nenhum — o CSS da porta de idade mora dentro do `AgeGate.tsx` e é da P |
+| **X — exclusão** | β9.6 ✅ (`28e5792`); resta alinhar o `recusar()` | o `recusar()` de `auth.ts` + teste | web, outras rotas |
+| **U — perfil público** | #37, #38 | `apps/api/src/routes/profile.ts` + teste | `me.ts`, `auth.ts`, web |
+| **H — cabeçalhos** | #42 (a metade que não quebra) | `apps/api/src/server.ts`, `apps/web/public/_headers` (novo) | rotas |
+| **F — ferramenta** | β9.5, β9.7, β9.8, #40, #41 | `.claude/skills/run-watchlytics/driver.mjs` e o `SKILL.md`, `tools/a11y/*` | `apps/**` |
+
+X, U e H são todas de api e mesmo assim disjuntas: `me.ts`+`auth.ts`,
+`profile.ts` e `server.ts`. P e V são as duas de web, e a fronteira entre elas é
+que o CSS da porta de idade é inline no `.tsx`.
+
+A F só começa depois da β9.0a — as duas mexem no `driver.mjs`.
+
+### Ordem
+
+1. **Serial:** β9.0a (✅) e β9.0b. Duas tarefas pequenas, uma sessão só.
+2. **P e H em paralelo.** São as duas que bloqueiam o convite, e não se
+   encontram em arquivo nenhum — uma é de web, a outra de api.
+3. **U.** O perfil público é o link que circula; vale antes de convidar, não
+   depois.
+4. **V, X e F** em qualquer ordem, inclusive depois do convite. Nenhuma muda o
+   que quem usa o app vê: uma é cor, uma é a segunda porta de exclusão que hoje
+   não produz sobra, e a outra é ferramenta.
+
+> A X entrou primeiro e fechou no mesmo dia: a β9.6 era a única com PII de pé, e
+> o código já existia. O que sobrou dela — alinhar o `recusar()` — não tem
+> pressa pelo mesmo motivo que o defeito original tinha: conta sem swipe não
+> aparece em aviso nenhum.
+
+Três trilhas ao mesmo tempo é o teto útil aqui. Não é limite de máquina — é que
+`main` só recebe um merge por vez, e a lição do β8 é que a fila de integração é
+onde as trilhas se quebram, não o editor.
+
+### O que continua sendo do usuário
+
+Não são trilhas de agente, e nenhuma delas é código:
+
+- Publicar a tela de consentimento do Google, ou cadastrar os testadores no modo
+  Testing (teto de 100, só e-mail listado). É o que destrava o convite.
+- O filtro do Gmail para `+watchlytics`, que o β5 deixou combinado e ninguém
+  criou. Sem ele o sufixo não organiza nada.
+- O veredito do gesto no celular (HANDOFF, §Bloqueado 1).
+- `gh pr merge` e qualquer operação contra produção.
