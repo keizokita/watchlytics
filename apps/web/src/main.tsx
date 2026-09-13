@@ -10,6 +10,7 @@ import { Alerta } from "./Alerta.tsx";
 import { Deck } from "./Deck.tsx";
 import { Filters, toParams, type FeedFilters } from "./Filters.tsx";
 import { Friends, NotificationsBadge } from "./Friends.tsx";
+import { HandleGate } from "./HandleGate.tsx";
 import { Library } from "./Library.tsx";
 import { Login, useSession } from "./Login.tsx";
 import { authedFetch } from "./session.ts";
@@ -392,8 +393,12 @@ function Root() {
               é pior que link ausente.
 
               β2 — e com a porta de idade aberta a nav também sai: "não passa da
-              tela" inclui não contornar por um link. */}
-          {user && !user.needsAgeGate ? (
+              tela" inclui não contornar por um link.
+
+              β8 — o mesmo vale para a porta do handle: sem isto dava para cair
+              no deck por um link e ficar com o handle derivado do e-mail, que é
+              exatamente o que esta porta existe para impedir. */}
+          {user && !user.needsAgeGate && !user.needsHandle ? (
             <>
               <a href="#/" aria-current={inLibrary || inFriends ? undefined : "page"}>
                 {t.navDeck}
@@ -427,6 +432,12 @@ function Root() {
           // dado: a idade é condição para a conta existir, não uma etapa do
           // onboarding.
           <AgeGate user={user} />
+        ) : user.needsHandle ? (
+          // β8 — depois da idade e antes do onboarding. Nesta ordem porque não
+          // faz sentido escolher handle em conta que pode ser apagada na porta
+          // anterior, e porque o handle é publicado no perfil: escolher tem que
+          // vir antes de existir qualquer coisa publicada.
+          <HandleGate user={user} />
         ) : inLibrary ? (
           <Library />
         ) : inFriends ? (

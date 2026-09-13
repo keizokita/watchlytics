@@ -188,7 +188,9 @@ export function Login() {
       {error && <span className="error">{error} </span>}
       {user ? (
         <>
-          {t.signedInAs(user.handle)}{" "}
+          {/* β8 — antes de a pessoa escolher, o handle é o gerado: anunciá-lo
+              aqui contradiria a tela ao lado, que está pedindo para escolher um. */}
+          {user.needsHandle ? t.signedIn : t.signedInAs(user.handle)}{" "}
           <button type="button" className="link" onClick={() => void onSignOut()}>
             {t.signOut}
           </button>
