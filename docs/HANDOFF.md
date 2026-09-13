@@ -49,6 +49,12 @@ mediana fica perto demais do topo. O `social` (23 asserções) roda fora do `all
 **O β8 fechou em 2026-09-13** (BACKLOG §7): o handle deixou de sair do e-mail.
 Toda conta entra com `handle_chosen = false` e escolhe o handle numa porta nova,
 logo depois da porta de idade — inclusive as que já existem.
+
+**A fase beta fechou em 2026-09-13**, com o β6 — o último item — provado entre
+duas contas Google de verdade em produção. Não há tarefa de código aberta para o
+beta. O que falta para convidar gente é decisão e configuração: publicar a tela
+de consentimento do Google ou cadastrar os testadores (modo Testing, teto de
+100), e o veredito do gesto no celular.
 A trilha **I** (catálogo real, BACKLOG §5) fechou inteira: I0.1 (régua), I0.2
 (migration 0003 + `castNames` no contrato), I1 (elenco) e I2 (catálogo vivo).
 **`schema.ts` e `contract/index.ts` continuam CONGELADOS** — quem precisar de
@@ -118,20 +124,12 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 1. **Veredito do gesto no celular.** Uma pergunta em aberto que reverte
    decisão: o gesto tem peso? (senão, `framer-motion` se justifica). A outra —
    "o card convence sem pôster?" — perdeu o objeto: agora há pôster.
-2. **Uma segunda conta Google** (β6.1, e só ela). Não precisa de outra pessoa —
-   precisa de um segundo `sub` do Google, que é uma conta a mais no mesmo
-   navegador anônimo.
-
-   O resto da checklist saiu daqui em 2026-09-12: `driver.mjs social` dirige
-   β6.2 a β6.5 com duas contas em contextos de navegação separados, 23 asserções
-   verdes (reconferidas na integração, num banco criado do zero). Fica aberto só
-   o que o Google prova: a linha em `consents` com a `CONSENT_VERSION` corrente
-   e a porta de idade, num cadastro que nasce na hora.
-
-   A porta do handle (β8) saiu desta lista em 2026-09-13: o dono a atravessou em
-   produção, numa sessão real do Google, e escolheu `@keizo` — `/u/keizokita1`
-   virou 404 e `/u/keizo` virou 200. Foi numa conta que já existia, então prova
-   a tela e a rota, não o cadastro novo.
+**A segunda conta Google saiu desta lista em 2026-09-13**, e com ela o β6
+inteiro. `@keizoteste` nasceu pelo OAuth em produção — aviso de consentimento
+visível no clique que cria, porta de idade cobrada, porta do handle logo atrás —
+e o loop social rodou entre ela e `@keizo`: busca por handle, pedido, aceite, as
+listas certas dos dois lados e 20 matches com as forças 3 e 2. Detalhes no
+BACKLOG §6.
 
 **Saiu desta lista em 2026-09-09:** "conferir o login no Network do DevTools".
 Os quatro elos foram medidos de fora e o caminho está inteiro — ver o bloco
@@ -190,6 +188,20 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 
 ## Problemas conhecidos
 
+- **EM ABERTO, e não confirmado: swipe que some depois do onboarding.** Em
+  2026-09-13, com duas contas reais, os swipes de `@keizoteste` geraram match
+  normalmente **durante** o onboarding (20 linhas entre 04:17 e 04:23). Depois
+  dele, likes dados no deck com filtro de gênero não produziram match nenhum,
+  mesmo com 46 títulos do mesmo gênero curtidos do outro lado e a consulta sendo
+  simétrica. **Não há diagnóstico ainda:** falta olhar, na conta que swipou, se
+  os títulos estão em `Library → Interested` e se `localStorage.getItem('wl.swipes')`
+  tem fila presa. As três hipóteses são fila que não descarrega (B6), swipe que
+  não vira `library_entries`, e defeito no `matchOnLike` — e o conserto é
+  diferente em cada uma. O `driver.mjs web` cobre esse caminho inteiro e
+  **passa**, então o recorte não é "a fila está quebrada": é produção, ou janela
+  anônima, ou aquela sessão. Não é bloqueio do beta — o β6 fechou com os 20
+  matches que existem —, mas é swipe que a pessoa deu e o servidor talvez não
+  tenha visto, o que é sério se for real.
 - **Título buscado e sem elenco é normal, não falha.** Três casos no banco de
   dev: JUJUTSU KAISEN, Black Mirror e Love, Death & Robots. O `/credits` do TMDB
   não devolve elenco fixo para antologia nem para boa parte do anime. É por isso
