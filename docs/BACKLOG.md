@@ -714,3 +714,71 @@ e afins colidem com rota ou induzem a erro.
 | **serial** | migration + contrato, congelados depois | `schema.ts`, `contract/index.ts` | — |
 | **A** | backend: escolher, checar disponibilidade, bloquear até escolher, parar de derivar do e-mail | `apps/api/src/auth.ts`, `apps/api/src/routes/auth.ts` | web, docs |
 | **B** | a tela da escolha no fluxo de entrada | `apps/web/src/**` | backend |
+
+**As três fecharam em 2026-09-13** (PRs #46, #48, #49, #51 e #52). O β8 está em
+`main` e no ar: `POST /v1/auth/handle` e `GET /v1/auth/handle/available`
+respondem 401 em produção, onde antes eram 404.
+
+### O que funcionou
+
+O contrato congelado na fase serial pagou o que prometia. A trilha B construiu a
+tela inteira **sem as rotas existirem** — validação enquanto se digita,
+disponibilidade com debounce, a frase de indisponível — e as duas suposições que
+ela precisou fazer sobre a trilha A bateram: `409` para handle tomado, e o
+`sessionUser` como resposta do `POST`. Zero ida e volta de integração, como no
+encontro entre α e γ do P0.
+
+### O que não funcionou: a implantação se separou das trilhas
+
+**As trilhas eram disjuntas por arquivo, exatamente como desenhado, e mesmo
+assim quebraram uma na outra — no merge.**
+
+| | |
+|---|---|
+| 22:44:22 | #47 leva `beta/handle-escolhido` para `main`: migration + `needsHandle` no `loadUser` |
+| 22:44:59 | #46 leva a trilha A para `beta/handle-escolhido` — **37 segundos tarde demais** |
+| 01:59 | #50 leva a tela para `main`, direto, sem passar pela branch de integração |
+| 02:19 | #52 leva a trilha A para `main` |
+
+Entre 01:59 e 02:19 a produção ficou assim: toda conta com
+`handle_chosen = false`, logo `needsHandle: true`; o shell montando a porta do
+handle e escondendo a nav, por requisito; e `POST /v1/auth/handle` respondendo
+404. Quem entrasse digitava um handle, enviava, lia "Something went wrong." e
+não passava. **Não havia contorno — não ter contorno é o que a porta promete.**
+
+A tela foi feita para tolerar a rota ausente: o 404 vira erro genérico em vez de
+acusar o handle da pessoa, que seria pior, porque não há troca depois. Mas
+tolerar não é atravessar. Com porta obrigatória, o único conserto é o backend
+chegar.
+
+**A regra que saiu disso** está no [CLAUDE.md](../CLAUDE.md), seção "Mesclar
+também é coordenação": feature em duas trilhas é uma unidade de implantação,
+mesmo com PRs separadas; antes de mesclar em `main`, conferir o que ela já tem
+(`git log origin/<branch>..origin/main`), porque outra sessão anda por fora da
+sua pilha de PRs.
+
+### O segundo efeito da porta nova: o driver
+
+O `driver.mjs api` quebrou no #46 e ninguém viu. A porta do β8 fechou o
+`/v1/feed`, e o `cmdApi` cria o usuário descartável direto no banco — a asserção
+seguinte lia `.items` de um 403 e o comando morria com `TypeError`. O
+`npm run check` e o `npm test` ficaram verdes o tempo todo, porque **o CI não
+roda o driver**.
+
+Consertado no #51: o usuário do run passa a escolher o handle pela rota, e
+ganhou a asserção que faltava — com a idade respondida, o feed ainda é 403 sem
+handle. Toda porta nova invalida conta de fixture criada em SQL; valeu para
+`birth_year`, valeu para `handle_chosen`, vai valer para a próxima.
+
+### Cobertura
+
+`driver.mjs handle` (31 asserções) entrou no `all`: valida digitando, nove
+teclas em ~360ms viram uma consulta, a corrida do 409 acontece de verdade — a
+consulta responde "livre", o driver ocupa o handle, e só então a tela envia —, e
+o Postgres é quem confirma `handle_chosen` no fim. Foco, alvo de 44px e estouro
+de largura saem de `getBoundingClientRect` e `activeElement`, nunca de print.
+
+**E é do usuário:** toda conta existente escolhe o handle na próxima entrada. É
+a decisão da tabela acima, e é o que fecha o defeito — mas o handle atual delas
+já está em `/u/<handle>` e no texto pronto das notificações. Link já
+compartilhado morre quando a pessoa trocar.
