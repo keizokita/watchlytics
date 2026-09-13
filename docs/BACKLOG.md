@@ -574,7 +574,7 @@ em 2026-09-11** (PRs #20 e #23).
 
 | id | Tarefa | Por quê | |
 |---|---|---|---|
-| β6 | Loop social provado entre duas contas reais | Amizade, match e notificação nunca rodaram entre duas contas distintas *pela tela* | 🔑 precisa de um segundo `sub` do Google — não de uma segunda pessoa. Checklist abaixo |
+| β6 | Loop social provado entre duas contas reais | Amizade, match e notificação nunca rodaram entre duas contas distintas *pela tela* | ✅ 2026-09-13, `@keizo` e `@keizoteste`, duas contas Google de verdade: cadastro novo pelo OAuth, amizade ponta a ponta e **20 matches** com as forças 3 e 2 |
 | β7 | Onboarding conferido contra o catálogo real | O deck estratificado dos 20 swipes foi desenhado para 94 títulos, não para milhares com régua 800 | ✅ medido em 9830 títulos: 20/20 itens e 19/19 gêneros, ~100ms, duas vezes por conta |
 
 ### β6 — a checklist, e o que ela NÃO precisa provar
@@ -592,9 +592,13 @@ cobre. E para isso basta um segundo `sub` do Google: qualquer segunda conta que
 você já tenha serve para ensaiar, e o primeiro amigo que logar entrega a coisa
 real de graça.
 
+**Foi o que aconteceu em 2026-09-13**, com `@keizoteste` num segundo `sub`. A
+checklist abaixo está cumprida; o bloco depois dela diz o que cada linha provou
+e o que continua valendo só pela suíte.
+
 | id | O que provar | Pronto quando |
 |---|---|---|
-| β6.1 | Conta nova entra por OAuth | `consents` ganha a linha com a `CONSENT_VERSION` corrente, e o cadastro bate nas DUAS portas: a de idade e a do handle (§7). **Parcial** — a porta do handle já foi atravessada em produção por uma sessão real do Google (2026-09-13), mas numa conta que já existia. Falta numa conta que nasce agora |
+| β6.1 | Conta nova entra por OAuth | ✅ 2026-09-13 — `@keizoteste` nasceu pelo Google em produção: aviso de consentimento visível no clique que cria, porta de idade cobrada e, logo atrás, a porta do handle (§7). A ordem das portas foi observada na tela, não inferida |
 | β6.2 | Duas sessões vivas ao mesmo tempo | Navegadores (ou dispositivos) diferentes, cada um rotacionando o próprio cookie de refresh sem derrubar o outro. O C3 trata reuso de refresh como replay e revoga a sessão inteira: duas sessões legítimas não podem disparar isso |
 | β6.3 | Amizade ponta a ponta pela tela | A busca B pelo handle e pede; B vê em "Friend requests" e aceita; as três listas ficam certas dos DOIS lados |
 | β6.4 | Match e notificação na tela | Os dois curtem o mesmo título e cada um vê o match. Dê um like ANTES do aceite para exercitar o cruzamento retroativo do E4 |
@@ -618,17 +622,28 @@ real de graça.
 > privado) para "9 titles watched · stats unlock at 10" e só então, com o
 > décimo assistido marcado na tela, para o agregado.
 >
-> **O que só o Google prova, e continua aberto: a β6.1.** O `sub` não se
-> falsifica daqui, então as contas do driver nascem no banco como o OAuth as
-> deixaria — sem `birth_year` — em vez de nascerem pelo OAuth. Ficam sem prova:
-> a linha em `consents` com a `CONSENT_VERSION` corrente, e o primeiro cadastro
-> real batendo na porta de idade.
+> **A β6.1 fechou em 2026-09-13, e com ela o β6.** O `sub` não se falsifica
+> daqui, então o driver nunca alcançou esta parte: as contas dele nascem no
+> banco em vez de nascerem pelo OAuth. Provado com Google real, em produção:
 >
-> **Menos uma parte, desde 2026-09-13:** a porta do handle (§7) foi atravessada
-> em produção por uma sessão real do Google — o dono escolheu `@keizo`, e
-> `/u/keizokita1` passou a 404 enquanto `/u/keizo` passou a 200. Isso é a tela e
-> a rota do β8 num navegador de gente, fora do driver; o que continua faltando é
-> a mesma porta numa conta RECÉM-CRIADA pelo OAuth, que é o resto da β6.1.
+> - o dono atravessou a porta do handle (§7) e escolheu `@keizo` —
+>   `/u/keizokita1` passou a 404 e `/u/keizo` a 200;
+> - `@keizoteste` **nasceu pelo OAuth**, com o aviso de consentimento visível no
+>   clique que cria, a porta de idade cobrada e a do handle logo atrás. A ordem
+>   das duas foi vista na tela: o shell só monta a segunda com a primeira
+>   respondida;
+> - o handle gerado nunca foi publicado — a nav diz "Signed in" enquanto
+>   `needsHandle` for true, de propósito;
+> - amizade ponta a ponta entre as duas: busca por handle, pedido em **Sent**,
+>   aceite do outro lado, e o par migrando para **Your friends**;
+> - **20 matches** entre as duas contas, com força 3 ("You both want to watch
+>   it") e força 2 ("One of you has seen it"), criados na mesma transação do
+>   swipe enquanto a segunda conta fazia o onboarding.
+>
+> O que continua valendo só pela suíte é a β6.5 com contas reais: o perfil
+> público do outro exige o piso de 10 assistidos dos dois lados, e não valeu o
+> atrito de marcar vinte títulos à mão para reproduzir o que o `social` já
+> cobre.
 
 **Atenção — o badge leva até 60s.** `NotificationsBadge` faz poll de
 `/v1/notifications` a cada 60 segundos (`Friends.tsx:435`), e só a aba de avisos
