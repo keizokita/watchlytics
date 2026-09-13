@@ -33,6 +33,20 @@ function stub(reply: () => Response) {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status });
 
+/**
+ * A sessão como a rota a devolve: `POST /v1/auth/handle` responde o
+ * `sessionUser` inteiro, com a porta já fechada.
+ */
+const sessao = (handle: string) => ({
+  id: "00000000-0000-4000-8000-000000000001",
+  handle,
+  displayName: "Quem escolheu",
+  avatarUrl: null,
+  isPublic: false,
+  needsAgeGate: false,
+  needsHandle: false,
+});
+
 // ─── o que a tela julga a cada tecla ────────────────────────────────────────
 
 /**
@@ -100,11 +114,11 @@ test("a consulta manda o handle na query e lê o contrato", async () => {
 });
 
 /**
- * O 404 é a trilha A ainda não ter chegado, e ela corre em paralelo com esta.
- * Ler isso como "ocupado" mandaria a pessoa trocar de handle por causa de uma
- * rota que não existe — e ela não pode trocar depois.
+ * Um 404 é a rota não estar lá — web publicado à frente da api, proxy errado,
+ * caminho renomeado. Ler isso como "ocupado" mandaria a pessoa trocar de handle
+ * por causa de um problema de implantação, e ela não pode trocar depois.
  */
-test("a rota que ainda não existe não vira handle ocupado", async () => {
+test("rota ausente não vira handle ocupado", async () => {
   stub(() => json({ error: "not found" }, 404));
   assert.equal(await checarDisponibilidade("keizo"), "desconhecido");
 });
@@ -131,15 +145,37 @@ test("resposta fora do contrato cala, e não vira veredito", async () => {
 // ─── o envio, que é definitivo ──────────────────────────────────────────────
 
 test("o envio manda o handle normalizado, e só ele", async () => {
-  const chamadas = stub(() => json({ ok: true }));
+  const chamadas = stub(() => json(sessao("keizokita")));
 
   assert.deepEqual(await escolherHandle("  @KeizoKita "), {
     kind: "ok",
-    handle: "keizokita",
+    user: sessao("keizokita"),
   });
   assert.deepEqual(chamadas, [
     { url: "/v1/auth/handle", body: { handle: "keizokita" } },
   ]);
+});
+
+/**
+ * A sessão que volta para a tela é a do SERVIDOR, e não uma remontada aqui:
+ * quem sabe o que ficou gravado é quem gravou. Se a api normalizar diferente
+ * do cliente, é a dela que vale — e `needsHandle` fechado vem junto, que é o
+ * que tira a porta da tela.
+ */
+test("o envio devolve a sessão que a api mandou, não uma remontada", async () => {
+  stub(() => json({ ...sessao("outro_handle"), displayName: "Nome do servidor" }));
+
+  const r = await escolherHandle("keizokita");
+  assert.equal(r.kind, "ok");
+  assert.equal(r.kind === "ok" && r.user.handle, "outro_handle");
+  assert.equal(r.kind === "ok" && r.user.displayName, "Nome do servidor");
+  assert.equal(r.kind === "ok" && r.user.needsHandle, false);
+});
+
+/** Resposta fora do contrato lança: sessão pela metade é pior que erro. */
+test("resposta do envio fora do contrato lança", async () => {
+  stub(() => json({ ok: true }));
+  await assert.rejects(escolherHandle("keizokita"));
 });
 
 /** Duas pessoas escolhendo o mesmo handle no mesmo segundo: quem decide é o POST. */
@@ -149,11 +185,11 @@ test("409 é o handle tomado entre a consulta e o envio", async () => {
 });
 
 /**
- * O 404 LANÇA em vez de virar desfecho: a tela pinta erro genérico e mantém o
- * formulário. Vira "esse handle não serve" e a pessoa troca de handle por causa
- * de uma rota ausente — e não há troca depois.
+ * No envio o 404 LANÇA em vez de virar desfecho: a tela pinta erro genérico e
+ * mantém o formulário. Vira "esse handle não serve" e a pessoa troca de handle
+ * por causa de uma rota ausente — e não há troca depois.
  */
-test("a rota ausente lança, e não vira recusa do handle", async () => {
+test("no envio, a rota ausente lança e não vira recusa do handle", async () => {
   stub(() => json({ error: "not found" }, 404));
   await assert.rejects(escolherHandle("keizo"), /respondeu 404/);
 
@@ -162,7 +198,7 @@ test("a rota ausente lança, e não vira recusa do handle", async () => {
 });
 
 test("o que o contrato reprova não chega a sair do dispositivo", async () => {
-  const chamadas = stub(() => json({ ok: true }));
+  const chamadas = stub(() => json(sessao("keizokita")));
   assert.deepEqual(await escolherHandle("1keizo"), { kind: "invalid" });
   assert.deepEqual(await escolherHandle("admin"), { kind: "invalid" });
   assert.deepEqual(chamadas, []);

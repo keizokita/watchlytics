@@ -437,7 +437,7 @@ function Root() {
           // faz sentido escolher handle em conta que pode ser apagada na porta
           // anterior, e porque o handle é publicado no perfil: escolher tem que
           // vir antes de existir qualquer coisa publicada.
-          <HandleGate user={user} />
+          <HandleGate />
         ) : inLibrary ? (
           <Library />
         ) : inFriends ? (

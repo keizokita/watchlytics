@@ -77,7 +77,7 @@ derruba no fim.
 | `driver.mjs api` | Sobe o Fastify **em processo** e bate nas rotas com `app.inject()`. Sem porta, sem servidor. É o caminho para PR que mexe em `apps/api/src/`. |
 | `driver.mjs web` | Garante api:3000 + vite:5173 (subindo o que faltar), **planta uma sessão e cumpre o onboarding** de um usuário descartável, dirige o Chrome headless pelo deck, tira dois prints e confere os swipes no banco. Desfaz as duas coisas no fim. |
 | `driver.mjs social` | **β6** — duas contas com sessões simultâneas, em contextos de navegação separados. Porta de idade, rotação de refresh, amizade, match, notificação e perfil público, tudo pela tela. Cria as duas contas e as apaga no fim. |
-| `driver.mjs handle` | **β8** — a porta onde a pessoa escolhe o handle. Único comando que FINGE rotas (`Fetch.fulfillRequest`): as duas rotas do handle são da trilha A. Mede foco, alvo de toque e estouro de largura por `getBoundingClientRect`. ~20s. |
+| `driver.mjs handle` | **β8** — a porta onde a pessoa escolhe o handle: valida digitando, debounce da consulta, a corrida do 409 e a gravação. Mede foco, alvo de toque e estouro de largura por `getBoundingClientRect`. ~20s. |
 | `driver.mjs all` | `api`, `web` e `handle`, nessa ordem. Padrão. O `social` fica de fora: ele leva ~40s e sobe dois contextos. |
 
 Flags do `web`: `--url` (padrão `http://localhost:5173`), `--wait <seletor>`
@@ -114,7 +114,7 @@ Prints → `/tmp/watchlytics-run/web.png` (deck inicial) e `web-depois.png`
 O último ✔ é o que fecha o circuito: clique no DOM → `POST /v1/swipes` →
 linha no Postgres. O driver apaga essas linhas no fim (veja Gotchas).
 
-### `handle` — a porta do β8, contra o contrato congelado
+### `handle` — a porta do β8
 
 ```
 ── handle ──
@@ -125,25 +125,26 @@ linha no Postgres. O driver apaga essas linhas no fim (veja Gotchas).
 ✔ β8 nada estoura a janela de 430px — 0 elementos, mais largo 391.0
 ✔ β8 caractere inválido é acusado enquanto se digita
 ✔ β8 nove teclas em ~360ms viram UMA consulta, não nove — 1 requisições
-✔ β8 404 da consulta não vira handle ocupado, e não tranca o envio
-✔ β8 409 no envio vira indisponível, e não erro fatal
-✔ β8 o corpo leva o handle e só ele — {"handle":"keizo"}
+✔ β8 reservado dá a MESMA frase do tomado, sem gastar requisição
+✔ β8 perder a corrida vira indisponível, e não erro fatal
+✔ β8 o Postgres tem o handle escolhido, e a porta fechada — {"handle":"escolhido","handle_chosen":true}
+✔ β8 e recarregar não reabre a porta — escolhe uma vez
 ```
 
-São 33 asserções. Duas coisas só existem aqui:
+São 31 asserções, nenhuma contra rota fingida: "tomado" é outra conta ocupando
+a linha, e o 409 é a corrida acontecendo de verdade — a consulta responde
+"livre", o driver ocupa o handle, e só então a tela envia. É a janela que
+nenhuma consulta prévia fecha, e quem a resolve é o índice único.
 
-**Rotas fingidas.** `POST /v1/auth/handle` e `GET /v1/auth/handle/available`
-são da trilha A do β8. Enquanto ela não chegar, `page.stubbar(fn)` responde o
-`handleAvailability` do contrato congelado — `fn(request)` devolve
-`{ status, body }` para fingir, ou `null` para deixar passar. Um cenário tira a
-interceptação de propósito: o **404 de verdade** é um desfecho que a tela tem
-que tratar, não um contratempo do teste. Quando a trilha A publicar as rotas, os
-stubs de "livre" e "tomado" viram estado de banco e o cenário do 404 sai junto.
+O penúltimo ✔ fecha o circuito, como o swipe fecha no `web`: digitação no DOM →
+`POST /v1/auth/handle` → linha no Postgres.
 
 **Tecla por tecla.** `teclar()` manda um `keyDown`/`keyUp` por caractere porque
 o que se mede é o DEBOUNCE: o `digitar()` normal usa `Input.insertText`, que
 entrega tudo num evento só — um campo sem debounce nenhum também sairia com uma
-requisição, e a asserção passaria por cima do bug.
+requisição, e a asserção passaria por cima do bug. E o debounce não é enfeite:
+`/v1/auth/handle/available` tem o mesmo teto por IP das rotas que emitem token
+(20/min), então sem ele UM handle de nove letras gasta nove requisições.
 
 ### `social` — o loop entre duas contas (β6)
 
@@ -297,9 +298,6 @@ sujar nada.
   gravam `true`: sem isso o `cmdWeb` e o `social` parariam na tela do handle e o
   sintoma seria `.deck-card` nunca aparecendo. Quem quer a porta ABERTA pede
   `abrirSessao(page, { handleEscolhido: false })`.
-- **`Fetch.enable` é por aba e trava o que não for tratado.** `novaAba({
-  interceptar: [...] })` registra os padrões, e só as urls que casam esperam
-  resposta. Ligar sem tratar o `Fetch.requestPaused` pendura a página inteira.
 - **`chromium-cli` não existe nesta máquina.** O driver fala CDP direto no
   `google-chrome` pelo `WebSocket` global do Node — sem Playwright, sem `ws`, e
   `npm install` não muda por causa dele.
