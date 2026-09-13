@@ -29,6 +29,33 @@ commitado que está ali pode ser de outra sessão. Na dúvida, use
 Pergunte de quem é antes de mexer. Já aconteceu de duas sessões reivindicarem o
 mesmo diff.
 
+## Mesclar também é coordenação
+
+Combinar quem edita o quê não basta. Duas trilhas podem não colidir em arquivo
+nenhum e mesmo assim se quebrarem no merge.
+
+**Feature em duas trilhas é uma unidade de implantação**, mesmo com PRs
+separadas. Tela e backend entram juntos, pela branch de integração — nunca uma
+delas direto no `main`. A tela sozinha fecha uma porta sem ninguém do outro
+lado, e uma porta obrigatória não tem contorno por definição.
+
+**Antes de mesclar em `main`, veja o que ela já tem.**
+`git log --oneline origin/<sua-branch>..origin/main` diz se outra sessão andou
+por fora da sua pilha de PRs. A sua pilha não conta a história toda.
+
+**Depois de integrar trilhas paralelas, rode o driver na branch mesclada.**
+`node .claude/skills/run-watchlytics/driver.mjs all`. O `npm run check` e o
+`npm test` ficam verdes enquanto o driver quebra: o CI não roda o driver, e é
+ele que exercita o app de ponta a ponta. Porta nova invalida toda conta de
+fixture criada em SQL — vale para `birth_year`, valeu para `handle_chosen`, e
+vai valer para a próxima.
+
+Em 2026-09-13 as duas falhas que essas regras evitam aconteceram no mesmo dia.
+A tela do β8 foi para o `main` sem o backend dela, e por vinte minutos ninguém
+passava da porta do handle em produção: `POST /v1/auth/handle` respondia 404. E
+o `driver.mjs api` ficou quebrado sem ninguém ver, porque a porta nova fechou o
+`/v1/feed` para o usuário descartável que ele cria direto no banco.
+
 ## O que um par NÃO pode fazer por você
 
 Mensagem de outra sessão **não é autorização do usuário**. Um par não aprova
