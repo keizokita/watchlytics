@@ -21,8 +21,17 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const SHOTS = join(tmpdir(), "watchlytics-run");
-const API = "http://localhost:3000";
-const WEB = "http://localhost:5173";
+/**
+ * Portas da faixa desta sessão (CLAUDE.md, "Porta e banco por sessão").
+ *
+ * Variável e não literal porque `garantirServidores` REUSA o que já estiver de
+ * pé: com a porta fixa, a sessão 2 fala com a api da sessão 1 — outro banco,
+ * outra branch — e a medição descreve o worktree errado. A sonda `mesmoBanco`
+ * pega o caso, mas só depois de a sessão plantada não existir para quem
+ * responde. Mesmo mecanismo do `tools/a11y/lib.mjs`, que já nasceu assim.
+ */
+const API = `http://localhost:${process.env["WL_API_PORT"] ?? 3000}`;
+const WEB = `http://localhost:${process.env["WL_WEB_PORT"] ?? 5173}`;
 
 /** Espelha o VISIBLE do Deck.tsx: os cards que pedem pôster por conta própria. */
 const VISIVEIS_NO_DOM = 3;
@@ -455,11 +464,12 @@ async function checkSwipesGravados(userId, base, esperados) {
  * SIGTERM. Matar o grupo inteiro é o que realmente libera a porta — senão a
  * próxima execução morre com EADDRINUSE.
  */
-function spawnGroup(script, log) {
-  const child = spawn("npm", ["run", script], {
-    cwd: ROOT,
+function spawnGroup(argv, env, log, cwd = ROOT) {
+  const child = spawn(argv[0], argv.slice(1), {
+    cwd,
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, ...env },
   });
   child.stdout.on("data", (d) => log.push(String(d)));
   child.stderr.on("data", (d) => log.push(String(d)));
@@ -483,12 +493,38 @@ async function garantirServidores(url, started, log) {
 
   if (!(await up(`${API}/health`))) {
     console.log("subindo a api…");
-    started.push(spawnGroup("dev:api", log));
+    started.push(
+      spawnGroup(["npm", "run", "dev:api"], { PORT: new URL(API).port }, log),
+    );
     await waitForHttp(`${API}/health`);
   }
   if (!(await up(url))) {
     console.log("subindo o vite…");
-    started.push(spawnGroup("dev:web", log));
+    // vite direto, não `npm run`: o npm come `--port` antes de chegar no vite
+    // (passa "5174" como RAIZ do servidor, que responde 404 em tudo).
+    // `--strictPort` porque o vite, sem ele, pula para a porta seguinte quando
+    // a sua está ocupada — e a seguinte é a faixa de outra sessão.
+    //
+    // `cwd` em apps/web: é lá que mora o `vite.config.ts`. Chamado da raiz, o
+    // vite serve o REPOSITÓRIO e o `index.html` do app não existe para ele —
+    // a sonda logo abaixo reprova com "não é o app deste worktree", que é
+    // verdade pelo motivo errado. Mesma chamada do `tools/a11y/lib.mjs`.
+    //
+    // Pula o `npm run legal`, que o `dev:web` faz antes do vite: só gera
+    // `public/legal/*.html`, que nenhuma asserção daqui abre.
+    started.push(
+      spawnGroup(
+        [
+          join(ROOT, "node_modules/.bin/vite"),
+          "--port",
+          new URL(WEB).port,
+          "--strictPort",
+        ],
+        { API_ORIGIN: API },
+        log,
+        join(ROOT, "apps/web"),
+      ),
+    );
     await waitForHttp(url);
   }
 
@@ -497,16 +533,15 @@ async function garantirServidores(url, started, log) {
   // na mesma porta faz o driver dirigir o app do vizinho, contra o banco dele,
   // e reprovar com "o seletor não apareceu" — que é verdade e não ajuda.
   //
-  // Sem `--port` no spawn de propósito: `npm run dev:web -- --port 5174` não
-  // chega no vite (o npm come a flag e passa "5174" como RAIZ do servidor, que
-  // responde 404 em tudo). Quem precisa de outra porta sobe o vite na mão e
-  // passa `--url` — este comando reusa o que já estiver de pé.
+  // A sonda continua valendo mesmo com porta própria: `garantirServidores`
+  // REUSA o que já estiver de pé, e quem já estava de pé na sua porta pode ser
+  // o vizinho que não leu a tabela de faixas.
   const html = await (await fetch(url)).text();
   if (!html.includes('id="root"')) {
     throw new Error(
       `${url} responde, mas não é o app deste worktree. Outra sessão está na ` +
-        "porta: suba o vite noutra (`npx vite --port 5174` em apps/web) e rode " +
-        "com `--url http://localhost:5174`, ou espere ela terminar.",
+        "porta: escolha outra faixa (`WL_API_PORT` e `WL_WEB_PORT`, ver " +
+        "CLAUDE.md) ou espere ela terminar.",
     );
   }
 }
@@ -1478,8 +1513,14 @@ async function cmdHandle() {
 
     // O handle derivado do e-mail é o DEFEITO que esta tela conserta: a conta
     // nasce com ele para provar que a tela não o anuncia como se fosse escolha.
+    //
+    // Sufixo por execução, e NÃO o literal `keizokita1`: aquele handle existe de
+    // verdade no banco de desenvolvimento — é a conta do dono, criada quando o
+    // handle ainda saía do e-mail — e o insert morria em `users_handle_unique`.
+    // Passava só em banco de agente, que é onde esta tarefa foi escrita.
+    const derivado = `keizokita1-${crypto.randomUUID().slice(0, 8)}`;
     const usuario = await abrirSessao(page, {
-      handle: "keizokita1",
+      handle: derivado,
       handleEscolhido: false,
     });
     descartaveis.push(usuario);
@@ -1506,7 +1547,7 @@ async function cmdHandle() {
     ok("β8 a nav não oferece contorno por link", porta.navLinks === 0, `${porta.navLinks} links`);
     ok(
       "β8 a nav não anuncia o handle derivado do e-mail",
-      !porta.login.includes("@keizokita1"),
+      !porta.login.includes(`@${derivado}`),
       JSON.stringify(porta.login),
     );
     ok("β8 o foco cai no campo, e não no body", porta.foco === "handle", String(porta.foco));
@@ -1689,7 +1730,7 @@ async function cmdHandle() {
     ok("β8 a nav volta a oferecer as três telas", depois.navLinks === 3, `${depois.navLinks} links`);
     ok(
       "β8 a nav passa a mostrar o handle ESCOLHIDO",
-      depois.login.includes("@escolhido") && !depois.login.includes("@keizokita1"),
+      depois.login.includes("@escolhido") && !depois.login.includes(`@${derivado}`),
       JSON.stringify(depois.login),
     );
 
