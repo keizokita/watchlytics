@@ -4,6 +4,8 @@ import {
   handleAvailability,
   handleInput,
   handleRegex,
+  sessionUser,
+  type SessionUser,
 } from "@watchlytics/contract";
 import { authedFetch } from "./session.ts";
 
@@ -103,7 +105,8 @@ export async function checarDisponibilidade(
 }
 
 export type Escolha =
-  | { kind: "ok"; handle: string }
+  /** A sessão como o SERVIDOR a vê agora, com a porta já fechada. */
+  | { kind: "ok"; user: SessionUser }
   /** Alguém chegou primeiro entre a consulta e o envio. */
   | { kind: "taken" }
   /** O contrato reprovou na borda. A tela não deixa chegar aqui. */
@@ -118,9 +121,13 @@ export type Escolha =
  * 404 em "esse handle não serve" culparia a pessoa pela trilha A não ter
  * chegado.
  *
- * Só o 409 é lido como tomado. O corpo da resposta não é parseado porque o
- * contrato congelado não define um para este POST: `res.ok` é o sinal, e o
- * handle que volta para a sessão é o que o contrato normalizou aqui.
+ * Só o 409 é lido como tomado — é o que a rota responde tanto para o handle já
+ * ocupado quanto para a conta que já escolheu uma vez.
+ *
+ * A resposta é o `sessionUser` inteiro, e é ele que volta para a sessão local.
+ * Remontar `{ ...user, handle, needsHandle: false }` aqui daria o mesmo
+ * resultado hoje e seria uma segunda verdade sobre quem está logado: quem sabe
+ * o que ficou gravado é o servidor, e ele está dizendo.
  */
 export async function escolherHandle(raw: string): Promise<Escolha> {
   const parsed = handleInput.safeParse({ handle: normalizar(raw) });
@@ -133,5 +140,5 @@ export async function escolherHandle(raw: string): Promise<Escolha> {
   });
   if (res.status === 409) return { kind: "taken" };
   if (!res.ok) throw new Error(`/v1/auth/handle respondeu ${res.status}`);
-  return { kind: "ok", handle: parsed.data.handle };
+  return { kind: "ok", user: sessionUser.parse(await res.json()) };
 }
