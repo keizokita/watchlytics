@@ -19,7 +19,7 @@ watchlytics/
   packages/contract/    Zod: schemas + tipos derivados. A costura entre api e web.
   apps/api/             Fastify + Drizzle
   apps/web/             Vite + React
-  seed/titles.json      ~100 títulos, UUIDs fixos
+  seed/titles.json      ~100 títulos, chaveados por slug (o id é defaultRandom)
 ```
 
 | id | Tarefa | Pronto quando | |
@@ -825,15 +825,16 @@ existia, então `consents` e a porta de idade seguem sem passada real.
 > **A varredura rodou num worktree 60 commits atrás do `main`** — a branch
 > `beta/porta-de-idade-apaga-conta`, que já estava mesclada (`ccada75`). Cada
 > achado de tela foi reconferido contra o `main` antes de virar tarefa aqui, e
-> os quatro sobreviveram. O que ela **não** exercitou é a porta do handle (§7),
-> que não existia naquele worktree: é a β9.7.
+> **três dos quatro sobreviveram**: a β9.2 não procedia, e a correção está na
+> própria entrada dela. O que a varredura **não** exercitou é a porta do handle
+> (§7), que não existia naquele worktree: é a β9.7.
 
 ### Os achados
 
 | id | Achado | Onde | Bloqueia o convite? |
 |---|---|---|---|
 | β9.1 | A porta de idade nunca mostra o aviso que o app escreveu para ela | `apps/web/src/AgeGate.tsx:135` | **sim** |
-| β9.2 | A tela de recusa continua anunciando "Signed in as @handle" | `apps/web/src/main.tsx` | não |
+| β9.2 | ~~A tela de recusa continua anunciando "Signed in as @handle"~~ — não procede | — | não |
 | β9.3 | O checkbox do perfil público sai azul do navegador | `apps/web/index.html` | não |
 | β9.4 | O link do perfil público sai na cor default do agente | `apps/web/src/screenCss.ts` | não |
 | β9.5 | Visita deslogada sempre registra um 401 no console | ferramenta | não |
@@ -860,11 +861,23 @@ quem fala é o navegador. **Pronto quando** digitar `12` e enviar mostrar
 navegador. O caminho barato é tirar `min`/`max` do input — o zod continua
 guardando o intervalo, e é ele quem já decide — ou `noValidate` no `<form>`.
 
-**β9.2 — o cabeçalho contradiz a recusa.** Depois da recusa a conta foi apagada
-no servidor (β2.1) e o texto diz *"there is nothing here for you to come back
-to"*, mas o shell segue mostrando "Signed in as @handle" e o botão de sair. O
-botão em si não quebra: clicar não produz erro de console. **Pronto quando** a
-tela de recusa não anunciar sessão nenhuma.
+**β9.2 — não procede, e o erro foi meu.** Foi registrado assim: depois da
+recusa o shell seguiria mostrando "Signed in as @handle" ao lado do texto que
+diz que não há nada aqui. É verdade no worktree em que a varredura rodou, e é
+falso em `main` desde antes deste documento existir — a auditoria de
+acessibilidade (`4325bd6`, `32621c5`) tirou a tela de recusa de dentro do
+`AgeGate`: na recusa a sessão local é jogada fora, e `AgeGateRecusa` é montada
+pelo shell a partir de `recusaDaPorta()`, sem `<Login />` do lado.
+
+Medido em `main` em 2026-09-13, dirigindo a recusa pela tela: a primeira linha
+do `body` é a própria frase da recusa, e não "Signed in as @handle".
+
+**Como o erro passou:** os outros três achados de tela foram reconferidos
+abrindo o arquivo de `main`; este foi "reconferido" por um `grep` de
+`needsAgeGate` no `main.tsx`, que mostra o ramo da porta e não diz nada sobre o
+ramo da recusa. Ver um sinal adjacente não é conferir — e o antídoto era o que
+estava à mão o tempo todo: rodar a tela, que é como o defeito tinha sido achado
+em primeiro lugar.
 
 **β9.3 — `accent-color` medido: `auto`.** O `accent-color: var(--like)` existe
 só no `<progress>` do contador de onboarding (`index.html:523`). O checkbox
@@ -1029,7 +1042,7 @@ e não na hora de mesclar.
 
 | Trilha | Escopo | Possui | Não toca |
 |---|---|---|---|
-| **P — porta de idade** | β9.1, β9.2 | `apps/web/src/AgeGate.tsx` (CSS incluso), `ageGate.ts` + teste, o ramo `needsAgeGate` de `main.tsx` | backend, CSS de outras telas |
+| **P — porta de idade** | β9.1 | `apps/web/src/AgeGate.tsx` (CSS incluso), `ageGate.ts` + teste | backend, CSS de outras telas |
 | **V — tema** | β9.3, β9.4 | o bloco de CSS de `apps/web/index.html`, `apps/web/src/screenCss.ts` | `.tsx` nenhum — o CSS da porta de idade mora dentro do `AgeGate.tsx` e é da P |
 | **X — exclusão** | β9.6 ✅ (`28e5792`); resta alinhar o `recusar()` | o `recusar()` de `auth.ts` + teste | web, outras rotas |
 | **U — perfil público** | #37, #38 | `apps/api/src/routes/profile.ts` + teste | `me.ts`, `auth.ts`, web |

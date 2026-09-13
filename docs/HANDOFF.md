@@ -53,17 +53,21 @@ logo depois da porta de idade — inclusive as que já existem.
 **A fase beta fechou em 2026-09-13**, com o β6 — o último item — provado entre
 duas contas Google de verdade em produção.
 
-**E no mesmo dia uma varredura funcional pelo navegador reabriu oito itens**
+**E no mesmo dia uma varredura funcional pelo navegador abriu oito itens**
 (BACKLOG §8, a β9): dez fluxos que o `driver.mjs` não cobre, dirigidos por CDP.
-Dois bloqueiam o convite — a porta de idade não mostra o aviso que o app
-escreveu para ela (quem fala é o navegador, no idioma dele), e nem o Pages nem a
-API mandam HSTS. Um era PII de pé e fechou no mesmo dia (β9.6, PR #59): apagar a
-conta deixava o handle dela no aviso de quem foi amigo, porque a cascata do banco
-não alcança cópia que mora dentro de um `payload`. Os outros cinco são cor,
-ferramenta e cobertura. Junto deles
-seguem abertas as cinco issues da verificação de produção (#37, #38, #40, #41,
-#42). **Feature continua não sendo o que falta** — o que falta agora é acabamento
-e uma porta legal que fale a própria língua.
+**Seis seguem abertos** — um fechou no mesmo dia e um não procedia.
+
+Dois bloqueiam o convite: a porta de idade não mostra o aviso que o app escreveu
+para ela (quem fala é o navegador, no idioma dele), e nem o Pages nem a API
+mandam HSTS. O que fechou era PII de pé (β9.6, PR #59) — apagar a conta deixava
+o handle dela no aviso de quem foi amigo, porque a cascata do banco não alcança
+cópia que mora dentro de um `payload`. O que não procedia era a β9.2, medida
+numa branch velha e já consertada em `main` pela auditoria de acessibilidade. Os
+outros quatro são cor, ferramenta e cobertura.
+
+Junto deles seguem abertas as cinco issues da verificação de produção (#37, #38,
+#40, #41, #42). **Feature continua não sendo o que falta** — o que falta agora é
+acabamento e uma porta legal que fale a própria língua.
 
 Fora do código, para convidar gente: publicar a tela de consentimento do Google
 ou cadastrar os testadores (modo Testing, teto de 100), o filtro do Gmail para
