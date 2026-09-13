@@ -9,6 +9,7 @@ import { notificationRoutes } from "./routes/notifications.ts";
 import { onboardingRoutes } from "./routes/onboarding.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import { swipeRoutes } from "./routes/swipes.ts";
+import { securityHeaders } from "./seguranca.ts";
 
 /**
  * Raiz de composição. Uma rota por módulo em routes/ — o arquivo passou a ser
@@ -17,6 +18,10 @@ import { swipeRoutes } from "./routes/swipes.ts";
  */
 export function buildServer() {
   const app = buildApp();
+
+  // Antes das rotas: é um `onSend`, então vale para toda resposta — inclusive a
+  // que o error handler monta e o 404 que nenhuma rota atendeu.
+  securityHeaders(app);
 
   app.get("/health", async () => ({ ok: true }));
 
