@@ -51,10 +51,23 @@ Toda conta entra com `handle_chosen = false` e escolhe o handle numa porta nova,
 logo depois da porta de idade — inclusive as que já existem.
 
 **A fase beta fechou em 2026-09-13**, com o β6 — o último item — provado entre
-duas contas Google de verdade em produção. Não há tarefa de código aberta para o
-beta. O que falta para convidar gente é decisão e configuração: publicar a tela
-de consentimento do Google ou cadastrar os testadores (modo Testing, teto de
-100), e o veredito do gesto no celular.
+duas contas Google de verdade em produção.
+
+**E no mesmo dia uma varredura funcional pelo navegador reabriu oito itens**
+(BACKLOG §8, a β9): dez fluxos que o `driver.mjs` não cobre, dirigidos por CDP.
+Dois bloqueiam o convite — a porta de idade não mostra o aviso que o app
+escreveu para ela (quem fala é o navegador, no idioma dele), e nem o Pages nem a
+API mandam HSTS. Um era PII de pé e fechou no mesmo dia (β9.6, PR #59): apagar a
+conta deixava o handle dela no aviso de quem foi amigo, porque a cascata do banco
+não alcança cópia que mora dentro de um `payload`. Os outros cinco são cor,
+ferramenta e cobertura. Junto deles
+seguem abertas as cinco issues da verificação de produção (#37, #38, #40, #41,
+#42). **Feature continua não sendo o que falta** — o que falta agora é acabamento
+e uma porta legal que fale a própria língua.
+
+Fora do código, para convidar gente: publicar a tela de consentimento do Google
+ou cadastrar os testadores (modo Testing, teto de 100), o filtro do Gmail para
+`+watchlytics`, e o veredito do gesto no celular.
 A trilha **I** (catálogo real, BACKLOG §5) fechou inteira: I0.1 (régua), I0.2
 (migration 0003 + `castNames` no contrato), I1 (elenco) e I2 (catálogo vivo).
 **`schema.ts` e `contract/index.ts` continuam CONGELADOS** — quem precisar de
@@ -67,11 +80,21 @@ propósito: nenhum dos campos dela tem tela que mostre.
 npm run db:up      # Postgres + pgvector via podman, porta 5433 (a 5432 está ocupada)
 npm run migrate
 npm run seed       # idempotente por PK, pode rodar sempre
-npm run dev:api    # :3000
-npm run dev:web    # :5173, faz proxy de /v1 (sem CORS)
+npm run dev:api    # :3000 (PORT troca)
+npm run dev:web    # :5173, faz proxy de /v1 (sem CORS; API_ORIGIN troca o alvo)
 npm test           # precisa do banco de pé e semeado
 npm run check      # typecheck dos 3 pacotes
 ```
+
+- **Mais de uma sessão na máquina?** Reserve porta e banco antes de subir
+  qualquer coisa — a tabela de faixas está no [CLAUDE.md](../CLAUDE.md), seção
+  "Porta e banco por sessão". `WL_API_PORT` e `WL_WEB_PORT` movem o
+  `driver.mjs`; `A11Y_API_PORT` e `A11Y_WEB_PORT` movem o `tools/a11y`. Porta
+  compartilhada não dá erro: dá uma medição que descreve a branch do vizinho.
+- **Banco de desenvolvimento também atrasa.** Em 2026-09-13 ele estava três
+  migrations atrás (`handle_chosen` não existia) e toda conta de fixture do
+  driver morria no insert. `npm run migrate` depois de trocar de branch é mais
+  barato que diagnosticar isso.
 
 - **Node ≥24.** O projeto executa `.ts` direto, sem `tsx` e sem build step. Só
   `packages/contract` compila — type stripping não vale dentro de `node_modules`.
@@ -258,23 +281,30 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 
 ## Próximos passos sugeridos
 
-O P0 do beta fechou em 2026-09-11: β1, β2 e β3 estão em `main` e no ar, junto
-com o β4. As três trilhas paralelas (α, β, γ) foram mergeadas pelos PRs #19,
-#20, #21 e #22, e a divisão por arquivo do BACKLOG §6 aguentou — o único
-encontro entre duas trilhas, "gravar a idade", encaixou no contrato congelado
-sem ida e volta.
+**O plano está em [BACKLOG.md §8](./BACKLOG.md)** — a β9, com os oito achados da
+varredura, as cinco issues abertas, quem possui qual arquivo e em que ordem
+entra. Aqui fica só a ordem de quem vai começar agora.
 
-1. **Convidar as primeiras pessoas.** É o que o P0 destravava, e não depende de
-   mais código: a idade é cobrada em toda rota, os documentos existem e são
-   nomeados pelo aviso, e o shim não existe mais. O que falta é publicar a tela
-   de consentimento do Google ou cadastrar os testadores no modo Testing (teto
-   de 100, só e-mail listado).
-2. **β6.1 — o primeiro cadastro por OAuth de verdade** (§Bloqueado 2). Amizade,
-   match, notificação e perfil público já rodaram PELA TELA entre duas contas
-   (`driver.mjs social`); o que falta é a entrada pelo Google, que é a segunda
-   conta do item 1 — não uma segunda pessoa.
-3. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
+1. **Trilhas P e H, em paralelo.** As duas que bloqueiam o convite: a porta de
+   idade que fala pelo navegador (β9.1) e os cabeçalhos que nem o Pages nem a
+   API mandam (#42, só a metade que não quebra nada — HSTS e `nosniff`; a CSP é
+   tarefa própria, com `Report-Only` primeiro).
+2. **Trilha U.** O perfil público é o link que circula e hoje não tem caminho de
+   volta para o app (#37) nem `og:image` (#38). Vale antes de convidar.
+3. **Convidar as primeiras pessoas.** Não depende de mais código nem nunca
+   dependeu: publicar a tela de consentimento do Google ou cadastrar os
+   testadores no modo Testing (teto de 100, só e-mail listado).
+4. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
+
+A β9.6 já saiu da lista: fechou no mesmo dia em que foi achada, pelo PR #59
+(`28e5792`) — apagar a conta passou a apagar também a cópia do handle no aviso
+de quem foi amigo. Era o único achado da leva com PII de pé.
+
+As trilhas V (cor) e F (ferramenta) cabem depois do convite. E fica registrado
+que o `driver.mjs all` termina vermelho hoje na última asserção do `handle`, por
+um `fetch` que o próprio driver aborta ao recarregar a página — é a β9.8, e não
+é regressão do app.
 
 O β5 fechou junto (PR #23): o retorno é um `mailto:` no rodapé do shell, fora
 do `user &&`, porque quem não consegue entrar é quem mais precisa contar isso —

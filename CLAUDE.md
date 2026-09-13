@@ -72,9 +72,44 @@ erro nos dois sentidos neste projeto — inclusive erro meu.
 Se você corrigir alguém, traga a medição junto. Se alguém te corrigir e tiver
 razão, aceite e siga.
 
+## Porta e banco por sessão
+
+Duas sessões nas mesmas portas não dão erro — dão uma medição que descreve a
+branch da outra. O `driver.mjs` reusa o que já estiver de pé, então o vite da
+sua sessão fala com a api da sessão vizinha, com OUTRO banco, e o sintoma é um
+`.deck-card` que nunca aparece.
+
+**Reserve a sua faixa antes de subir qualquer coisa** e diga qual é quando
+anunciar o que vai tocar:
+
+| sessão | api | vite | banco | como |
+|---|---|---|---|---|
+| 1 (a árvore principal) | 3000 | 5173 | `watchlytics` | o padrão, sem variável |
+| 2 | 3001 | 5174 | `wl_s2` | `PORT`, `WL_API_PORT`, `WL_WEB_PORT`, `API_ORIGIN`, `DATABASE_URL` |
+| 3 | 3002 | 5175 | `wl_s3` | idem |
+| `tools/a11y` | 3100 | 5273 | o da sessão | já é o padrão dele (`A11Y_API_PORT`, `A11Y_WEB_PORT`) |
+
+As variáveis moram no `apps/api/.env` do **seu** worktree, que é gitignored — é
+por isso que worktree próprio não é luxo. `PORT` é da api (`server.ts`),
+`API_ORIGIN` é o alvo do proxy do vite (`vite.config.ts`), e
+`WL_API_PORT`/`WL_WEB_PORT` dizem ao `driver.mjs` onde procurar.
+
+Banco próprio porque os testes fazem `DELETE` e rodam em paralelo:
+`podman exec watchlytics-db createdb -U dev wl_s2`, depois `npm run migrate` e
+`npm run seed` com o seu `DATABASE_URL`. O container e a porta 5433 são
+compartilhados; o banco dentro dele, não.
+
+**Não mate porta que não é sua.** `fuser -k 3000/tcp` derruba a sessão do
+vizinho no meio de uma medição. Se a porta que você reservou estiver ocupada,
+pergunte antes.
+
 ## Regras de trabalho paralelo
 
 Estão em [docs/BACKLOG.md](docs/BACKLOG.md), seção "Regras de paralelização
 (aprendidas errando)": worktree a partir do `main` atual, database próprio por
 agente, todo arquivo com dono, arquivos congelados, commit antes de terminar, e
 teste com usuário próprio. Leia antes de abrir trilha nova.
+
+Quando for abrir uma leva nova de trilhas paralelas, a divisão mais recente
+(quem possui o quê, e em que ordem entra) está em
+[docs/BACKLOG.md §8](docs/BACKLOG.md).
