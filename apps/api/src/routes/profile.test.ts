@@ -119,9 +119,30 @@ test("D5 — no piso o preview traz título, descrição e og:url", async () => 
   assert.doesNotMatch(html, /\b1 days\b/);
   assert.doesNotMatch(html, /\b1 titles\b/);
 
-  // Sem og:image de propósito: não há pôster, e imagem quebrada no preview é
-  // pior que preview de texto. Se um dia entrar, este assert cai junto.
-  assert.doesNotMatch(html, /og:image/);
+  // #38 — a imagem do preview, ABSOLUTA: o scraper do WhatsApp busca a url como
+  // ela está no atributo, sem base para resolver caminho relativo.
+  assert.match(html, /<meta property="og:image" content="https?:\/\/[^"]+\/og\.png">/);
+  assert.match(html, /<meta name="twitter:card" content="summary_large_image">/);
+
+  // A MESMA arte para todo perfil (#38): o preview é buscado pelo servidor do
+  // mensageiro, então pôster da biblioteca viraria "o que fulano assistiu" no
+  // cache de um terceiro. Esta asserção é o que impede a troca silenciosa.
+  assert.doesNotMatch(html, /og:image" content="[^"]*image\.tmdb\.org/);
+});
+
+test("#37 — o perfil público tem caminho de volta para o app", async () => {
+  const html = (await get("/u/perfil-publico")).body;
+
+  // Medido em produção antes do conserto: `grep -c '<a '` dava 0, e a caminhada
+  // de Tab tinha zero paradas. Quem recebe o link lia a contagem e acabava ali.
+  assert.match(html, /<a class="entrar" href="https?:\/\/[^"]+\/">[^<]+<\/a>/);
+});
+
+test("#37 — e o 404 também tem, porque link morto é quem mais precisa", async () => {
+  const res = await get("/u/nao-existe-mesmo");
+
+  assert.equal(res.statusCode, 404);
+  assert.match(res.body, /<a href="https?:\/\/[^"]+\/">/);
 });
 
 test("D5 — display_name do usuário nunca sai cru no HTML", async () => {
