@@ -55,19 +55,23 @@ duas contas Google de verdade em produção.
 
 **E no mesmo dia uma varredura funcional pelo navegador abriu oito itens**
 (BACKLOG §8, a β9): dez fluxos que o `driver.mjs` não cobre, dirigidos por CDP.
-**Seis seguem abertos** — um fechou no mesmo dia e um não procedia.
+**Em 2026-09-13 fecharam cinco deles e três das cinco issues abertas**, em cinco
+PRs (#61 a #65) mesclados no mesmo dia e conferidos em produção depois do deploy.
 
-Dois bloqueiam o convite: a porta de idade não mostra o aviso que o app escreveu
-para ela (quem fala é o navegador, no idioma dele), e nem o Pages nem a API
-mandam HSTS. O que fechou era PII de pé (β9.6, PR #59) — apagar a conta deixava
-o handle dela no aviso de quem foi amigo, porque a cascata do banco não alcança
-cópia que mora dentro de um `payload`. O que não procedia era a β9.2, medida
-numa branch velha e já consertada em `main` pela auditoria de acessibilidade. Os
-outros quatro são cor, ferramenta e cobertura.
+Os dois que bloqueavam o convite caíram: a porta de idade passou a mostrar o
+aviso que o app escreveu para ela — o `min` do campo fazia a validação nativa
+cancelar o envio, e quem respondia era o navegador, no idioma dele — e HSTS está
+no ar nas duas origens. O perfil público, que é o link que circula, ganhou
+caminho de volta (#37) e `og:image` (#38). Antes deles, a β9.6 tinha tirado PII
+de pé: apagar a conta deixava o handle dela no aviso de quem foi amigo.
 
-Junto deles seguem abertas as cinco issues da verificação de produção (#37, #38,
-#40, #41, #42). **Feature continua não sendo o que falta** — o que falta agora é
-acabamento e uma porta legal que fale a própria língua.
+A β9.2 **não procedia** — foi medida numa branch velha e já estava consertada em
+`main` pela auditoria de acessibilidade.
+
+**O que continua aberto:** a trilha F (β9.5, β9.7, β9.8, #40, #41), que é
+ferramenta; alinhar o `recusar()` do `auth.ts`, que hoje não produz sobra; e a
+CSP do #42, que é tarefa própria com `Report-Only` primeiro. Nenhum deles
+bloqueia convidar gente.
 
 Fora do código, para convidar gente: publicar a tela de consentimento do Google
 ou cadastrar os testadores (modo Testing, teto de 100), o filtro do Gmail para
@@ -289,21 +293,18 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 varredura, as cinco issues abertas, quem possui qual arquivo e em que ordem
 entra. Aqui fica só a ordem de quem vai começar agora.
 
-1. **Trilhas P e H, em paralelo.** As duas que bloqueiam o convite: a porta de
-   idade que fala pelo navegador (β9.1) e os cabeçalhos que nem o Pages nem a
-   API mandam (#42, só a metade que não quebra nada — HSTS e `nosniff`; a CSP é
-   tarefa própria, com `Report-Only` primeiro).
-2. **Trilha U.** O perfil público é o link que circula e hoje não tem caminho de
-   volta para o app (#37) nem `og:image` (#38). Vale antes de convidar.
-3. **Convidar as primeiras pessoas.** Não depende de mais código nem nunca
-   dependeu: publicar a tela de consentimento do Google ou cadastrar os
-   testadores no modo Testing (teto de 100, só e-mail listado).
-4. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
+1. **Convidar as primeiras pessoas.** Não depende de código, e desde
+   2026-09-13 não depende mais de acabamento nenhum: publicar a tela de
+   consentimento do Google ou cadastrar os testadores no modo Testing (teto de
+   100, só e-mail listado).
+2. **Veredito do gesto no celular** (§Bloqueado 1). Duas perguntas que revertem
    decisões já tomadas; nenhuma se responde no terminal, só com o app na mão.
+3. **Trilha F** (BACKLOG §8), quando incomodar: hoje o `driver.mjs all` termina
+   vermelho na última asserção do `handle`, e a causa está diagnosticada — o
+   próprio driver aborta o fetch ao recarregar a página (β9.8). Verde de novo
+   vale mais depois do convite do que antes dele.
 
-A β9.6 já saiu da lista: fechou no mesmo dia em que foi achada, pelo PR #59
-(`28e5792`) — apagar a conta passou a apagar também a cópia do handle no aviso
-de quem foi amigo. Era o único achado da leva com PII de pé.
+As trilhas P, H, U e V fecharam nos PRs #62, #63, #64 e #65, e a β9.6 no #59.
 
 As trilhas V (cor) e F (ferramenta) cabem depois do convite. E fica registrado
 que o `driver.mjs all` termina vermelho hoje na última asserção do `handle`, por
