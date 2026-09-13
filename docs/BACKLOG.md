@@ -19,7 +19,7 @@ watchlytics/
   packages/contract/    Zod: schemas + tipos derivados. A costura entre api e web.
   apps/api/             Fastify + Drizzle
   apps/web/             Vite + React
-  seed/titles.json      ~100 títulos, UUIDs fixos
+  seed/titles.json      ~100 títulos, chaveados por slug (o id é defaultRandom)
 ```
 
 | id | Tarefa | Pronto quando | |
