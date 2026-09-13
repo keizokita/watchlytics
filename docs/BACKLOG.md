@@ -833,10 +833,10 @@ existia, então `consents` e a porta de idade seguem sem passada real.
 
 | id | Achado | Onde | Bloqueia o convite? |
 |---|---|---|---|
-| β9.1 | A porta de idade nunca mostra o aviso que o app escreveu para ela | `apps/web/src/AgeGate.tsx:135` | **sim** |
+| β9.1 ✅ | A porta de idade nunca mostra o aviso que o app escreveu para ela | `apps/web/src/AgeGate.tsx` | **bloqueava** |
 | β9.2 | ~~A tela de recusa continua anunciando "Signed in as @handle"~~ — não procede | — | não |
-| β9.3 | O checkbox do perfil público sai azul do navegador | `apps/web/index.html` | não |
-| β9.4 | O link do perfil público sai na cor default do agente | `apps/web/src/screenCss.ts` | não |
+| β9.3 ✅ | O checkbox do perfil público sai azul do navegador | `apps/web/index.html` | não |
+| β9.4 ✅ | O link do perfil público sai na cor default do agente | `apps/web/src/screenCss.ts` | não |
 | β9.5 | Visita deslogada sempre registra um 401 no console | ferramenta | não |
 | β9.6 ✅ | Apagar a conta deixa o handle dela no aviso de quem foi amigo | `apps/api/src/routes/me.ts` | não, mas quebrava a promessa do §8.4 |
 | β9.7 | A porta do handle nunca foi varrida fora do `driver.mjs` | — | não |
@@ -984,9 +984,9 @@ Nenhuma foi refutada agora. Continuam valendo como estão escritas.
 
 | issue | O quê | Bloqueia o convite? |
 |---|---|---|
-| [#42](https://github.com/keizokita/watchlytics/issues/42) | Nem o Pages nem a API mandam CSP ou HSTS | **sim**, a parte que não quebra nada |
-| [#37](https://github.com/keizokita/watchlytics/issues/37) | O perfil público não tem caminho de volta para o app | não, mas é o link que circula |
-| [#38](https://github.com/keizokita/watchlytics/issues/38) | O perfil público não declara `og:image` | não, mesmo motivo |
+| [#42](https://github.com/keizokita/watchlytics/issues/42) ✅ parcial | Nem o Pages nem a API mandam CSP ou HSTS | **bloqueava**; a CSP segue aberta |
+| [#37](https://github.com/keizokita/watchlytics/issues/37) ✅ | O perfil público não tem caminho de volta para o app | não, mas é o link que circula |
+| [#38](https://github.com/keizokita/watchlytics/issues/38) ✅ | O perfil público não declara `og:image` | não, mesmo motivo |
 | [#40](https://github.com/keizokita/watchlytics/issues/40) | `driver.mjs social`: duas asserções de console reprovam com catálogo real | não |
 | [#41](https://github.com/keizokita/watchlytics/issues/41) | `driver.mjs api`: a asserção do topo do feed é intermitente na fixture de 94 | não |
 
@@ -1005,7 +1005,7 @@ itens de coordenação.
 | id | Tarefa | Por que é serial |
 |---|---|---|
 | β9.0a ✅ | `driver.mjs` lê `WL_API_PORT`/`WL_WEB_PORT`, como `tools/a11y` já lê os dele | Toda trilha vai querer rodar o driver, e duas sessões nas portas 3000/5173 medem a branch da outra. A sonda `mesmoBanco` avisa, mas só depois de falhar |
-| β9.0b · parcial | Limpar o working tree compartilhado: o diff órfão saiu; falta tirar a árvore de cima de uma branch mesclada | Enquanto a árvore principal estiver parada em `beta/porta-de-idade-apaga-conta` com diff sem dono, toda sessão que chegar vai gastar a mesma meia hora descobrindo de quem é. Perguntado às três sessões vivas em 2026-09-13: não era de nenhuma |
+| β9.0b ✅ | Limpar o working tree compartilhado: o diff órfão saiu e a árvore voltou para `main` | Enquanto a árvore principal estiver parada em `beta/porta-de-idade-apaga-conta` com diff sem dono, toda sessão que chegar vai gastar a mesma meia hora descobrindo de quem é. Perguntado às três sessões vivas em 2026-09-13: não era de nenhuma |
 
 > **A β9.0b é descarte, e descarte se faz reversível.** O diff parado no tree
 > compartilhado foi conferido contra `origin/main` em 2026-09-13 e é subconjunto
@@ -1042,12 +1042,12 @@ e não na hora de mesclar.
 
 | Trilha | Escopo | Possui | Não toca |
 |---|---|---|---|
-| **P — porta de idade** | β9.1 | `apps/web/src/AgeGate.tsx` (CSS incluso), `ageGate.ts` + teste | backend, CSS de outras telas |
-| **V — tema** | β9.3, β9.4 | o bloco de CSS de `apps/web/index.html`, `apps/web/src/screenCss.ts` | `.tsx` nenhum — o CSS da porta de idade mora dentro do `AgeGate.tsx` e é da P |
-| **X — exclusão** | β9.6 ✅ (`28e5792`); resta alinhar o `recusar()` | o `recusar()` de `auth.ts` + teste | web, outras rotas |
-| **U — perfil público** | #37, #38 | `apps/api/src/routes/profile.ts` + teste | `me.ts`, `auth.ts`, web |
-| **H — cabeçalhos** | #42 (a metade que não quebra) | `apps/api/src/server.ts`, `apps/web/public/_headers` (novo) | rotas |
-| **F — ferramenta** | β9.5, β9.7, β9.8, #40, #41 | `.claude/skills/run-watchlytics/driver.mjs` e o `SKILL.md`, `tools/a11y/*` | `apps/**` |
+| **P — porta de idade** ✅ | β9.1 (PR #62) | `apps/web/src/AgeGate.tsx` (CSS incluso), `ageGate.ts` + teste | backend, CSS de outras telas |
+| **V — tema** ✅ | β9.3, β9.4 (PR #65) | o bloco de CSS de `apps/web/index.html`, `apps/web/src/screenCss.ts` | `.tsx` nenhum — o CSS da porta de idade mora dentro do `AgeGate.tsx` e é da P |
+| **X — exclusão** · resta um item | β9.6 ✅ (`28e5792`); falta alinhar o `recusar()` | o `recusar()` de `auth.ts` + teste | web, outras rotas |
+| **U — perfil público** ✅ | #37, #38 (PR #64) | `apps/api/src/routes/profile.ts` + teste | `me.ts`, `auth.ts`, web |
+| **H — cabeçalhos** ✅ | #42, a metade que não quebra (PR #63) | `apps/api/src/server.ts`, `apps/web/public/_headers` (novo) | rotas |
+| **F — ferramenta** · aberta | β9.5, β9.7, β9.8, #40, #41 | `.claude/skills/run-watchlytics/driver.mjs` e o `SKILL.md`, `tools/a11y/*` | `apps/**` |
 
 X, U e H são todas de api e mesmo assim disjuntas: `me.ts`+`auth.ts`,
 `profile.ts` e `server.ts`. P e V são as duas de web, e a fronteira entre elas é
@@ -1055,25 +1055,52 @@ que o CSS da porta de idade é inline no `.tsx`.
 
 A F só começa depois da β9.0a — as duas mexem no `driver.mjs`.
 
-### Ordem
+### Ordem, e o que sobrou dela
 
-1. **Serial:** β9.0a (✅) e β9.0b. Duas tarefas pequenas, uma sessão só.
-2. **P e H em paralelo.** São as duas que bloqueiam o convite, e não se
-   encontram em arquivo nenhum — uma é de web, a outra de api.
-3. **U.** O perfil público é o link que circula; vale antes de convidar, não
-   depois.
-4. **V, X e F** em qualquer ordem, inclusive depois do convite. Nenhuma muda o
-   que quem usa o app vê: uma é cor, uma é a segunda porta de exclusão que hoje
-   não produz sobra, e a outra é ferramenta.
+A ordem planejada era: serial, depois P e H em paralelo, depois U, depois V, X e
+F. **Foi seguida, e em 2026-09-13 sobrou só a F.**
+
+O que continua aberto:
+
+| | o quê | por que não tem pressa |
+|---|---|---|
+| **F** | β9.5, β9.7, β9.8, #40, #41 | É ferramenta. O `driver.mjs all` termina vermelho na última asserção do `handle`, e a causa está diagnosticada (β9.8): o próprio driver aborta o fetch ao recarregar |
+| resto da **X** | alinhar o `recusar()` do `auth.ts` | Conta sem swipe não aparece em aviso nenhum, então a divergência não produz sobra hoje |
+| resto do **#42** | a CSP | Tarefa própria, com `Report-Only` primeiro — e agora com HSTS e `nosniff` já no ar por baixo dela |
 
 > A X entrou primeiro e fechou no mesmo dia: a β9.6 era a única com PII de pé, e
-> o código já existia. O que sobrou dela — alinhar o `recusar()` — não tem
-> pressa pelo mesmo motivo que o defeito original tinha: conta sem swipe não
-> aparece em aviso nenhum.
+> o código já existia.
 
 Três trilhas ao mesmo tempo é o teto útil aqui. Não é limite de máquina — é que
 `main` só recebe um merge por vez, e a lição do β8 é que a fila de integração é
 onde as trilhas se quebram, não o editor.
+
+### O que os cinco merges deixaram no ar
+
+Mesclados em 2026-09-13, nesta ordem: #61, #62, #63, #64, #65. **Conferido na
+branch mesclada antes de tudo** — `npm run check` limpo, 150 testes da api e 43
+da web, e o `driver.mjs all` (api, web, handle e a `porta` nova) verde exceto a
+β9.8, que é conhecida. É a regra do β8: o CI não roda o driver.
+
+Um detalhe do CI que engana quem for ler depois: os runs de #62 e #63 aparecem
+**cancelados**, porque o grupo de concorrência derruba o run em voo quando o
+merge seguinte chega. Quem validou e implantou os cinco foi o run de #65.
+
+Medido em produção depois do deploy, e não inferido do deploy ter passado:
+
+```
+api    strict-transport-security: max-age=31536000; includeSubDomains
+       x-content-type-options: nosniff
+       referrer-policy: strict-origin-when-cross-origin
+Pages  strict-transport-security: max-age=31536000; includeSubDomains   (era ausente)
+/u/keizo   og:image = https://watchlytics.pages.dev/og.png
+           twitter:card = summary_large_image
+           <a class="entrar" href="https://watchlytics.pages.dev/">
+/og.png    HTTP/2 200 · image/png
+```
+
+**Os dois bloqueios do convite caíram**: a porta de idade fala a própria língua,
+e o HSTS está no ar nas duas origens.
 
 ### O que continua sendo do usuário
 
