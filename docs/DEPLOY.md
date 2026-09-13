@@ -142,11 +142,22 @@ As duas páginas são geradas no build por `apps/web/legal.mjs` a partir de
 `docs/legal/*.md` — é por isso que elas ficam no domínio do app e não no
 GitHub, que não dá para verificar como domínio nosso.
 
-> **Não publique com os `[PREENCHER]` de pé.** A política e os termos ainda
-> declaram controlador, encarregado, representante na UE, data de vigência e lei
-> aplicável como campos em branco, e é justamente a identificação do controlador
-> que GDPR e LGPD exigem. No modo Testing isso é rascunho; publicado é promessa
-> quebrada.
+> **Os `[PREENCHER]` saíram em 2026-09-11 (β1).** Os cinco campos que este aviso
+> cobrava estão respondidos: controlador nomeado (pessoa física, no Brasil),
+> encarregado, representante na UE, data de vigência (`2026-09-11`) e lei
+> aplicável (Brasil, comarca de Maringá). `git grep PREENCHER docs/legal/` não
+> devolve nada. Publicar deixou de estar bloqueado por aqui.
+>
+> **O que sobrou é condição, não campo em branco.** O encarregado (LGPD art. 41)
+> e o representante na UE (GDPR art. 27) estão declarados como **não nomeados**,
+> cada um com a isenção que o dispensa — porte pequeno na Resolução CD/ANPD nº
+> 2/2022, e o art. 27(2)(a) para processamento ocasional, sem categoria especial
+> e de baixo risco. As duas isenções descrevem o beta fechado de hoje: sair do
+> convite-only, ou crescer, reabre as duas, e a própria política promete nomear
+> um representante antes disso. Reler as duas linhas antes de abrir ao público.
+>
+> O que o formulário de publicação ainda cobra de verdade são os *Authorized
+> domains* verificados no Search Console — ver o parágrafo acima.
 
 ## 4. GitHub (CI)
 
