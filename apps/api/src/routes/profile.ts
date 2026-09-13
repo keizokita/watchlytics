@@ -84,11 +84,22 @@ function summary(stats: ProfileStats): string {
 }
 
 /**
- * Sem `og:image`: não há pôster no catálogo (B4 está parada pelo mesmo motivo)
- * e og:image apontando para nada faz o WhatsApp mostrar um retângulo cinza —
- * pior que preview só de texto.
+ * O HTML que vira preview quando o link circula.
+ *
+ * **A arte do `og:image` é a MESMA para todo perfil** (#38), e isso é decisão de
+ * privacidade, não preguiça: quem busca a imagem do preview é o servidor do
+ * WhatsApp, do X ou do Slack, não o navegador de quem clicou. Um pôster da
+ * biblioteca sairia mais bonito e custaria zero infra — o `poster_url` já está
+ * no banco —, mas viraria "o que fulano assistiu" no cache de um terceiro.
+ *
+ * Havia aqui a justificativa de NÃO ter `og:image` porque não havia pôster no
+ * catálogo. Aquilo venceu: são 9.769 títulos com pôster desde a I1, e a razão
+ * que sobrou é a de cima, que não depende do catálogo.
+ *
+ * `summary_large_image` e não `summary`: com imagem de 1200×630, o `summary`
+ * recorta num quadrado pequeno e joga fora a arte.
  */
-function page(profile: Profile, url: string): string {
+function page(profile: Profile, url: string, origin: string): string {
   const title = `${profile.displayName} on Watchlytics`;
   const desc = summary(profile.stats);
   const meta = (property: string, content: string) =>
@@ -104,7 +115,11 @@ ${meta("og:type", "profile")}
 ${meta("og:title", title)}
 ${meta("og:description", desc)}
 ${meta("og:url", url)}
-<meta name="twitter:card" content="summary">
+${meta("og:image", `${origin}/og.png`)}
+${meta("og:image:width", "1200")}
+${meta("og:image:height", "630")}
+${meta("og:image:alt", "Watchlytics — find what to watch next.")}
+<meta name="twitter:card" content="summary_large_image">
 <style>
   body { font: 16px/1.5 system-ui, sans-serif; margin: 0; display: grid;
          place-items: center; min-height: 100dvh; background: #10131a; color: #e8eaf0 }
@@ -112,12 +127,19 @@ ${meta("og:url", url)}
   h1 { margin: 0 0 .25rem; font-size: 1.5rem }
   .handle, .muted { color: #98a0b3 }
   .summary { margin-top: 1.25rem; font-size: 1.1rem }
+  /* O link é o único alvo da página: alvo de toque de 44px e foco visível,
+     porque quem chega aqui por teclado tem UMA parada e ela precisa aparecer. */
+  .entrar { display: inline-block; margin-top: 1.75rem; padding: .7rem 1.2rem;
+            min-height: 44px; box-sizing: border-box; border-radius: 999px;
+            border: 1px solid #2a3040; color: #e8eaf0; text-decoration: none }
+  .entrar:hover { border-color: #4a5268 }
+  .entrar:focus-visible { outline: 2px solid #e8eaf0; outline-offset: 3px }
 </style>
 <main>
   <h1>${escape(profile.displayName)}</h1>
   <p class="handle">@${escape(profile.handle)}</p>
   <p class="summary">${escape(desc)}</p>
-  <p class="muted">Watchlytics</p>
+  <a class="entrar" href="${escape(origin)}/">Open Watchlytics</a>
 </main>
 `;
 }
@@ -192,17 +214,21 @@ export function profileRoutes(app: FastifyInstance): void {
       ? await publicProfile(parsed.data.handle)
       : null;
 
-    reply.type("text/html; charset=utf-8");
-    if (!profile) {
-      reply.code(404);
-      return "<!doctype html><meta charset=utf-8><title>Not found</title><p>No public profile here.";
-    }
-
     // PUBLIC_ORIGIN e não o header Host: o `og:url` vai dentro do preview que
     // outra pessoa vê, e Host é do cliente. Em dev não há proxy nem CDN, então
     // o header serve de fallback.
     const origin =
       process.env["PUBLIC_ORIGIN"] ?? `http://${req.headers.host ?? "localhost"}`;
-    return page(profile, `${origin}/u/${profile.handle}`);
+
+    reply.type("text/html; charset=utf-8");
+    if (!profile) {
+      reply.code(404);
+      // O 404 leva o mesmo caminho de volta que a página cheia: quem recebeu um
+      // link que morreu é justamente quem não tem outra porta de entrada.
+      return `<!doctype html><meta charset=utf-8><title>Not found</title>
+<p>No public profile here. <a href="${escape(origin)}/">Open Watchlytics</a>`;
+    }
+
+    return page(profile, `${origin}/u/${profile.handle}`, origin);
   });
 }

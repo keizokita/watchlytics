@@ -1,0 +1,20 @@
+<!doctype html><meta charset=utf-8>
+<style>
+  html,body { margin:0; padding:0 }
+  body { width:1200px; height:630px; background:#10131a; color:#e8eaf0;
+         font: 400 32px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         display:grid; place-items:center; position:relative; overflow:hidden }
+  /* Mesma ideia do forro do card (poster.ts): um gradiente escuro atrás, para
+     a arte não ser um retângulo chapado. */
+  .luz { position:absolute; inset:-30% -10% auto -10%; height:120%;
+         background: radial-gradient(60% 60% at 30% 20%, #1d3a2e 0%, transparent 70%),
+                     radial-gradient(50% 50% at 80% 80%, #2a2340 0%, transparent 70%) }
+  main { position:relative; text-align:center; padding:0 4rem }
+  h1 { margin:0; font-size:104px; font-weight:700; letter-spacing:-.02em }
+  p  { margin:.6rem 0 0; font-size:40px; color:#98a0b3 }
+</style>
+<div class="luz"></div>
+<main>
+  <h1>Watchlytics</h1>
+  <p>Find what to watch next.</p>
+</main>
