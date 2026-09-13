@@ -78,7 +78,8 @@ derruba no fim.
 | `driver.mjs web` | Garante api:3000 + vite:5173 (subindo o que faltar), **planta uma sessão e cumpre o onboarding** de um usuário descartável, dirige o Chrome headless pelo deck, tira dois prints e confere os swipes no banco. Desfaz as duas coisas no fim. |
 | `driver.mjs social` | **β6** — duas contas com sessões simultâneas, em contextos de navegação separados. Porta de idade, rotação de refresh, amizade, match, notificação e perfil público, tudo pela tela. Cria as duas contas e as apaga no fim. |
 | `driver.mjs handle` | **β8** — a porta onde a pessoa escolhe o handle: valida digitando, debounce da consulta, a corrida do 409 e a gravação. Mede foco, alvo de toque e estouro de largura por `getBoundingClientRect`. ~20s. |
-| `driver.mjs all` | `api`, `web` e `handle`, nessa ordem. Padrão. O `social` fica de fora: ele leva ~40s e sobe dois contextos. |
+| `driver.mjs porta` | **β2 / β9.1** — a porta de idade: ano fora da faixa mostra o aviso DO APP (e não a bolha do navegador, no idioma dele), a recusa apaga a conta e não anuncia sessão, e o ano bom passa e é gravado. Duas contas descartáveis, porque a recusa apaga a primeira. |
+| `driver.mjs all` | `api`, `web`, `handle` e `porta`, nessa ordem. Padrão. O `social` fica de fora: ele leva ~40s e sobe dois contextos. |
 
 Flags do `web`: `--url` (padrão `http://localhost:5173`), `--wait <seletor>`
 (padrão `.deck-card`), `--out <arquivo.png>`.
