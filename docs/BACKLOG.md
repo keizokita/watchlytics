@@ -594,7 +594,7 @@ real de graça.
 
 | id | O que provar | Pronto quando |
 |---|---|---|
-| β6.1 | Conta nova entra por OAuth | O handle sai de outro local-part sem colidir; `consents` ganha a linha com a `CONSENT_VERSION` corrente; a porta de idade é cobrada — ela nunca rodou num cadastro real |
+| β6.1 | Conta nova entra por OAuth | `consents` ganha a linha com a `CONSENT_VERSION` corrente; as DUAS portas são cobradas — a de idade e a do handle (§7), e nenhuma das duas rodou num cadastro real ainda. O handle gerado é `user_<hex>`, que não diz nada sobre o e-mail; quem entra escolhe o dele |
 | β6.2 | Duas sessões vivas ao mesmo tempo | Navegadores (ou dispositivos) diferentes, cada um rotacionando o próprio cookie de refresh sem derrubar o outro. O C3 trata reuso de refresh como replay e revoga a sessão inteira: duas sessões legítimas não podem disparar isso |
 | β6.3 | Amizade ponta a ponta pela tela | A busca B pelo handle e pede; B vê em "Friend requests" e aceita; as três listas ficam certas dos DOIS lados |
 | β6.4 | Match e notificação na tela | Os dois curtem o mesmo título e cada um vê o match. Dê um like ANTES do aceite para exercitar o cruzamento retroativo do E4 |

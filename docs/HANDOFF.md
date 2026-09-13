@@ -39,9 +39,16 @@ só a mudança. Vale ler antes de propor refazer algo.
 com gesto, teclado, undo e fila offline; o catálogo inteiro passa uma vez sem
 repetir; o LIKE vira coleção com abas e estatísticas.
 
-**160 testes** (133 API + 27 web), `npm run check` limpo nos três pacotes e as
-asserções do `driver.mjs` verdes, `api` e `social` (recontado em `main` em
-2026-09-12, na integração das quatro branches).
+**188 testes** (145 API + 43 web), `npm run check` limpo nos três pacotes e o
+`driver.mjs all` com 50 asserções verdes — `api`, `web` e `handle` (recontado em
+`main` em 2026-09-13, num banco criado do zero). As 4 vermelhas do `all` são o
+limite da fixture de 94 títulos, não regressão: elenco (I1.2) e as duas do
+pôster (B4) precisam do catálogo ingerido, e "feed puxa do topo" pisca porque a
+mediana fica perto demais do topo. O `social` (23 asserções) roda fora do `all`.
+
+**O β8 fechou em 2026-09-13** (BACKLOG §7): o handle deixou de sair do e-mail.
+Toda conta entra com `handle_chosen = false` e escolhe o handle numa porta nova,
+logo depois da porta de idade — inclusive as que já existem.
 A trilha **I** (catálogo real, BACKLOG §5) fechou inteira: I0.1 (régua), I0.2
 (migration 0003 + `castNames` no contrato), I1 (elenco) e I2 (catálogo vivo).
 **`schema.ts` e `contract/index.ts` continuam CONGELADOS** — quem precisar de
@@ -118,9 +125,9 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
    O resto da checklist saiu daqui em 2026-09-12: `driver.mjs social` dirige
    β6.2 a β6.5 com duas contas em contextos de navegação separados, 23 asserções
    verdes (reconferidas na integração, num banco criado do zero). Fica aberto só
-   o que o Google prova: handle derivado do local-part sem colidir, a linha em
-   `consents` com a `CONSENT_VERSION` corrente, e o primeiro cadastro real
-   batendo na porta de idade.
+   o que o Google prova: a linha em `consents` com a `CONSENT_VERSION` corrente,
+   e o primeiro cadastro real batendo nas DUAS portas — a de idade e, desde o
+   β8, a do handle, que nunca foi atravessada por uma conta criada pelo OAuth.
 
 **Saiu desta lista em 2026-09-09:** "conferir o login no Network do DevTools".
 Os quatro elos foram medidos de fora e o caminho está inteiro — ver o bloco
