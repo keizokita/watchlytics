@@ -37,6 +37,13 @@ export const SCREEN_CSS = `
 .lib .notice.error { display: grid; gap: 0.6rem; justify-items: center; }
 
 .lib-locked { margin: 0; color: var(--muted); font-size: 0.9rem; }
+/* O link do perfil público era o único do app sem cor própria: medido em
+   rgb(158, 158, 255), que é o default do agente em tema escuro, contra
+   rgb(154, 160, 173) da nav ao lado. Mesma regra do .consent a: sublinhado
+   junto com a cor, para o link ser reconhecível sem depender de distinguir
+   --fg de --muted. */
+.lib-account a { color: var(--fg); text-decoration: underline; }
+.lib-account a:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
 .lib-hint { margin: 0; color: var(--muted); font-size: 0.85rem; }
 .lib-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .lib-list li { border: 1px solid var(--line); border-radius: var(--r-panel);

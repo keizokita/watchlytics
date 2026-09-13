@@ -574,6 +574,13 @@
          clica no texto marca a caixa. É a label que precisa da altura. */
       .lib-public { display: flex; gap: 0.5rem; align-items: center;
         justify-content: center; min-height: var(--tap); }
+      /* A caixa nativa sem `accent-color` é pintada pelo navegador: medido
+         `accent-color: auto`, que no Chrome em tema escuro sai no azul do
+         sistema — o único azul do app, no meio de uma tela que é verde e
+         cinza. O `<progress>` do onboarding já fazia isso; a caixa ficou de
+         fora. Nativa continua sendo o certo: ela já vem com papel, estado e
+         teclado que uma div fingindo de checkbox teria que reconstruir. */
+      .lib-public input { accent-color: var(--like); }
 
       .sr-only {
         position: absolute;
