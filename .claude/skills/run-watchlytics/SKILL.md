@@ -77,7 +77,8 @@ derruba no fim.
 | `driver.mjs api` | Sobe o Fastify **em processo** e bate nas rotas com `app.inject()`. Sem porta, sem servidor. É o caminho para PR que mexe em `apps/api/src/`. |
 | `driver.mjs web` | Garante api:3000 + vite:5173 (subindo o que faltar), **planta uma sessão e cumpre o onboarding** de um usuário descartável, dirige o Chrome headless pelo deck, tira dois prints e confere os swipes no banco. Desfaz as duas coisas no fim. |
 | `driver.mjs social` | **β6** — duas contas com sessões simultâneas, em contextos de navegação separados. Porta de idade, rotação de refresh, amizade, match, notificação e perfil público, tudo pela tela. Cria as duas contas e as apaga no fim. |
-| `driver.mjs all` | `api` e `web`, nessa ordem. Padrão. O `social` fica de fora: ele leva ~40s e sobe dois contextos. |
+| `driver.mjs handle` | **β8** — a porta onde a pessoa escolhe o handle: valida digitando, debounce da consulta, a corrida do 409 e a gravação. Mede foco, alvo de toque e estouro de largura por `getBoundingClientRect`. ~20s. |
+| `driver.mjs all` | `api`, `web` e `handle`, nessa ordem. Padrão. O `social` fica de fora: ele leva ~40s e sobe dois contextos. |
 
 Flags do `web`: `--url` (padrão `http://localhost:5173`), `--wait <seletor>`
 (padrão `.deck-card`), `--out <arquivo.png>`.
@@ -112,6 +113,38 @@ Prints → `/tmp/watchlytics-run/web.png` (deck inicial) e `web-depois.png`
 
 O último ✔ é o que fecha o circuito: clique no DOM → `POST /v1/swipes` →
 linha no Postgres. O driver apaga essas linhas no fim (veja Gotchas).
+
+### `handle` — a porta do β8
+
+```
+── handle ──
+✔ β8 a porta do handle abre depois da de idade
+✔ β8 a nav não anuncia o handle derivado do e-mail — "Signed in Sign out"
+✔ β8 o foco cai no campo, e não no body — handle
+✔ β8 alvo do campo ≥ 44px — 46.0px
+✔ β8 nada estoura a janela de 430px — 0 elementos, mais largo 391.0
+✔ β8 caractere inválido é acusado enquanto se digita
+✔ β8 nove teclas em ~360ms viram UMA consulta, não nove — 1 requisições
+✔ β8 reservado dá a MESMA frase do tomado, sem gastar requisição
+✔ β8 perder a corrida vira indisponível, e não erro fatal
+✔ β8 o Postgres tem o handle escolhido, e a porta fechada — {"handle":"escolhido","handle_chosen":true}
+✔ β8 e recarregar não reabre a porta — escolhe uma vez
+```
+
+São 31 asserções, nenhuma contra rota fingida: "tomado" é outra conta ocupando
+a linha, e o 409 é a corrida acontecendo de verdade — a consulta responde
+"livre", o driver ocupa o handle, e só então a tela envia. É a janela que
+nenhuma consulta prévia fecha, e quem a resolve é o índice único.
+
+O penúltimo ✔ fecha o circuito, como o swipe fecha no `web`: digitação no DOM →
+`POST /v1/auth/handle` → linha no Postgres.
+
+**Tecla por tecla.** `teclar()` manda um `keyDown`/`keyUp` por caractere porque
+o que se mede é o DEBOUNCE: o `digitar()` normal usa `Input.insertText`, que
+entrega tudo num evento só — um campo sem debounce nenhum também sairia com uma
+requisição, e a asserção passaria por cima do bug. E o debounce não é enfeite:
+`/v1/auth/handle/available` tem o mesmo teto por IP das rotas que emitem token
+(20/min), então sem ele UM handle de nove letras gasta nove requisições.
 
 ### `social` — o loop entre duas contas (β6)
 
@@ -150,6 +183,15 @@ Se `apps/web/src/Deck.tsx` ou `Card.tsx` mudarem de marcação, é aqui que queb
 | `.deck .deck-card:last-child` | card do topo — **último** no DOM, `Deck.tsx` renderiza `.reverse()` |
 | `.card-title` | título (é `<h2>`, não `<h1>`) |
 | `.actions button` + texto | Pass / Undo / Like — o driver acha **pelo texto**, não por posição |
+
+E o `handle` depende de `HandleGate.tsx`:
+
+| seletor | o quê |
+|---|---|
+| `#handle` | o campo. É o `id` que o `aria-describedby` e a `<label for>` amarram |
+| `#handle-status` | a linha de veredito (`role="status"`) — inválido, checando, livre, indisponível |
+| `.handle-field` | a moldura com o `@`. É ELA que carrega os 44px, não o `<input>` |
+| `.onboarding-go` | o botão de enviar, compartilhado com o onboarding |
 
 Os botões são casados por `innerText`, de propósito: a ordem já mudou uma vez
 (B7 inseriu o Undo entre Pass e Like) e `:last-child` teria quebrado calado.
@@ -250,6 +292,12 @@ sujar nada.
   `screenCss.ts`, então o "Results" do `strings.ts` chega como "RESULTS". Casar
   texto de tela sem normalizar a caixa dá seletor que não acha nada e uma espera
   de 10s culpando a requisição, que tinha respondido.
+- **Conta criada na mão precisa de `handle_chosen`, além de `birth_year`.** O
+  β8 põe uma segunda porta logo depois da de idade, e conta com
+  `handle_chosen = false` para nela. É por isso que `abrirSessao` e `criarConta`
+  gravam `true`: sem isso o `cmdWeb` e o `social` parariam na tela do handle e o
+  sintoma seria `.deck-card` nunca aparecendo. Quem quer a porta ABERTA pede
+  `abrirSessao(page, { handleEscolhido: false })`.
 - **`chromium-cli` não existe nesta máquina.** O driver fala CDP direto no
   `google-chrome` pelo `WebSocket` global do Node — sem Playwright, sem `ws`, e
   `npm install` não muda por causa dele.

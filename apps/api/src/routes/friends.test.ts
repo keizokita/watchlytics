@@ -41,11 +41,17 @@ await db
   .insert(users)
   .values([
     // β2 — `birthYear` é a porta de idade já respondida: sem ano, 403.
-    { id: ANA, handle: "ana-teste-e1", displayName: "Ana", email: "ana@example.com", birthYear: 1990 },
-    { id: BRUNO, handle: "bruno-teste-e1", displayName: "Bruno", birthYear: 1990 },
-    { id: CARLA, handle: "carla-teste-e1", displayName: "Carla", birthYear: 1990 },
+    // β8 — e `handleChosen`, a do handle: sem ela, 403 também.
+    { id: ANA, handle: "ana-teste-e1", displayName: "Ana", email: "ana@example.com", birthYear: 1990, handleChosen: true },
+    { id: BRUNO, handle: "bruno-teste-e1", displayName: "Bruno", birthYear: 1990, handleChosen: true },
+    { id: CARLA, handle: "carla-teste-e1", displayName: "Carla", birthYear: 1990, handleChosen: true },
   ])
-  .onConflictDoNothing();
+  // DoUpdate e não DoNothing: a linha pode ter sobrado de uma rodada
+  // anterior às portas, e fixture com porta fechada é 403 em todo teste.
+  .onConflictDoUpdate({
+    target: users.id,
+    set: { birthYear: 1990, handleChosen: true },
+  });
 
 const app = buildServer();
 

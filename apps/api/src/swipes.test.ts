@@ -26,8 +26,13 @@ process.env["AUTH_SECRET"] ??= "chave-de-teste-com-mais-de-32-caracteres";
 await db
   .insert(users)
   // β2 — nasce com a porta de idade já respondida: sem ano, toda rota é 403.
-  .values({ id: USER, handle: "swipes-test", displayName: "A0", birthYear: 1990 })
-  .onConflictDoNothing();
+  .values({ id: USER, handle: "swipes-test", displayName: "A0", birthYear: 1990, handleChosen: true })
+  // DoUpdate e não DoNothing: a linha pode ter sobrado de uma rodada
+  // anterior às portas, e fixture com porta fechada é 403 em todo teste.
+  .onConflictDoUpdate({
+    target: users.id,
+    set: { birthYear: 1990, handleChosen: true },
+  });
 
 const app = buildServer();
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { HANDLE_MAX, type SessionUser } from "@watchlytics/contract";
+import { HANDLE_MAX } from "@watchlytics/contract";
 import {
   checarDisponibilidade,
   escolherHandle,
@@ -42,7 +42,9 @@ type Status =
   /** Tomado ou reservado: a mesma frase, porque o contrato responde um booleano. */
   | { kind: "taken" };
 
-export function HandleGate({ user }: { user: SessionUser }) {
+// Sem prop: a sessão de DEPOIS vem na resposta do envio, e a de antes esta
+// tela não lê. Quem monta e desmonta o componente é o `needsHandle` do shell.
+export function HandleGate() {
   const [raw, setRaw] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [error, setError] = useState<string | null>(null);
@@ -109,12 +111,11 @@ export function HandleGate({ user }: { user: SessionUser }) {
     setError(null);
     try {
       const r = await escolherHandle(raw);
-      // Gravou: o shell sai daqui na hora. O handle novo vai junto porque a nav
-      // escreve "Signed in as @handle" — deixar o gerado ali contradiria a
-      // escolha que a pessoa acabou de fazer. Sai antes de mexer em estado
-      // local: este componente já desmontou.
+      // Gravou: o shell sai daqui na hora, com a sessão que o SERVIDOR devolveu
+      // — é ela que traz o handle novo, e a nav escreve "Signed in as @handle".
+      // Sai antes de mexer em estado local: este componente já desmontou.
       if (r.kind === "ok") {
-        setUser({ ...user, handle: r.handle, needsHandle: false });
+        setUser(r.user);
         return;
       }
       // Recusado pela borda: alguém chegou primeiro, ou o contrato reprovou. A

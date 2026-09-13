@@ -74,7 +74,9 @@ async function cmdApi() {
   const { eq } = await import("drizzle-orm");
 
   const userId = crypto.randomUUID();
-  const handle = `driver-${userId.slice(0, 8)}`;
+  // `_` e não `-`: o `handleRegex` do contrato não aceita hífen, e desde o β8
+  // este usuário ESCOLHE o handle pela rota de verdade, abaixo.
+  const handle = `driver_${userId.slice(0, 8)}`;
   await db.insert(users).values({ id: userId, handle, displayName: "Driver" });
 
   const app = buildServer();
@@ -99,6 +101,30 @@ async function cmdApi() {
       payload: { birthYear: new Date().getFullYear() - 30 },
     });
     ok("a porta de idade abre com maior de idade", porta.json().ok === true);
+
+    // β8 — e logo atrás vem a segunda porta. Esta ordem é o requisito: idade
+    // primeiro, porque não faz sentido pedir handle a quem pode ser recusado no
+    // passo seguinte. Sem esta asserção, o dia em que a ordem inverter passa
+    // calado — e o sintoma seria a tela do handle aparecendo para quem está
+    // prestes a ter a conta apagada.
+    const semHandle = await get("/v1/feed");
+    ok(
+      "com a idade respondida, o feed ainda é 403 sem handle (β8)",
+      semHandle.statusCode === 403,
+      String(semHandle.statusCode),
+    );
+
+    const escolha = await app.inject({
+      method: "POST",
+      url: "/v1/auth/handle",
+      headers,
+      payload: { handle },
+    });
+    ok(
+      "a porta do handle abre, e devolve a sessão com ela fechada (β8)",
+      escolha.json().needsHandle === false,
+      escolha.json().handle,
+    );
 
     const feed = await get("/v1/feed");
     const items = feed.json().items;
@@ -303,7 +329,6 @@ async function openBrowser() {
       deviceScaleFactor: 2,
       mobile: w < 700,
     });
-
     return page;
   }
 
@@ -648,21 +673,27 @@ async function cmdWeb() {
  * mais atalho nenhum no ambiente. E a limpeza vira uma linha só —
  * `delete from users` cascateia sessão e swipes.
  */
-async function abrirSessao(page) {
+async function abrirSessao(page, { handle = null, handleEscolhido = true } = {}) {
   const { newRefreshToken, REFRESH_TTL_S, signAccess } = await import(
     join(ROOT, "apps/api/src/auth.ts")
   );
   const userId = crypto.randomUUID();
   const sessionId = crypto.randomUUID();
   const { token, hash } = newRefreshToken(sessionId);
+  const oHandle = handle ?? `driver-${userId.slice(0, 8)}`;
 
   await comBanco(async (sql) => {
     // β2 — nasce com a porta de idade já respondida. A TELA que pergunta o ano
     // é da trilha α e ainda não existe; enquanto não existir, o headless não
     // teria como responder e pararia no 403 antes de ver o deck.
+    //
+    // β8 — e com o handle já escolhido, pelo MESMO motivo: a porta do handle
+    // vem logo depois da idade, e uma conta que nasce com `handle_chosen`
+    // falso pararia nela em vez de chegar ao deck. Quem quer a porta ABERTA é
+    // o `cmdHandle`, que pede `handleEscolhido: false`.
     await sql`
-      insert into users (id, handle, display_name, birth_year)
-      values (${userId}, ${`driver-${userId.slice(0, 8)}`}, 'Driver', 1990)`;
+      insert into users (id, handle, display_name, birth_year, handle_chosen)
+      values (${userId}, ${oHandle}, 'Driver', 1990, ${handleEscolhido})`;
     await sql`
       insert into sessions (id, user_id, refresh_token_hash, expires_at, user_agent)
       values (${sessionId}, ${userId}, ${hash},
@@ -885,6 +916,39 @@ async function digitar(page, seletor, valor) {
 }
 
 /**
+ * Escreve UMA TECLA DE CADA VEZ, com intervalo.
+ *
+ * O `digitar` acima não serve onde o que se mede é o debounce: `Input.insertText`
+ * entrega o texto inteiro num evento só, então um campo sem debounce nenhum
+ * também sairia com uma requisição — a asserção passaria sobre um bug.
+ *
+ * `text` no keyDown é o que insere o caractere; sem ele o evento chega ao
+ * `window` mas o campo continua vazio.
+ */
+async function teclar(page, texto, intervaloMs = 40) {
+  for (const ch of texto) {
+    await page.cmd("Input.dispatchKeyEvent", { type: "keyDown", text: ch, key: ch });
+    await page.cmd("Input.dispatchKeyEvent", { type: "keyUp", key: ch });
+    await sleep(intervaloMs);
+  }
+}
+
+/** Esvazia um campo controlado pelo React sem passar pelo teclado. */
+async function limparCampo(page, seletor) {
+  await evaluate(
+    page,
+    `(() => {
+       const el = document.querySelector(${JSON.stringify(seletor)});
+       const set = Object.getOwnPropertyDescriptor(
+         window.HTMLInputElement.prototype, "value").set;
+       set.call(el, "");
+       el.dispatchEvent(new Event("input", { bubbles: true }));
+       el.focus();
+     })()`,
+  );
+}
+
+/**
  * Recarrega e espera o documento NOVO.
  *
  * A marca existe porque `Page.reload` volta antes de a página trocar: o
@@ -965,9 +1029,11 @@ async function criarConta(sql, nome) {
   const handle = `${nome}-${userId.slice(0, 8)}`;
   const { token, hash } = newRefreshToken(sessionId);
 
+  // β8 — handle já escolhido: estas contas respondem a porta de IDADE pela
+  // tela, de propósito, mas a do handle pararia o β6 antes do primeiro passo.
   await sql`
-    insert into users (id, handle, display_name)
-    values (${userId}, ${handle}, ${nome})`;
+    insert into users (id, handle, display_name, handle_chosen)
+    values (${userId}, ${handle}, ${nome}, true)`;
   await sql`
     insert into sessions (id, user_id, refresh_token_hash, expires_at, user_agent)
     values (${sessionId}, ${userId}, ${hash},
@@ -1360,6 +1426,318 @@ async function cmdSocial() {
   }
 }
 
+// ─── handle: a porta do β8 ──────────────────────────────────────────────────
+
+/** O que a linha de veredito da tela está dizendo agora. */
+const veredito = (page) =>
+  evaluate(page, `document.getElementById("handle-status")?.textContent ?? null`);
+
+/**
+ * Ocupa um handle com uma conta descartável.
+ *
+ * É assim que "indisponível" e a corrida do 409 viram estado de banco em vez de
+ * resposta fingida: quem responde `available: false` e quem devolve 409 é a
+ * rota de verdade, contra o índice único de verdade.
+ */
+async function ocuparHandle(handle) {
+  const userId = crypto.randomUUID();
+  await comBanco(
+    (sql) => sql`
+      insert into users (id, handle, display_name, birth_year, handle_chosen)
+      values (${userId}, ${handle}, 'Ocupante', 1990, true)`,
+  );
+  return userId;
+}
+
+/**
+ * β8 — a tela onde a pessoa escolhe o próprio handle.
+ *
+ * Uma coisa aqui não existe em nenhum outro comando: o texto entra TECLA POR
+ * TECLA. O `digitar()` usa `Input.insertText`, que entrega tudo num evento só —
+ * com ele, um campo sem debounce nenhum também sairia com uma requisição e a
+ * asserção passaria por cima do bug.
+ *
+ * O debounce não é enfeite: `/v1/auth/handle/available` tem o mesmo teto por IP
+ * das rotas que emitem token (20/min, `MINT_PER_MIN`). Sem ele, UM handle de
+ * nove letras gasta nove requisições, e a segunda tentativa de quem está
+ * escolhendo já bate no 429.
+ */
+async function cmdHandle() {
+  const url = arg("--url", WEB);
+  const started = [];
+  const log = [];
+  /** Contas do run: a de quem escolhe, mais as que ocupam handle. */
+  const descartaveis = [];
+  let browser = null;
+
+  try {
+    await garantirServidores(url, started, log);
+    browser = await openBrowser();
+    const page = await browser.novaAba();
+    await page.cmd("Network.enable");
+
+    // O handle derivado do e-mail é o DEFEITO que esta tela conserta: a conta
+    // nasce com ele para provar que a tela não o anuncia como se fosse escolha.
+    const usuario = await abrirSessao(page, {
+      handle: "keizokita1",
+      handleEscolhido: false,
+    });
+    descartaveis.push(usuario);
+
+    const abrirTela = async () => {
+      await page.cmd("Page.navigate", { url });
+      await waitFor(page, "#handle");
+    };
+
+    // ── 1. a porta abre, e não há como contorná-la ──────────────────────────
+    await abrirTela();
+    const porta = await evaluate(
+      page,
+      `(() => ({
+         gate: !!document.querySelector('.handle-gate'),
+         deck: !!document.querySelector('.deck-card'),
+         navLinks: document.querySelectorAll('nav a').length,
+         login: document.querySelector('nav .notice')?.innerText ?? '',
+         foco: document.activeElement?.id ?? document.activeElement?.tagName,
+       }))()`,
+    );
+    ok("β8 a porta do handle abre depois da de idade", porta.gate === true);
+    ok("β8 nenhuma tela do app por baixo dela", porta.deck === false);
+    ok("β8 a nav não oferece contorno por link", porta.navLinks === 0, `${porta.navLinks} links`);
+    ok(
+      "β8 a nav não anuncia o handle derivado do e-mail",
+      !porta.login.includes("@keizokita1"),
+      JSON.stringify(porta.login),
+    );
+    ok("β8 o foco cai no campo, e não no body", porta.foco === "handle", String(porta.foco));
+
+    // ── 2. o que a auditoria do beta cobra, medido ──────────────────────────
+    const medido = await evaluate(
+      page,
+      `(() => {
+         const input = document.getElementById('handle');
+         const campo = document.querySelector('.handle-field');
+         const botao = document.querySelector('.onboarding-go');
+         const ids = (input.getAttribute('aria-describedby') ?? '').split(' ');
+         const caixas = [...document.querySelectorAll('.handle-gate *')]
+           .map((el) => el.getBoundingClientRect())
+           .filter((r) => r.width > 0);
+         return {
+           descritores: ids.map((id) => document.getElementById(id)?.id ?? null),
+           label: document.querySelector('label[for=handle]')?.innerText ?? null,
+           alvoCampo: campo.getBoundingClientRect().height,
+           alvoBotao: botao.getBoundingClientRect().height,
+           statusRole: document.getElementById('handle-status').getAttribute('role'),
+           estouro: caixas.filter((r) => r.right > innerWidth + 0.5 || r.left < -0.5).length,
+           janela: innerWidth,
+           maisLargo: Math.max(...caixas.map((r) => r.right)),
+         };
+       })()`,
+    );
+    ok(
+      "β8 aria-describedby aponta para elementos que existem",
+      medido.descritores.every((d) => d !== null),
+      JSON.stringify(medido.descritores),
+    );
+    ok("β8 o campo tem label associada", medido.label !== null, JSON.stringify(medido.label));
+    ok("β8 alvo do campo ≥ 44px", medido.alvoCampo >= 44, `${medido.alvoCampo.toFixed(1)}px`);
+    ok("β8 alvo do botão ≥ 44px", medido.alvoBotao >= 44, `${medido.alvoBotao.toFixed(1)}px`);
+    ok(
+      "β8 o veredito é região viva (role=status)",
+      medido.statusRole === "status",
+      String(medido.statusRole),
+    );
+    // scrollWidth não serve: o `overflow-x: clip` do index.html esconde o
+    // estouro dele. A medida é a borda de cada elemento contra a janela.
+    ok(
+      `β8 nada estoura a janela de ${medido.janela}px`,
+      medido.estouro === 0,
+      `${medido.estouro} elementos, mais largo ${medido.maisLargo.toFixed(1)}`,
+    );
+
+    await screenshot(page, join(SHOTS, "handle.png"));
+
+    // ── 3. valida enquanto se digita, e não no envio ────────────────────────
+    const antes = page.requests.length;
+    await teclar(page, "1keizo");
+    const invalido = await evaluate(
+      page,
+      `(() => ({
+         status: document.getElementById('handle-status').textContent,
+         invalid: document.getElementById('handle').getAttribute('aria-invalid'),
+         pintado: document.getElementById('handle-status').className.includes('error'),
+         botao: document.querySelector('.onboarding-go').disabled,
+       }))()`,
+    );
+    ok(
+      "β8 caractere inválido é acusado enquanto se digita",
+      /start with a letter/i.test(invalido.status ?? ""),
+      JSON.stringify(invalido.status),
+    );
+    ok("β8 o erro é associado ao campo (aria-invalid)", invalido.invalid === "true");
+    // A cor é reforço: quem não a distingue lê uma linha que ANTES estava vazia.
+    ok("β8 e a linha muda de conteúdo, não só de cor", invalido.pintado === true);
+    ok("β8 o envio fica fechado com handle inválido", invalido.botao === true);
+    ok(
+      "β8 handle inválido não vira requisição",
+      page.requests.slice(antes).filter((u) => u.includes("/v1/auth/handle")).length === 0,
+    );
+
+    // ── 4. o debounce, que é o motivo de existir tecla por tecla ────────────
+    await limparCampo(page, "#handle");
+    const base = page.requests.length;
+    await teclar(page, "keizokita", 40);
+    const livre = await until(
+      () => veredito(page),
+      (v) => /available/i.test(v ?? ""),
+      "a consulta de disponibilidade responder",
+    );
+    const consultas = page.requests
+      .slice(base)
+      .filter((u) => u.includes("/v1/auth/handle/available"));
+    ok(
+      "β8 nove teclas em ~360ms viram UMA consulta, não nove",
+      consultas.length === 1,
+      `${consultas.length} requisições`,
+    );
+    ok(
+      "β8 a consulta leva o handle já normalizado",
+      consultas[0]?.endsWith("handle=keizokita") === true,
+      consultas[0],
+    );
+    ok("β8 disponível é dito com o handle na frase", livre.includes("@keizokita"), JSON.stringify(livre));
+    ok(
+      "β8 com handle livre o envio abre",
+      (await evaluate(page, `!document.querySelector('.onboarding-go').disabled`)) === true,
+    );
+
+    // ── 5. indisponível, e a mesma frase para tomado e reservado ────────────
+    // Handle tomado de VERDADE: quem responde `available: false` é a rota,
+    // contra a linha que a outra conta ocupou.
+    descartaveis.push(await ocuparHandle("ocupadojati"));
+    await limparCampo(page, "#handle");
+    await teclar(page, "ocupadojati", 40);
+    const ocupado = await until(
+      () => veredito(page),
+      (v) => /not available/i.test(v ?? ""),
+      "a consulta dizer indisponível",
+    );
+    ok("β8 tomado é dito sem culpar quem digitou", /Try another/i.test(ocupado), JSON.stringify(ocupado));
+    ok(
+      "β8 e o envio fecha",
+      (await evaluate(page, `document.querySelector('.onboarding-go').disabled`)) === true,
+    );
+
+    // Reservado é resolvido pela lista DO CONTRATO, no cliente: a rota também
+    // responderia `available: false`, mas gastar requisição para saber o que já
+    // está no bundle é o que o debounce existe para evitar.
+    const baseRes = page.requests.length;
+    await limparCampo(page, "#handle");
+    await teclar(page, "admin", 40);
+    await sleep(600);
+    ok(
+      "β8 reservado dá a MESMA frase do tomado, sem gastar requisição",
+      (await veredito(page)) === ocupado &&
+        page.requests.slice(baseRes).filter((u) => u.includes("/v1/auth/handle")).length === 0,
+    );
+
+    // ── 6. a corrida que o 409 existe para resolver ─────────────────────────
+    // A consulta diz livre, e alguém ocupa o handle ANTES do envio. É a janela
+    // que nenhuma consulta prévia fecha, e é por isso que quem decide é o
+    // índice único (routes/auth.ts) e não a resposta que a tela já tem na mão.
+    await abrirTela();
+    await teclar(page, "corrida", 40);
+    await until(() => veredito(page), (v) => /available/i.test(v ?? ""), "a consulta dizer livre");
+    descartaveis.push(await ocuparHandle("corrida"));
+    await evaluate(page, `document.querySelector('.onboarding-go').click()`);
+    const perdeu = await until(
+      () =>
+        evaluate(
+          page,
+          `(() => ({ status: document.getElementById('handle-status').textContent,
+                     foco: document.activeElement?.id,
+                     gate: !!document.querySelector('.handle-gate') }))()`,
+        ),
+      (v) => /not available/i.test(v.status ?? ""),
+      "o 409 virar indisponível na tela",
+    );
+    ok("β8 perder a corrida vira indisponível, e não erro fatal", perdeu.gate === true, JSON.stringify(perdeu.status));
+    ok(
+      "β8 e o foco volta para o campo, onde está a correção",
+      perdeu.foco === "handle",
+      String(perdeu.foco),
+    );
+
+    // ── 7. a escolha grava, e é o banco que diz ─────────────────────────────
+    await abrirTela();
+    await teclar(page, "escolhido", 40);
+    await until(() => veredito(page), (v) => /available/i.test(v ?? ""), "a consulta dizer livre");
+    await evaluate(page, `document.querySelector('.onboarding-go').click()`);
+
+    const depois = await until(
+      () =>
+        evaluate(
+          page,
+          `(() => ({ gate: !!document.querySelector('.handle-gate'),
+                     navLinks: document.querySelectorAll('nav a').length,
+                     login: document.querySelector('nav .notice')?.innerText ?? '' }))()`,
+        ),
+      (v) => v.gate === false,
+      "a porta do handle sair da tela",
+    );
+    ok("β8 gravou: a porta sai e o app monta", depois.gate === false);
+    ok("β8 a nav volta a oferecer as três telas", depois.navLinks === 3, `${depois.navLinks} links`);
+    ok(
+      "β8 a nav passa a mostrar o handle ESCOLHIDO",
+      depois.login.includes("@escolhido") && !depois.login.includes("@keizokita1"),
+      JSON.stringify(depois.login),
+    );
+
+    // Fecha o circuito, como o `cmdWeb` faz com o swipe: digitação no DOM →
+    // POST → linha no Postgres. Sem isto o ✔ acima só provaria que o React
+    // acreditou na resposta.
+    const [linha] = await comBanco(
+      (sql) => sql`select handle, handle_chosen from users where id = ${usuario}`,
+    );
+    ok(
+      "β8 o Postgres tem o handle escolhido, e a porta fechada",
+      linha?.handle === "escolhido" && linha?.handle_chosen === true,
+      JSON.stringify(linha),
+    );
+
+    // Escolhe UMA vez: a porta não reabre nem recarregando.
+    await page.cmd("Page.navigate", { url });
+    await waitFor(page, ".shell nav a");
+    ok(
+      "β8 e recarregar não reabre a porta — escolhe uma vez",
+      (await evaluate(page, `!document.querySelector('.handle-gate')`)) === true,
+    );
+
+    await screenshot(page, join(SHOTS, "handle-depois.png"));
+
+    // O 409 do cenário da corrida é esperado, e o Chrome registra TODA resposta
+    // fora do 2xx como erro de recurso. Filtra só ele, e só nessa rota: um 500
+    // em `/v1/auth/handle` continua reprovando.
+    const reais = page.errors.filter(
+      (e) => !/favicon/i.test(e) && !/status of 409[\s\S]*\/v1\/auth\/handle/.test(e),
+    );
+    ok("β8 console sem erro além do 409 da corrida", reais.length === 0, reais.join(" | "));
+  } finally {
+    if (browser) browser.close();
+    // Uma consulta só: a cascata leva sessão e swipes de cada conta junto.
+    if (descartaveis.length) {
+      await comBanco((sql) => sql`delete from users where id in ${sql(descartaveis)}`);
+    }
+    for (const c of started) {
+      try {
+        process.kill(-c.pid, "SIGTERM");
+      } catch {}
+    }
+    if (process.exitCode) console.log(log.join(""));
+  }
+}
+
+
 // ─── entrada ────────────────────────────────────────────────────────────────
 
 const cmd = process.argv[2] ?? "all";
@@ -1376,14 +1754,19 @@ if (cmd === "api") await cmdApi();
 else if (cmd === "web") await cmdWeb();
 else if (cmd === "shot") await cmdShot();
 else if (cmd === "social") await cmdSocial();
+else if (cmd === "handle") await cmdHandle();
 else if (cmd === "all") {
   console.log("── api ──");
   await cmdApi();
   console.log("── web ──");
   await cmdWeb();
+  // No `all` e o `social` não: este leva ~20s contra os ~40s do outro, e cobre
+  // uma PORTA — quando ela quebra, o `cmdWeb` só diz "o seletor não apareceu".
+  console.log("── handle ──");
+  await cmdHandle();
 } else {
   console.error(
-    "uso: driver.mjs [api|web|shot|social|all] [--url U] [--wait SEL] [--out P] [--sessao]",
+    "uso: driver.mjs [api|web|shot|social|handle|all] [--url U] [--wait SEL] [--out P] [--sessao]",
   );
   process.exit(2);
 }
