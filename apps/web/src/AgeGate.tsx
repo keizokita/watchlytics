@@ -119,8 +119,18 @@ export function AgeGate({ user }: { user: SessionUser }) {
         </a>
       </p>
       {/* `<form>` e não dois handlers: é o que faz o Enter do teclado virtual
-          enviar, e o teclado virtual é como a maioria vai responder isto. */}
+          enviar, e o teclado virtual é como a maioria vai responder isto.
+
+          `noValidate` porque o `min`/`max` do campo abaixo cancelava o envio
+          ANTES de `onSubmit` rodar: a validação nativa reprovava o ano, o
+          navegador pintava a bolha dele — no idioma DELE, nesta tela em inglês
+          — e `t.ageGateInvalid` nunca aparecia. Quem decide continua sendo o
+          `ageGateInput` do contrato, que já cobre o mesmo intervalo; o
+          `min`/`max` fica só como a faixa que o campo declara para quem lê a
+          tela por leitor de tela. Esta é a única tela em que o app fala sozinho
+          com alguém que ele pode ter que recusar: quem fala tem que ser ele. */}
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
           void onSubmit();

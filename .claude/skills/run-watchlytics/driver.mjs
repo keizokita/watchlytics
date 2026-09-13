@@ -708,7 +708,10 @@ async function cmdWeb() {
  * mais atalho nenhum no ambiente. E a limpeza vira uma linha só —
  * `delete from users` cascateia sessão e swipes.
  */
-async function abrirSessao(page, { handle = null, handleEscolhido = true } = {}) {
+async function abrirSessao(
+  page,
+  { handle = null, handleEscolhido = true, anoNascimento = ANO_ADULTO } = {},
+) {
   const { newRefreshToken, REFRESH_TTL_S, signAccess } = await import(
     join(ROOT, "apps/api/src/auth.ts")
   );
@@ -718,9 +721,9 @@ async function abrirSessao(page, { handle = null, handleEscolhido = true } = {})
   const oHandle = handle ?? `driver-${userId.slice(0, 8)}`;
 
   await comBanco(async (sql) => {
-    // β2 — nasce com a porta de idade já respondida. A TELA que pergunta o ano
-    // é da trilha α e ainda não existe; enquanto não existir, o headless não
-    // teria como responder e pararia no 403 antes de ver o deck.
+    // β2 — nasce com a porta de idade já respondida, porque quase todo comando
+    // daqui quer chegar ao deck e não à porta. Quem quer a porta ABERTA é o
+    // `cmdPorta`, que pede `anoNascimento: null`.
     //
     // β8 — e com o handle já escolhido, pelo MESMO motivo: a porta do handle
     // vem logo depois da idade, e uma conta que nasce com `handle_chosen`
@@ -728,7 +731,7 @@ async function abrirSessao(page, { handle = null, handleEscolhido = true } = {})
     // o `cmdHandle`, que pede `handleEscolhido: false`.
     await sql`
       insert into users (id, handle, display_name, birth_year, handle_chosen)
-      values (${userId}, ${oHandle}, 'Driver', 1990, ${handleEscolhido})`;
+      values (${userId}, ${oHandle}, 'Driver', ${anoNascimento}, ${handleEscolhido})`;
     await sql`
       insert into sessions (id, user_id, refresh_token_hash, expires_at, user_agent)
       values (${sessionId}, ${userId}, ${hash},
@@ -901,6 +904,11 @@ const TELA = {
   abaPessoas: "People",
   abaComum: "In common",
   abaAvisos: "Alerts",
+  // β2 — a porta de idade
+  continuar: "Continue",
+  anoInvalido: "Enter the four digits of the year you were born.",
+  /** Trecho, não a frase inteira: o texto da recusa é longo e vai mudar. */
+  recusaTrecho: "Thanks for answering honestly",
 };
 
 /** `evaluate` que devolve null em vez de explodir: durante um reload o contexto morre. */
@@ -1779,6 +1787,179 @@ async function cmdHandle() {
 }
 
 
+/**
+ * β9.1 — a porta de idade responde com as palavras DO APP.
+ *
+ * Existe porque o defeito que ela guarda é de JSX, e a suíte da web roda em
+ * `node --test` sem DOM: `ageGate.test.ts` cobre os quatro desfechos de
+ * `submitBirthYear` e continuava verde enquanto a tela não mostrava nenhum
+ * deles. O `min`/`max` do campo fazia a validação NATIVA cancelar o envio antes
+ * de `onSubmit` rodar — `checkValidity()` false, zero requisição, nenhum nó de
+ * erro no DOM — e quem respondia era a bolha do navegador, no idioma dele,
+ * nesta tela em inglês.
+ *
+ * Duas contas descartáveis porque a recusa apaga a primeira (β2.1): não dá para
+ * reusar quem já foi recusado para depois provar que o ano bom passa.
+ */
+async function cmdPorta() {
+  const url = arg("--url", WEB);
+  const started = [];
+  const log = [];
+  const descartaveis = [];
+  let browser = null;
+
+  try {
+    await garantirServidores(url, started, log);
+    browser = await openBrowser();
+    const page = await browser.novaAba();
+    await page.cmd("Network.enable");
+
+    const usuario = await abrirSessao(page, { anoNascimento: null });
+    descartaveis.push(usuario);
+
+    await page.cmd("Page.navigate", { url });
+    await waitFor(page, ".age-gate");
+
+    const abertura = await evaluate(
+      page,
+      `(() => ({
+         campo: !!document.querySelector('.age-gate input'),
+         deck: !!document.querySelector('.deck-card'),
+         navLinks: document.querySelectorAll('nav a').length,
+         envio: document.querySelector('.age-gate button[type=submit]')?.disabled,
+       }))()`,
+    );
+    ok("β2 a porta de idade abre para conta sem ano", abertura.campo === true);
+    ok("β2 nenhuma tela do app por baixo dela", abertura.deck === false);
+    ok("β2 a nav não oferece contorno por link", abertura.navLinks === 0, `${abertura.navLinks} links`);
+    ok("β2 o envio nasce fechado com o campo vazio", abertura.envio === true);
+
+    // ── β9.1: ano fora da faixa ────────────────────────────────────────────
+    const antes = page.requests.filter((u) => u.includes("/v1/auth/age")).length;
+    await digitar(page, ".age-gate input", "12");
+    await clicar(page, ".age-gate button", TELA.continuar);
+
+    const aviso = await until(
+      () =>
+        evaluate(
+          page,
+          `(() => { const p = document.querySelector('.age-gate .notice.error');
+             return p ? { texto: p.innerText.trim(), papel: p.getAttribute('role') } : null; })()`,
+        ),
+      (v) => v !== null,
+      "o aviso de formato do app aparecer",
+      8000,
+    ).catch(() => null);
+
+    ok(
+      "β9.1 ano fora da faixa mostra o aviso DO APP, não o do navegador",
+      aviso?.texto === TELA.anoInvalido,
+      aviso ? JSON.stringify(aviso.texto) : await mensagemNativa(page),
+    );
+    ok("β9.1 e o aviso é região viva", aviso?.papel === "alert", String(aviso?.papel));
+    ok(
+      "β9.1 ano fora da faixa não vira requisição",
+      page.requests.filter((u) => u.includes("/v1/auth/age")).length === antes,
+      "o contrato reprova antes da rede",
+    );
+
+    // Digitar de novo é a correção; o aviso é sobre o que FOI enviado.
+    await digitar(page, ".age-gate input", "0");
+    const limpou = await until(
+      () => evaluate(page, `!document.querySelector('.age-gate .notice.error')`),
+      (v) => v === true,
+      "o aviso sumir ao digitar de novo",
+      5000,
+    ).catch(() => false);
+    // `aviso` no `&&` de propósito: sem ele esta asserção passa NA AUSÊNCIA do
+    // aviso, que é exatamente o estado defeituoso — verde por cegueira.
+    ok("β9.1 digitar de novo limpa o aviso", aviso !== null && limpou === true);
+
+    // ── a recusa, e o que ela deixa na tela ────────────────────────────────
+    await limparCampo(page, ".age-gate input");
+    await digitar(page, ".age-gate input", String(new Date().getFullYear() - 10));
+    await clicar(page, ".age-gate button", TELA.continuar);
+
+    const recusa = await until(
+      // Sem normalizar espaço: `\s` dentro de template literal vira `s`, e a
+      // regex saía apagando todo "s" do texto — "Thanks" virava "Thank ".
+      () => evaluate(page, `document.body.innerText.trim()`),
+      (t) => t.includes(TELA.recusaTrecho),
+      "a recusa aparecer",
+    ).catch(() => "");
+    ok("β2.1 menor de idade é recusado na tela", recusa.includes(TELA.recusaTrecho));
+    ok(
+      "β9.2 a recusa não anuncia sessão de conta apagada",
+      !/Signed in as/i.test(recusa),
+      recusa.slice(0, 60),
+    );
+    ok(
+      "β2.1 não sobra formulário para uma segunda tentativa",
+      (await evaluate(page, `!!document.querySelector('.age-gate input')`)) === false,
+    );
+
+    const sobrou = await comBanco(
+      (sql) => sql`select id from users where id = ${usuario}`,
+    );
+    ok("β2.1 a conta recusada é apagada de verdade", sobrou.length === 0);
+    if (sobrou.length === 0) descartaveis.pop();
+
+    await screenshot(page, join(SHOTS, "porta.png"));
+
+    // ── e o ano bom continua passando ──────────────────────────────────────
+    const aba = await browser.novaAba();
+    await aba.cmd("Network.enable");
+    const adulto = await abrirSessao(aba, { anoNascimento: null });
+    descartaveis.push(adulto);
+
+    await aba.cmd("Page.navigate", { url });
+    await waitFor(aba, ".age-gate");
+    await digitar(aba, ".age-gate input", String(ANO_ADULTO));
+    await clicar(aba, ".age-gate button", TELA.continuar);
+    const passou = await until(
+      () => evaluate(aba, `!document.querySelector('.age-gate')`),
+      (v) => v === true,
+      "a porta sair da tela com ano de maior de idade",
+    ).catch(() => false);
+    ok("β2 ano de maior de idade passa a porta", passou === true);
+
+    const [linha] = await comBanco(
+      (sql) => sql`select birth_year from users where id = ${adulto}`,
+    );
+    ok(
+      "β2 e o Postgres guardou o ano",
+      Number(linha?.birth_year) === ANO_ADULTO,
+      String(linha?.birth_year),
+    );
+
+    const reais = page.errors
+      .concat(aba.errors)
+      // A porta fechada responde 403 nas rotas do app, e o Chrome registra toda
+      // resposta fora do 2xx como erro de recurso. É o β2 funcionando.
+      .filter((e) => !/favicon/i.test(e) && !/status of 40[13]/.test(e));
+    ok("β9.1 console sem erro além do 401/403 da porta", reais.length === 0, reais.join(" | "));
+  } finally {
+    if (browser) browser.close();
+    if (descartaveis.length) {
+      await comBanco((sql) => sql`delete from users where id in ${sql(descartaveis)}`);
+    }
+    for (const c of started) {
+      try {
+        process.kill(-c.pid, "SIGTERM");
+      } catch {}
+    }
+    if (process.exitCode) console.log(log.join(""));
+  }
+}
+
+/** O que o navegador DIRIA se ele tivesse barrado o envio — só para o relatório. */
+const mensagemNativa = (page) =>
+  evaluate(
+    page,
+    `(() => { const el = document.querySelector('.age-gate input');
+       return el ? \`sem aviso do app; nativo diria "\${el.validationMessage}"\` : 'campo sumiu'; })()`,
+  );
+
 // ─── entrada ────────────────────────────────────────────────────────────────
 
 const cmd = process.argv[2] ?? "all";
@@ -1796,6 +1977,7 @@ else if (cmd === "web") await cmdWeb();
 else if (cmd === "shot") await cmdShot();
 else if (cmd === "social") await cmdSocial();
 else if (cmd === "handle") await cmdHandle();
+else if (cmd === "porta") await cmdPorta();
 else if (cmd === "all") {
   console.log("── api ──");
   await cmdApi();
@@ -1805,9 +1987,14 @@ else if (cmd === "all") {
   // uma PORTA — quando ela quebra, o `cmdWeb` só diz "o seletor não apareceu".
   console.log("── handle ──");
   await cmdHandle();
+  // As duas portas ficam juntas no `all` pelo mesmo motivo: elas são o caminho
+  // obrigatório de toda conta nova, e quando uma quebra os outros comandos só
+  // dizem "o seletor não apareceu".
+  console.log("── porta ──");
+  await cmdPorta();
 } else {
   console.error(
-    "uso: driver.mjs [api|web|shot|social|handle|all] [--url U] [--wait SEL] [--out P] [--sessao]",
+    "uso: driver.mjs [api|web|shot|social|handle|porta|all] [--url U] [--wait SEL] [--out P] [--sessao]",
   );
   process.exit(2);
 }
