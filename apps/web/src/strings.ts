@@ -121,6 +121,12 @@ export const t = {
     "Swipe through a catalog, keep what you like, and see what you have in common with friends. Sign in to start.",
   signOut: "Sign out",
   signedInAs: (handle: string) => `Signed in as @${handle}`,
+  /**
+   * β8 — antes da escolha, o handle na tela é o gerado automaticamente. Mostrá-lo
+   * ao lado da tela que pede para escolher um anunciaria como definitivo
+   * justamente o que está prestes a ser trocado.
+   */
+  signedIn: "Signed in",
   authNotConfigured: "Sign-in is not configured on this build.",
   /**
    * C5 — o que a conta grava em `consents` na primeira entrada. Mudou o texto,
@@ -154,6 +160,36 @@ export const t = {
   ageGateRefused: (min: number) =>
     `Thanks for answering honestly. Watchlytics is only for people ${min} and over, so we can't set up your account. We did not keep the year you entered, and there is nothing here for you to come back to.`,
   authStateMismatch: "Sign-in did not come back from where it started.",
+
+  // β8 — a escolha do handle. A tela existe porque o handle saía do e-mail
+  // (`keizokita1@gmail.com` virava `@keizokita1`) e é PÚBLICO: quem lia o
+  // perfil deduzia o endereço. O texto tem que dizer as três coisas antes de a
+  // pessoa escolher — para que serve, que é público, e que não tem volta.
+  handleTitle: "Pick your handle.",
+  handleBody:
+    "This is how friends find you here: they search your handle, never your email. It is public — it shows on your profile and next to anything you share.",
+  handleLabel: "Your handle",
+  handlePlaceholder: "yourhandle",
+  /** Sempre na tela, e não só depois de errar: ninguém adivinha a regra. */
+  handleRules: "3 to 20 characters: lowercase letters, numbers and _",
+  /**
+   * O veredito sobre o que FOI digitado, e por isso diz o que consertar em vez
+   * de repetir a regra. Aparecer onde não havia texto é o sinal que não depende
+   * de distinguir a cor (WCAG 1.4.1) — a linha muda de conteúdo, não só de cor.
+   */
+  handleInvalid: "Handles start with a letter and use only a-z, 0-9 and _.",
+  handleChecking: "Checking…",
+  handleAvailable: (handle: string) => `@${handle} is available.`,
+  /**
+   * Tomado e reservado dizem a MESMA frase: o contrato responde um booleano só,
+   * de propósito — distinguir não ajuda quem escolhe e melhora o oráculo de
+   * enumeração que a rota já é por natureza.
+   */
+  handleTaken: "That handle is not available. Try another one.",
+  /** Colado no botão: é a parte que ninguém espera de uma tela de cadastro. */
+  handlePermanent:
+    "You choose your handle once. It cannot be changed later, because links and notifications already carry it.",
+  handleAction: "Choose this handle",
 
   // A1 — filtros
   filters: "Filters",
