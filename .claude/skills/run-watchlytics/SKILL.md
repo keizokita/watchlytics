@@ -77,7 +77,8 @@ derruba no fim.
 | `driver.mjs api` | Sobe o Fastify **em processo** e bate nas rotas com `app.inject()`. Sem porta, sem servidor. É o caminho para PR que mexe em `apps/api/src/`. |
 | `driver.mjs web` | Garante api:3000 + vite:5173 (subindo o que faltar), **planta uma sessão e cumpre o onboarding** de um usuário descartável, dirige o Chrome headless pelo deck, tira dois prints e confere os swipes no banco. Desfaz as duas coisas no fim. |
 | `driver.mjs social` | **β6** — duas contas com sessões simultâneas, em contextos de navegação separados. Porta de idade, rotação de refresh, amizade, match, notificação e perfil público, tudo pela tela. Cria as duas contas e as apaga no fim. |
-| `driver.mjs all` | `api` e `web`, nessa ordem. Padrão. O `social` fica de fora: ele leva ~40s e sobe dois contextos. |
+| `driver.mjs handle` | **β8** — a porta onde a pessoa escolhe o handle. Único comando que FINGE rotas (`Fetch.fulfillRequest`): as duas rotas do handle são da trilha A. Mede foco, alvo de toque e estouro de largura por `getBoundingClientRect`. ~20s. |
+| `driver.mjs all` | `api`, `web` e `handle`, nessa ordem. Padrão. O `social` fica de fora: ele leva ~40s e sobe dois contextos. |
 
 Flags do `web`: `--url` (padrão `http://localhost:5173`), `--wait <seletor>`
 (padrão `.deck-card`), `--out <arquivo.png>`.
@@ -112,6 +113,37 @@ Prints → `/tmp/watchlytics-run/web.png` (deck inicial) e `web-depois.png`
 
 O último ✔ é o que fecha o circuito: clique no DOM → `POST /v1/swipes` →
 linha no Postgres. O driver apaga essas linhas no fim (veja Gotchas).
+
+### `handle` — a porta do β8, contra o contrato congelado
+
+```
+── handle ──
+✔ β8 a porta do handle abre depois da de idade
+✔ β8 a nav não anuncia o handle derivado do e-mail — "Signed in Sign out"
+✔ β8 o foco cai no campo, e não no body — handle
+✔ β8 alvo do campo ≥ 44px — 46.0px
+✔ β8 nada estoura a janela de 430px — 0 elementos, mais largo 391.0
+✔ β8 caractere inválido é acusado enquanto se digita
+✔ β8 nove teclas em ~360ms viram UMA consulta, não nove — 1 requisições
+✔ β8 404 da consulta não vira handle ocupado, e não tranca o envio
+✔ β8 409 no envio vira indisponível, e não erro fatal
+✔ β8 o corpo leva o handle e só ele — {"handle":"keizo"}
+```
+
+São 33 asserções. Duas coisas só existem aqui:
+
+**Rotas fingidas.** `POST /v1/auth/handle` e `GET /v1/auth/handle/available`
+são da trilha A do β8. Enquanto ela não chegar, `page.stubbar(fn)` responde o
+`handleAvailability` do contrato congelado — `fn(request)` devolve
+`{ status, body }` para fingir, ou `null` para deixar passar. Um cenário tira a
+interceptação de propósito: o **404 de verdade** é um desfecho que a tela tem
+que tratar, não um contratempo do teste. Quando a trilha A publicar as rotas, os
+stubs de "livre" e "tomado" viram estado de banco e o cenário do 404 sai junto.
+
+**Tecla por tecla.** `teclar()` manda um `keyDown`/`keyUp` por caractere porque
+o que se mede é o DEBOUNCE: o `digitar()` normal usa `Input.insertText`, que
+entrega tudo num evento só — um campo sem debounce nenhum também sairia com uma
+requisição, e a asserção passaria por cima do bug.
 
 ### `social` — o loop entre duas contas (β6)
 
@@ -150,6 +182,15 @@ Se `apps/web/src/Deck.tsx` ou `Card.tsx` mudarem de marcação, é aqui que queb
 | `.deck .deck-card:last-child` | card do topo — **último** no DOM, `Deck.tsx` renderiza `.reverse()` |
 | `.card-title` | título (é `<h2>`, não `<h1>`) |
 | `.actions button` + texto | Pass / Undo / Like — o driver acha **pelo texto**, não por posição |
+
+E o `handle` depende de `HandleGate.tsx`:
+
+| seletor | o quê |
+|---|---|
+| `#handle` | o campo. É o `id` que o `aria-describedby` e a `<label for>` amarram |
+| `#handle-status` | a linha de veredito (`role="status"`) — inválido, checando, livre, indisponível |
+| `.handle-field` | a moldura com o `@`. É ELA que carrega os 44px, não o `<input>` |
+| `.onboarding-go` | o botão de enviar, compartilhado com o onboarding |
 
 Os botões são casados por `innerText`, de propósito: a ordem já mudou uma vez
 (B7 inseriu o Undo entre Pass e Like) e `:last-child` teria quebrado calado.
@@ -250,6 +291,15 @@ sujar nada.
   `screenCss.ts`, então o "Results" do `strings.ts` chega como "RESULTS". Casar
   texto de tela sem normalizar a caixa dá seletor que não acha nada e uma espera
   de 10s culpando a requisição, que tinha respondido.
+- **Conta criada na mão precisa de `handle_chosen`, além de `birth_year`.** O
+  β8 põe uma segunda porta logo depois da de idade, e conta com
+  `handle_chosen = false` para nela. É por isso que `abrirSessao` e `criarConta`
+  gravam `true`: sem isso o `cmdWeb` e o `social` parariam na tela do handle e o
+  sintoma seria `.deck-card` nunca aparecendo. Quem quer a porta ABERTA pede
+  `abrirSessao(page, { handleEscolhido: false })`.
+- **`Fetch.enable` é por aba e trava o que não for tratado.** `novaAba({
+  interceptar: [...] })` registra os padrões, e só as urls que casam esperam
+  resposta. Ligar sem tratar o `Fetch.requestPaused` pendura a página inteira.
 - **`chromium-cli` não existe nesta máquina.** O driver fala CDP direto no
   `google-chrome` pelo `WebSocket` global do Node — sem Playwright, sem `ws`, e
   `npm install` não muda por causa dele.
