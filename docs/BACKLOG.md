@@ -594,7 +594,7 @@ real de graça.
 
 | id | O que provar | Pronto quando |
 |---|---|---|
-| β6.1 | Conta nova entra por OAuth | `consents` ganha a linha com a `CONSENT_VERSION` corrente; as DUAS portas são cobradas — a de idade e a do handle (§7), e nenhuma das duas rodou num cadastro real ainda. O handle gerado é `user_<hex>`, que não diz nada sobre o e-mail; quem entra escolhe o dele |
+| β6.1 | Conta nova entra por OAuth | `consents` ganha a linha com a `CONSENT_VERSION` corrente, e o cadastro bate nas DUAS portas: a de idade e a do handle (§7). **Parcial** — a porta do handle já foi atravessada em produção por uma sessão real do Google (2026-09-13), mas numa conta que já existia. Falta numa conta que nasce agora |
 | β6.2 | Duas sessões vivas ao mesmo tempo | Navegadores (ou dispositivos) diferentes, cada um rotacionando o próprio cookie de refresh sem derrubar o outro. O C3 trata reuso de refresh como replay e revoga a sessão inteira: duas sessões legítimas não podem disparar isso |
 | β6.3 | Amizade ponta a ponta pela tela | A busca B pelo handle e pede; B vê em "Friend requests" e aceita; as três listas ficam certas dos DOIS lados |
 | β6.4 | Match e notificação na tela | Os dois curtem o mesmo título e cada um vê o match. Dê um like ANTES do aceite para exercitar o cruzamento retroativo do E4 |
@@ -618,12 +618,17 @@ real de graça.
 > privado) para "9 titles watched · stats unlock at 10" e só então, com o
 > décimo assistido marcado na tela, para o agregado.
 >
-> **O que só o Google prova, e continua aberto: a β6.1 inteira.** O `sub` não se
+> **O que só o Google prova, e continua aberto: a β6.1.** O `sub` não se
 > falsifica daqui, então as contas do driver nascem no banco como o OAuth as
 > deixaria — sem `birth_year` — em vez de nascerem pelo OAuth. Ficam sem prova:
-> o handle derivado do local-part sem colidir, a linha em `consents` com a
-> `CONSENT_VERSION` corrente, e o primeiro cadastro real batendo na porta de
-> idade.
+> a linha em `consents` com a `CONSENT_VERSION` corrente, e o primeiro cadastro
+> real batendo na porta de idade.
+>
+> **Menos uma parte, desde 2026-09-13:** a porta do handle (§7) foi atravessada
+> em produção por uma sessão real do Google — o dono escolheu `@keizo`, e
+> `/u/keizokita1` passou a 404 enquanto `/u/keizo` passou a 200. Isso é a tela e
+> a rota do β8 num navegador de gente, fora do driver; o que continua faltando é
+> a mesma porta numa conta RECÉM-CRIADA pelo OAuth, que é o resto da β6.1.
 
 **Atenção — o badge leva até 60s.** `NotificationsBadge` faz poll de
 `/v1/notifications` a cada 60 segundos (`Friends.tsx:435`), e só a aba de avisos
@@ -782,3 +787,10 @@ de largura saem de `getBoundingClientRect` e `activeElement`, nunca de print.
 a decisão da tabela acima, e é o que fecha o defeito — mas o handle atual delas
 já está em `/u/<handle>` e no texto pronto das notificações. Link já
 compartilhado morre quando a pessoa trocar.
+
+**A primeira foi a do dono, em 2026-09-13.** Abriu o app em produção, bateu na
+porta, escolheu `@keizo`: `/u/keizo` passou a responder 200 com o `og:title` da
+conta, e `/u/keizokita1` — o handle que saía do e-mail — passou a 404. O custo
+declarado acima aconteceu de verdade, e foi o previsto: o link antigo morreu.
+Vale como prova parcial da β6.1 (§6), e não como prova inteira: a conta já
+existia, então `consents` e a porta de idade seguem sem passada real.

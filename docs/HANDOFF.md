@@ -125,9 +125,13 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
    O resto da checklist saiu daqui em 2026-09-12: `driver.mjs social` dirige
    β6.2 a β6.5 com duas contas em contextos de navegação separados, 23 asserções
    verdes (reconferidas na integração, num banco criado do zero). Fica aberto só
-   o que o Google prova: a linha em `consents` com a `CONSENT_VERSION` corrente,
-   e o primeiro cadastro real batendo nas DUAS portas — a de idade e, desde o
-   β8, a do handle, que nunca foi atravessada por uma conta criada pelo OAuth.
+   o que o Google prova: a linha em `consents` com a `CONSENT_VERSION` corrente
+   e a porta de idade, num cadastro que nasce na hora.
+
+   A porta do handle (β8) saiu desta lista em 2026-09-13: o dono a atravessou em
+   produção, numa sessão real do Google, e escolheu `@keizo` — `/u/keizokita1`
+   virou 404 e `/u/keizo` virou 200. Foi numa conta que já existia, então prova
+   a tela e a rota, não o cadastro novo.
 
 **Saiu desta lista em 2026-09-09:** "conferir o login no Network do DevTools".
 Os quatro elos foram medidos de fora e o caminho está inteiro — ver o bloco
