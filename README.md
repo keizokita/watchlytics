@@ -8,6 +8,31 @@ Login com Google. Funciona no navegador do celular, com gesto de arrastar de
 verdade.
 
 [![check & deploy](https://github.com/keizokita/watchlytics/actions/workflows/deploy.yml/badge.svg)](https://github.com/keizokita/watchlytics/actions/workflows/deploy.yml)
+[![licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-informational)](LICENSE)
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     O GIF do swipe entra AQUI, e é o que mais vale nesta página: é um app de
+     gesto, e gesto não se explica em prosa. Para publicar, basta pôr o arquivo
+     em docs/media/swipe.gif e descomentar a linha abaixo.
+
+<p align="center">
+  <img src="docs/media/swipe.gif" alt="Um card sendo arrastado para a direita; o próximo card aparece atrás" width="320">
+</p>
+
+     Como gravar, para o resultado não pesar nem ficar ilegível:
+
+     · viewport de 390x844 (iPhone 14) — é o tamanho em que o deck mede +0 de
+       folga, então nada fica cortado na captura;
+     · 3 a 5 segundos: um like para a direita, um pass para a esquerda, e o
+       card seguinte entrando. Nada mais — quem assiste decide em 2 segundos;
+     · alvo de 2MB. O GitHub serve até 10MB, mas o README é a primeira coisa
+       que carrega e um GIF pesado atrasa a página inteira;
+     · se passar disso, troque por .mp4 (o GitHub renderiza vídeo no README
+       arrastando o arquivo para a caixa de edição, que devolve uma URL de
+       user-attachments);
+     · use a conta de demonstração, não a sua: o deck mostra títulos reais e
+       o rodapé mostra o @handle de quem está logado.
+     ───────────────────────────────────────────────────────────────────────── -->
 
 | | |
 |---|---|
@@ -145,6 +170,16 @@ docs/                 PLAN, BACKLOG, DEPLOY, HANDOFF
 | [`docs/BACKLOG.md`](docs/BACKLOG.md) | Trilhas, dependências, e o catálogo de erros de medição |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | Neon + Fly + Cloudflare Pages, passo a passo |
 | [`docs/HANDOFF.md`](docs/HANDOFF.md) | Estado atual e armadilhas de ambiente |
+
+## Licença
+
+[MIT](LICENSE). O código é livre para usar, modificar e distribuir.
+
+Vale a distinção: a licença cobre **este código**, e não os dados do catálogo.
+Os metadados e as imagens vêm do TMDB sob os termos deles, que são de uso **não
+comercial** no plano gratuito — é por isso que o produto não tem monetização, e
+essa restrição foi o que de fato fechou a escolha do fornecedor
+([`PLAN.md §1`](docs/PLAN.md)).
 
 ---
 
