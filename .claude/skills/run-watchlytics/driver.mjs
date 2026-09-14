@@ -458,13 +458,28 @@ async function until(fn, done, what, timeoutMs = 10_000) {
   throw new Error(`${what} não aconteceu em ${timeoutMs}ms (último: ${last})`);
 }
 
-/** Teclado de verdade: Deck.tsx escuta keydown no window, não no card. */
+/**
+ * Teclado de verdade: Deck.tsx escuta keydown no window, não no card.
+ *
+ * O `text` não é enfeite, e a falta dele era um cego do driver (β9.7): sem ele
+ * o Chrome trata o Enter como tecla que não produz caractere, e NÃO há
+ * submissão implícita de formulário. O `onSubmit` do HandleGate nunca rodava, e
+ * a primeira leitura disso foi "a tela não envia pelo teclado" — defeito do
+ * instrumento vestido de defeito do app. Medido: sem `text`, 3 de 3 rodadas não
+ * enviam; com `text`, 3 de 3 enviam.
+ *
+ * Só para tecla que produz caractere. As setas do Deck seguem sem `text`, que é
+ * o que aquele caminho espera.
+ */
+const TEXTO_DA_TECLA = { Enter: "\r" };
 const pressKey = async (page, key, code) => {
+  const text = TEXTO_DA_TECLA[key];
   for (const type of ["keyDown", "keyUp"]) {
     await page.cmd("Input.dispatchKeyEvent", {
       type,
       key,
       code: key,
+      ...(text ? { text, unmodifiedText: text } : {}),
       windowsVirtualKeyCode: code,
       nativeVirtualKeyCode: code,
     });
@@ -1835,6 +1850,52 @@ async function cmdHandle() {
     );
 
     await screenshot(page, join(SHOTS, "handle-depois.png"));
+
+    // ── β9.7 · a porta se atravessa só com o teclado ────────────────────────
+    // Numa aba nova, com conta nova: o envio acima fechou a porta desta, e a
+    // porta só se atravessa uma vez. A varredura da β9.7 não achou defeito na
+    // tela, mas achou este caminho sem cobertura — quem chega por teclado ou
+    // leitor de tela não clica no botão, e o `<form>` existe exatamente para o
+    // Enter funcionar (HandleGate.tsx:194). Sem asserção, quebrar isso é mudar
+    // o botão de `type="submit"` para um `onClick`, que ninguém notaria.
+    const abaTeclado = await browser.novaAba({ isolada: true });
+    await abaTeclado.cmd("Network.enable");
+    const soTeclado = await abrirSessao(abaTeclado, {
+      handle: `so-teclado-${crypto.randomUUID().slice(0, 8)}`,
+      handleEscolhido: false,
+    });
+    descartaveis.push(soTeclado);
+    await abaTeclado.cmd("Page.navigate", { url });
+    await waitFor(abaTeclado, "#handle");
+    ok(
+      "β9.7 o foco já está no campo, sem um Tab sequer",
+      (await evaluate(abaTeclado, `document.activeElement?.id`)) === "handle",
+    );
+    await teclar(abaTeclado, "sopeloteclado");
+    await until(
+      () => talvez(abaTeclado, `document.querySelector('#handle-status')?.innerText ?? ''`),
+      (v) => /available/i.test(v ?? ""),
+      "o veredito dizer que está livre",
+    );
+    await pressKey(abaTeclado, "Enter", 13);
+    // `until` que não explode: aqui a ausência do evento É o defeito sob teste,
+    // e um stack trace no lugar de um ✘ esconde qual asserção caiu.
+    const saiuComEnter = await until(
+      () => talvez(abaTeclado, `!document.querySelector('.handle-gate')`),
+      (v) => v === true,
+      "a porta sair com o Enter",
+      8_000,
+    ).catch(() => false);
+    ok("β9.7 Enter no campo envia, sem passar pelo botão", saiuComEnter === true);
+    const [gravado] = await comBanco(
+      (sql) => sql`select handle, handle_chosen from users where id = ${soTeclado}`,
+    );
+    ok(
+      "β9.7 e o Postgres tem o handle que o teclado escolheu",
+      gravado?.handle === "sopeloteclado" && gravado?.handle_chosen === true,
+      JSON.stringify(gravado),
+    );
+    abaTeclado.close();
 
     // O 409 do cenário da corrida é esperado, e o Chrome registra TODA resposta
     // fora do 2xx como erro de recurso. Filtra só ele, e só nessa rota: um 500

@@ -131,6 +131,9 @@ linha no Postgres. O driver apaga essas linhas no fim (veja Gotchas).
 ✔ β8 perder a corrida vira indisponível, e não erro fatal
 ✔ β8 o Postgres tem o handle escolhido, e a porta fechada — {"handle":"escolhido","handle_chosen":true}
 ✔ β8 e recarregar não reabre a porta — escolhe uma vez
+✔ β9.7 o foco já está no campo, sem um Tab sequer
+✔ β9.7 Enter no campo envia, sem passar pelo botão
+✔ β9.7 e o Postgres tem o handle que o teclado escolheu — {"handle":"sopeloteclado","handle_chosen":true}
 ```
 
 São 31 asserções, nenhuma contra rota fingida: "tomado" é outra conta ocupando
@@ -140,6 +143,13 @@ nenhuma consulta prévia fecha, e quem a resolve é o índice único.
 
 O penúltimo ✔ fecha o circuito, como o swipe fecha no `web`: digitação no DOM →
 `POST /v1/auth/handle` → linha no Postgres.
+
+**`pressKey` e o `text`.** Tecla que produz caractere precisa de `text` no
+`Input.dispatchKeyEvent`, senão o Chrome não emite o evento de caractere e **não
+há submissão implícita de formulário** — o Enter chega ao campo e o `onSubmit`
+não roda. Sem isso o caminho do teclado era intestável, e a primeira leitura
+disso foi "a tela não envia pelo teclado", que é defeito do instrumento vestido
+de defeito do app. As setas do Deck seguem sem `text`, de propósito.
 
 **Tecla por tecla.** `teclar()` manda um `keyDown`/`keyUp` por caractere porque
 o que se mede é o DEBOUNCE: o `digitar()` normal usa `Input.insertText`, que
