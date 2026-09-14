@@ -226,6 +226,16 @@ const IGNORADOS = [
   // porque planta sessão antes de navegar; quem abre a tela de entrada vê
   // sempre. Só nesta rota e só em 401: um 500 aqui continua reprovando.
   /status of 401[\s\S]*\/v1\/auth\/refresh/,
+  // #42 — a CSP em `Report-Only` acusa UM eval por carregamento, e ele é do
+  // zod: `zod@4` testa se o ambiente deixa compilar validador com `new
+  // Function("")`, dentro de um `try/catch`, e cai no caminho sem JIT quando
+  // não deixa. O app funciona igual — o que se vê é a detecção, não uma falha.
+  //
+  // Só com o `[Report Only]` na frente, e é de propósito: quando alguém trocar
+  // a política para bloqueante, o Chrome tira esse prefixo da mensagem e ela
+  // volta a reprovar aqui. O filtro se desfaz sozinho na hora em que a decisão
+  // muda, que é quando alguém precisa olhar para ele de novo.
+  /^\[Report Only\] Refused to evaluate a string as JavaScript/,
 ];
 
 /**
@@ -328,9 +338,19 @@ async function openBrowser() {
     ) {
       registrar(aba, msg.params.args.map((a) => a.value ?? a.description).join(" "));
     }
-    if (msg.method === "Log.entryAdded" && msg.params.entry.level === "error") {
+    // Violação de CSP entra junto, e ela NÃO é `error`: o Chrome registra
+    // `[Report Only] Refused to…` como `level: "info"`, `source: "security"`.
+    // Sem esta segunda condição o driver dirigia o app com a política ligada e
+    // dava "console sem erro" com a política proibindo o pôster — medido em
+    // 2026-09-13 apertando `img-src` de propósito. Asserção que não enxerga o
+    // que está sob teste é pior do que asserção nenhuma: ela afirma.
+    const entrada = msg.params?.entry;
+    if (
+      msg.method === "Log.entryAdded" &&
+      (entrada.level === "error" || entrada.source === "security")
+    ) {
       // A url vem fora do text; sem ela, "Failed to load resource" não diz o quê.
-      registrar(aba, `${msg.params.entry.text} ${msg.params.entry.url ?? ""}`.trim());
+      registrar(aba, `${entrada.text} ${entrada.url ?? ""}`.trim());
     }
   };
 
@@ -2148,6 +2168,26 @@ function cmdRuido() {
   const real = { errors: [], descartados: [], navegando: true };
   registrar(real, PLANTADO);
   ok("ruído: erro que não é aborto sobrevive à janela aberta", real.errors.length === 1);
+
+  // ── #42 · a CSP, que entra pelo `source: "security"` e não pelo level ─────
+  const CSP_POSTER =
+    "[Report Only] Refused to load the image " +
+    "'https://image.tmdb.org/t/p/w500/x.jpg' because it violates the following " +
+    "Content Security Policy directive: \"img-src 'self'\".";
+  const CSP_EVAL =
+    "[Report Only] Refused to evaluate a string as JavaScript because " +
+    "'unsafe-eval' is not an allowed source of script in the following Content " +
+    "Security Policy directive: \"script-src 'self'\".";
+  ok(
+    "ruído: violação de CSP que não é a do zod reprova (#42)",
+    errosReais([CSP_POSTER]).length === 1,
+    "é a política proibindo o pôster — o defeito que a medição existe para pegar",
+  );
+  ok("ruído: o eval do zod sai, e só em Report-Only (#42)", errosReais([CSP_EVAL]).length === 0);
+  ok(
+    "ruído: o MESMO eval sem Report-Only reprova — bloquear é outra decisão",
+    errosReais([CSP_EVAL.replace("[Report Only] ", "")]).length === 1,
+  );
 
   // ── o que é esperado só numa cena continua sendo argumento de quem chama ──
   const C409 =

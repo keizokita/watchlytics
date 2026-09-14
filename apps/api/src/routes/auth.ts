@@ -18,6 +18,7 @@ import {
 import {
   ACCESS_TTL_S,
   REFRESH_TTL_S,
+  apagarConta,
   clientIp,
   constantTimeEqual,
   hashRefresh,
@@ -30,7 +31,7 @@ import {
   signAccess,
 } from "../auth.ts";
 import { db } from "../db/client.ts";
-import { consents, identities, sessions, swipes, users } from "../db/schema.ts";
+import { consents, identities, sessions, users } from "../db/schema.ts";
 
 /**
  * C2/C3/C4 — troca do código OAuth, rotação do refresh e sessão.
@@ -396,19 +397,18 @@ async function rotate(
  * app, e quem já entrou apenas perde a sessão e continua fora até responder um
  * ano válido. Os dados dessa pessoa não são meus para destruir por engano.
  *
- * O sinal de "nunca entrou" é ter zero swipes: o onboarding (D4) exige
- * ONBOARDING_SWIPES antes de qualquer outra tela, então conta que usou o app
- * tem swipe, e conta que não tem swipe não tem mais nada a perder.
+ * "Zero swipes" era o sinal de "nunca entrou", e NÃO é: o undo do A7
+ * (`DELETE /v1/swipes/:titleId`) apaga o swipe e deixa o catálogo, o match e o
+ * aviso de pé, e o `PUT /v1/library/:titleId` grava catálogo sem passar por
+ * swipe nenhum. Quem desfez o que swipou chegava aqui indistinguível de quem
+ * nunca abriu o app, e esta rota não tem porta de idade nem de handle: bastava
+ * um ano errado para a conta de alguém com amigos sumir. Por isso a pergunta
+ * agora é a que o parágrafo acima já fazia — a conta tem ALGUMA coisa dentro? —
+ * e ela é feita às três tabelas que guardam o que a pessoa construiu.
  */
 async function recusar(userId: string): Promise<void> {
-  const [usou] = await db
-    .select({ userId: swipes.userId })
-    .from(swipes)
-    .where(eq(swipes.userId, userId))
-    .limit(1);
-
-  if (!usou) {
-    await db.delete(users).where(eq(users.id, userId));
+  if (!(await temAlgoDentro(userId))) {
+    await apagarConta(userId);
     return;
   }
 
@@ -416,6 +416,27 @@ async function recusar(userId: string): Promise<void> {
     .update(sessions)
     .set({ revokedAt: new Date() })
     .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+}
+
+/**
+ * Uma consulta só, e `exists` para parar na primeira linha: o que importa é se
+ * existe alguma, nunca quantas.
+ *
+ * `matches` e `notifications` ficam de fora de propósito, e não é furo: match
+ * só existe entre amigos aceitos (`friends.ts`, o join em `friendships`), e
+ * `friendships` está na lista; aviso de amigo é consequência de match. A
+ * cobertura dessas duas é transitiva pelas três que estão aqui.
+ */
+async function temAlgoDentro(userId: string): Promise<boolean> {
+  const linhas = (await db.execute(sql`
+    select
+      exists(select 1 from swipes          where user_id = ${userId})
+      or exists(select 1 from library_entries where user_id = ${userId})
+      or exists(select 1 from friendships     where user_a = ${userId}
+                                                 or user_b = ${userId}) as usou
+  `)) as unknown as Record<string, unknown>[];
+
+  return linhas[0]?.["usou"] === true;
 }
 
 // ─── transporte ─────────────────────────────────────────────────────────────

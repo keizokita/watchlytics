@@ -1,8 +1,8 @@
-import { desc, eq, or, sql } from "drizzle-orm";
+import { desc, eq, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { GENRE_IDS, genreId } from "@watchlytics/contract";
-import { requireUserId } from "../auth.ts";
+import { apagarConta, requireUserId } from "../auth.ts";
 import { db } from "../db/client.ts";
 import {
   consents,
@@ -159,28 +159,11 @@ export function meRoutes(app: FastifyInstance): void {
   app.delete("/v1/me", async (req, reply) => {
     const userId = await requireUserId(req);
 
-    const gone = await db.transaction(async (tx) => {
-      const rows = await tx
-        .delete(users)
-        .where(eq(users.id, userId))
-        .returning({ id: users.id });
-      if (rows.length === 0) return rows;
+    // Apagar e varrer moram no `auth.ts` porque a recusa da porta de idade
+    // apaga pela mesma regra. Quando eram dois trechos, só um foi consertado.
+    const apagou = await apagarConta(userId);
 
-      // A cascata só alcança linha que é minha. O aviso de match do outro lado
-      // é dele, e guarda uma cópia do meu handle no payload (`friends.ts` grava
-      // assim de propósito, para a tela não fazer um fetch por linha). Sem esta
-      // varredura o handle de uma conta apagada continua aparecendo na lista de
-      // avisos de quem foi meu amigo — o §8.4 não admite essa sobra.
-      // ponytail: varredura sequencial, `payload->>'friendId'` não tem índice.
-      // Exclusão de conta é rara; se doer, índice de expressão nessa chave.
-      await tx
-        .delete(notifications)
-        .where(sql`${notifications.payload}->>'friendId' = ${userId}`);
-
-      return rows;
-    });
-
-    if (gone.length === 0) {
+    if (!apagou) {
       reply.code(404);
       return { error: "conta não encontrada" };
     }

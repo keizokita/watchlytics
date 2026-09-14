@@ -1,14 +1,9 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
-import {
-  authResponse,
-  sessionUser,
-  type SessionUser,
-} from "@watchlytics/contract";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { authResponse, type SessionUser } from "@watchlytics/contract";
 import { PRIVACY_URL, TERMS_URL, t } from "./strings.ts";
 import {
-  authedFetch,
   getUser,
-  refreshAccess,
+  resume,
   setAccessToken,
   setUser,
   subscribeUser,
@@ -123,14 +118,6 @@ async function exchange(code: string, state: string): Promise<SessionUser> {
   return body.user;
 }
 
-/** Sessão anterior: o refresh está no cookie, que o servidor lê e rotaciona. */
-async function resume(): Promise<SessionUser | null> {
-  if (!(await refreshAccess())) return null;
-
-  const me = await authedFetch("/v1/auth/me");
-  return me.ok ? sessionUser.parse(await me.json()) : null;
-}
-
 /**
  * Fora do componente porque o efeito do StrictMode roda duas vezes em dev: dois
  * refresh simultâneos com o mesmo token seriam um replay, e o servidor derruba
@@ -157,22 +144,40 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
 
-  useEffect(() => {
+  // Carga inicial, e a mesma função para o `retry`: repetir é zerar o `started`
+  // e passar por aqui de novo. Duas cópias divergiriam, e a que divergiria é a
+  // do retry, que ninguém exercita todo dia.
+  const carregar = useCallback(() => {
     let live = true;
+    let falhou = false;
+    setBusy(true);
+    setError(null);
     boot()
       .then((u) => live && setUser(u))
-      .catch((e: unknown) => live && setError(e instanceof Error ? e.message : String(e)))
+      .catch((e: unknown) => {
+        falhou = true;
+        if (live) setError(e instanceof Error ? e.message : String(e));
+      })
       .finally(() => {
         if (!live) return;
         // Boot que falhou é boot que terminou: sem isto o shell ficaria em
         // "ainda não sei" para sempre, mostrando tela nenhuma.
-        if (getUser() === undefined) setUser(null);
+        //
+        // Só quando NÃO houve erro. Um boot que falhou por a api não responder
+        // não sabe se há sessão, e `null` afirma que não há — é a tela de
+        // entrada outra vez, que é o defeito. Com erro o shell fica em "ainda
+        // não sei" de propósito: o `<main>` não pinta nada (main.tsx:428) e o
+        // que aparece é a linha de erro com o `retry` ao lado. Não é espera
+        // infinita porque existe ação, e ela é da pessoa.
+        if (getUser() === undefined && !falhou) setUser(null);
         setBusy(false);
       });
     return () => {
       live = false;
     };
   }, []);
+
+  useEffect(() => carregar(), [carregar]);
 
   const onSignOut = async () => {
     await fetch("/v1/auth/logout", { method: "POST" });
@@ -182,6 +187,30 @@ export function Login() {
   };
 
   if (busy) return null;
+
+  // Não se sabe se há sessão: o boot falhou sem conseguir perguntar. Afirmar
+  // qualquer coisa aqui é o defeito — nem "entre", que é falso para quem já
+  // tem sessão, nem "você está dentro", que é falso para quem não tem. O que
+  // cabe é dizer que deu errado e oferecer a repetição.
+  if (user === undefined) {
+    return (
+      <p className="notice">
+        <span className="error">{error ?? t.errorGeneric} </span>
+        <button
+          type="button"
+          className="link"
+          onClick={() => {
+            // Zerar o `started`: ele é a promessa do boot anterior, e sem isto
+            // o retry devolveria a MESMA falha sem tocar na rede.
+            started = null;
+            carregar();
+          }}
+        >
+          {t.retry}
+        </button>
+      </p>
+    );
+  }
 
   return (
     <p className="notice">

@@ -940,10 +940,77 @@ O teste de cascata antigo conta tabela por tabela e é cego para o payload, que 
 exatamente por isso que o defeito passou — cobertura que mede a forma errada
 aprova o defeito com a mesma confiança com que aprovaria o conserto.
 
-**Continua aberto** o outro lado da mesma regra: o `recusar()` do `auth.ts:383`
-apaga a conta sem a varredura. Hoje não produz sobra — só apaga quem tem zero
-swipes, e sem swipe não há como ser `friendId` de aviso nenhum —, mas as duas
-portas de exclusão têm que sair com a mesma regra.
+**Fechou em 2026-09-13** (PR #68) o outro lado da mesma regra: o `recusar()` da
+porta de idade apagava a conta sem a varredura. A nota que ficou aqui dizia que
+a divergência não produzia sobra, porque só se apaga quem tem zero swipes e sem
+swipe não há como ser `friendId` de aviso nenhum. **A nota não procedia**, e o
+que estava embaixo dela era pior do que a sobra: *"zero swipes" não quer dizer
+"nunca entrou"*. O undo do A7 (`DELETE /v1/swipes/:titleId`) apaga o swipe e
+deixa catálogo, match e aviso de pé; o `PUT /v1/library/:titleId` grava catálogo
+sem passar por swipe nenhum; e `POST /v1/auth/age` roda com `ageGate: false` e
+`handleGate: false`. Somando: uma conta com catálogo, amigos e matches chegava
+na porta indistinguível de uma recém-nascida, e um `2015` no lugar de `1995`
+apagava tudo dela sem confirmação — exatamente o que o comentário do `recusar()`
+promete impedir. A proteção estava desligada justamente para quem mais tinha a
+perder.
+
+O conserto foi `apagarConta()` no `auth.ts`, com a varredura dentro e chamada
+pelas duas portas, e a pergunta do `recusar()` passando de "tem swipe?" para
+"tem alguma coisa dentro?" (`swipes`, `library_entries`, `friendships`).
+
+### A forma que já apareceu quatro vezes
+
+Vale nomeá-la, porque o nome errado leva ao antídoto errado. **Não é "esqueceram
+uma tabela".** É que a medição encostou no lugar CERTO e leu o campo errado — e
+nos quatro casos havia um teste ou um `grep` passando, confiante:
+
+| | o que foi medido | o que a afirmação prometia |
+|---|---|---|
+| β9.2 | `grep` de `needsAgeGate` no `main.tsx` | o ramo da RECUSA, sobre o qual esse grep não diz nada |
+| #59 | o teste de cascata, tabela por tabela | que nenhuma cópia do handle sobrasse — e a cópia estava no payload |
+| β9.8 | "a tela não envia pelo teclado" | o `pressKey` do driver não mandava `text`; a tela estava certa |
+| #68 | "tem swipe?" | "tem alguma coisa dentro?" — e o undo do A7 separou as duas |
+
+Duas das quatro **absolveram código certo** em vez de deixar defeito passar
+(β9.2 e β9.8). O custo não é o mesmo: deixar defeito passar custa o defeito;
+acusar código certo custa alguém consertar o que não estava quebrado, e planta
+no repositório uma correção que ninguém consegue justificar depois.
+
+Quem ler "confira todas as tabelas" vai conferir todas as tabelas e errar de
+novo. O que pega é outra pergunta: **a coisa medida é a mesma coisa que a
+afirmação promete?** E, quando a resposta depende de um sinal indireto, uma
+segunda: **esse sinal ainda é verdade?**
+
+### E "documente a suposição" não salva — desta vez estava documentada
+
+O detalhe que vale mais que o resto: a premissa do #68 **estava escrita**. O
+comentário do `recusar()` dizia, com todas as letras, que o onboarding do D4
+exige `ONBOARDING_SWIPES` antes de qualquer tela e que por isso conta que usou o
+app tem swipe. Nomeada, explicada, com o porquê. Morreu assim mesmo, no dia em
+que o A7 ganhou undo — outro arquivo, outro dia, outro motivo, e quem escreveu o
+A7 não tinha como saber que alguém dependia daquilo.
+
+**Comentário não falha. Ninguém roda um comentário.** O que teria pegado é a
+premissa existir como asserção: um teste do invariante em si, separado do teste
+do `recusar()`, que ficaria vermelho no dia do A7 — na suíte que o autor do A7
+estava rodando, com a conversa acontecendo ali, barata.
+
+Fica como regra: **premissa que sustenta decisão destrutiva merece teste
+próprio, não comentário.** Comentário é para o porquê; asserção é para o que
+precisa continuar verdade.
+
+Com uma emenda que não é detalhe, porque a regra sem ela recria o problema:
+**afirme a FONTE da premissa, não a premissa.** Um teste que dissesse "conta que
+usou o app tem swipe" morreria junto com a premissa, no dia em que alguém
+mudasse o que significa usar — seria a mesma frase do comentário, só que
+executável. O teste que sobrevive não depende de nenhuma verdade de hoje: ele lê
+`pg_constraint` e pergunta pela tabela nova. E a pergunta vai escrita dentro da
+mensagem do assert, senão o vermelho sem explicação vira teste que alguém ajusta
+para passar. O #68 já deixa o dele: a premissa de hoje é "estas
+são todas as tabelas em que uma pessoa constrói alguma coisa", e ela é um teste
+que classifica cada tabela que aponta para `users` em uma de três gavetas (da
+conta, coisa dentro, consequência). A nona tabela chega vermelha no dia em que
+nasce, com a pergunta na mensagem do assert.
 
 **β9.7 — a porta do handle não foi varrida.** O `driver.mjs handle` tem 31
 asserções (§7), e elas rodam. O que não aconteceu é a varredura exploratória
@@ -1111,7 +1178,7 @@ e não na hora de mesclar.
 |---|---|---|---|
 | **P — porta de idade** ✅ | β9.1 (PR #62) | `apps/web/src/AgeGate.tsx` (CSS incluso), `ageGate.ts` + teste | backend, CSS de outras telas |
 | **V — tema** ✅ | β9.3, β9.4 (PR #65) | o bloco de CSS de `apps/web/index.html`, `apps/web/src/screenCss.ts` | `.tsx` nenhum — o CSS da porta de idade mora dentro do `AgeGate.tsx` e é da P |
-| **X — exclusão** · resta um item | β9.6 ✅ (`28e5792`); falta alinhar o `recusar()` | o `recusar()` de `auth.ts` + teste | web, outras rotas |
+| **X — exclusão** ✅ | β9.6 (`28e5792`); `recusar()` alinhado (PR #68) | o `recusar()` de `auth.ts`, `apagarConta()` e os testes | web, outras rotas |
 | **U — perfil público** ✅ | #37, #38 (PR #64) | `apps/api/src/routes/profile.ts` + teste | `me.ts`, `auth.ts`, web |
 | **H — cabeçalhos** ✅ | #42, a metade que não quebra (PR #63) | `apps/api/src/server.ts`, `apps/web/public/_headers` (novo) | rotas |
 | **F — ferramenta** ✅ | β9.5, β9.7, β9.8, #40, #41 (PR #67) | `.claude/skills/run-watchlytics/driver.mjs` e o `SKILL.md`, `tools/a11y/*` | `apps/**` |
@@ -1131,11 +1198,12 @@ O que continua aberto:
 
 | | o quê | por que não tem pressa |
 |---|---|---|
-| resto da **X** | alinhar o `recusar()` do `auth.ts` | Conta sem swipe não aparece em aviso nenhum, então a divergência não produz sobra hoje |
 | resto do **#42** | a CSP | Tarefa própria, com `Report-Only` primeiro — e agora com HSTS e `nosniff` já no ar por baixo dela |
 
 > A X entrou primeiro e fechou no mesmo dia: a β9.6 era a única com PII de pé, e
-> o código já existia.
+> o código já existia. O que sobrou dela — alinhar o `recusar()` — fechou no PR
+> #68, e foi a única tarefa desta leva em que a premissa da própria tarefa
+> estava errada: ver a β9.6 acima.
 
 Três trilhas ao mesmo tempo é o teto útil aqui. Não é limite de máquina — é que
 `main` só recebe um merge por vez, e a lição do β8 é que a fila de integração é
