@@ -79,7 +79,8 @@ derruba no fim.
 | `driver.mjs social` | **β6** — duas contas com sessões simultâneas, em contextos de navegação separados. Porta de idade, rotação de refresh, amizade, match, notificação e perfil público, tudo pela tela. Cria as duas contas e as apaga no fim. |
 | `driver.mjs handle` | **β8** — a porta onde a pessoa escolhe o handle: valida digitando, debounce da consulta, a corrida do 409 e a gravação. Mede foco, alvo de toque e estouro de largura por `getBoundingClientRect`. ~20s. |
 | `driver.mjs porta` | **β2 / β9.1** — a porta de idade: ano fora da faixa mostra o aviso DO APP (e não a bolha do navegador, no idioma dele), a recusa apaga a conta e não anuncia sessão, e o ano bom passa e é gravado. Duas contas descartáveis, porque a recusa apaga a primeira. |
-| `driver.mjs all` | `api`, `web`, `handle` e `porta`, nessa ordem. Padrão. O `social` fica de fora: ele leva ~40s e sobe dois contextos. |
+| `driver.mjs ruido` | Autoteste do filtro de erro de console: prova que ele engole o ruído conhecido e que um erro plantado continua reprovando. Sem banco, sem Chrome, sem `.env`. |
+| `driver.mjs all` | `ruido`, `api`, `web`, `handle` e `porta`, nessa ordem. Padrão. O `social` fica de fora: ele leva ~40s e sobe dois contextos. |
 
 Flags do `web`: `--url` (padrão `http://localhost:5173`), `--wait <seletor>`
 (padrão `.deck-card`), `--out <arquivo.png>`.
@@ -93,7 +94,7 @@ Prints → `/tmp/watchlytics-run/web.png` (deck inicial) e `web-depois.png`
 ✔ sem ano de nascimento o feed é 403 (β2)
 ✔ a porta de idade abre com maior de idade
 ✔ GET /v1/feed devolve 20 — Shrek
-✔ feed puxa do topo do catálogo, não do meio — menor da página 61 · mediana 34
+✔ feed puxa do topo do catálogo, não do meio — mediana da página 72 · do catálogo 34 · menor item 63
 ✔ POST /v1/swipes aceita
 ✔ reenvio é upsert, não duplicata — {"accepted":1,"skipped":0}
 ✔ título desconhecido é descartado
@@ -130,6 +131,9 @@ linha no Postgres. O driver apaga essas linhas no fim (veja Gotchas).
 ✔ β8 perder a corrida vira indisponível, e não erro fatal
 ✔ β8 o Postgres tem o handle escolhido, e a porta fechada — {"handle":"escolhido","handle_chosen":true}
 ✔ β8 e recarregar não reabre a porta — escolhe uma vez
+✔ β9.7 o foco já está no campo, sem um Tab sequer
+✔ β9.7 Enter no campo envia, sem passar pelo botão
+✔ β9.7 e o Postgres tem o handle que o teclado escolheu — {"handle":"sopeloteclado","handle_chosen":true}
 ```
 
 São 31 asserções, nenhuma contra rota fingida: "tomado" é outra conta ocupando
@@ -139,6 +143,13 @@ nenhuma consulta prévia fecha, e quem a resolve é o índice único.
 
 O penúltimo ✔ fecha o circuito, como o swipe fecha no `web`: digitação no DOM →
 `POST /v1/auth/handle` → linha no Postgres.
+
+**`pressKey` e o `text`.** Tecla que produz caractere precisa de `text` no
+`Input.dispatchKeyEvent`, senão o Chrome não emite o evento de caractere e **não
+há submissão implícita de formulário** — o Enter chega ao campo e o `onSubmit`
+não roda. Sem isso o caminho do teclado era intestável, e a primeira leitura
+disso foi "a tela não envia pelo teclado", que é defeito do instrumento vestido
+de defeito do app. As setas do Deck seguem sem `text`, de propósito.
 
 **Tecla por tecla.** `teclar()` manda um `keyDown`/`keyUp` por caractere porque
 o que se mede é o DEBOUNCE: o `digitar()` normal usa `Input.insertText`, que
@@ -238,7 +249,8 @@ sujar nada.
   fixture só traz `slug`; `title_external_ids` amarra os dois. Refazer o seed do
   zero troca todos os ids — e com eles o gradiente de cada card, que sai de
   `gradient(id)`. Nunca escreva um UUID de título em teste ou script; pegue do
-  `/v1/feed`. (`docs/BACKLOG.md` §0 diz "UUIDs fixos" — está errado.)
+  `/v1/feed`. (O §0 do `docs/BACKLOG.md` dizia "UUIDs fixos"; corrigido em
+  `8280442`.)
 - **O card do topo é o ÚLTIMO no DOM.** `Deck.tsx` faz `.reverse()` para o topo
   ficar por cima sem `z-index` brigando. `.deck-card:first-child` pega o card
   do fundo, que é `aria-hidden` e não responde a evento.
@@ -278,8 +290,10 @@ sujar nada.
   `poster_url` nem `cast_names` — o elenco (I1.2) e as duas do pôster (B4) só
   ficam verdes contra o catálogo ingerido do TMDB. Conferido no `driver.mjs` de
   `origin/main` em 2026-09-12, num `wl_b6` criado do zero. A saída verde acima é
-  a do banco de desenvolvimento. Pela mesma razão, "feed puxa do topo do
-  catálogo" pisca com 94 títulos: a mediana fica perto demais do topo.
+  a do banco de desenvolvimento. "Feed puxa do topo do catálogo" TAMBÉM piscava
+  com 94 títulos (#41), e não pisca mais: a asserção pedia todo item acima da
+  mediana, o que o ruído multiplicativo do A4 não promete — agora compara a
+  mediana DA PÁGINA, que o ruído não move.
 - **Outra sessão na mesma porta é o erro mais caro daqui.** Há vários worktrees
   nesta máquina, cada um com o seu banco. Se a api de outro já estiver em :3000,
   o driver reusa — e a sessão que ele plantou não existe para quem responde.
@@ -304,8 +318,17 @@ sujar nada.
   `npm install` não muda por causa dele.
 - **`--remote-debugging-port=0`**, não 9222: o Chrome anuncia a URL do devtools
   no stderr e duas execuções em paralelo não brigam pela porta.
-- **O 404 de `/favicon.ico` é esperado.** `apps/web/index.html` não declara
-  ícone e o Chrome pede assim mesmo; o driver filtra esse erro do console.
+- **Nem todo vermelho de console é defeito, e o driver separa os três casos.**
+  `IGNORADOS` tira o que é ruído em qualquer cena: o 404 de `/favicon.ico`
+  (o `index.html` não declara ícone e o Chrome pede assim mesmo) e o 401 de
+  `/v1/auth/refresh` numa visita deslogada (o cookie é httpOnly, o `resume()`
+  não tem como saber antes de perguntar — β9.5). O fetch que o próprio driver
+  abortou ao navegar por cima sai por JANELA, não por mensagem: só conta como
+  ruído entre o `Page.navigate`/`Page.reload` e o `load` seguinte, e a mesma
+  mensagem fora dessa janela continua reprovando (β9.8, #40). O que é esperado
+  só numa cena — o 409 da corrida do β8, o 403 da porta do β2 — é argumento de
+  quem chama `errosReais`, porque ali o erro É o comportamento sob teste.
+  `driver.mjs ruido` prova as três regras em ms, sem banco nem navegador.
 
 ## Troubleshooting
 

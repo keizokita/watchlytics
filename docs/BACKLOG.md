@@ -837,10 +837,10 @@ existia, então `consents` e a porta de idade seguem sem passada real.
 | β9.2 | ~~A tela de recusa continua anunciando "Signed in as @handle"~~ — não procede | — | não |
 | β9.3 ✅ | O checkbox do perfil público sai azul do navegador | `apps/web/index.html` | não |
 | β9.4 ✅ | O link do perfil público sai na cor default do agente | `apps/web/src/screenCss.ts` | não |
-| β9.5 | Visita deslogada sempre registra um 401 no console | ferramenta | não |
+| β9.5 ✅ | Visita deslogada sempre registra um 401 no console | ferramenta | não |
 | β9.6 ✅ | Apagar a conta deixa o handle dela no aviso de quem foi amigo | `apps/api/src/routes/me.ts` | não, mas quebrava a promessa do §8.4 |
-| β9.7 | A porta do handle nunca foi varrida fora do `driver.mjs` | — | não |
-| β9.8 | `driver.mjs handle` termina vermelho por um fetch abortado pelo reload | `driver.mjs` | não |
+| β9.7 ✅ | A porta do handle nunca foi varrida fora do `driver.mjs` | — | não |
+| β9.8 ✅ | `driver.mjs handle` termina vermelho por um fetch abortado pelo reload | `driver.mjs` | não |
 
 **β9.1 — o aviso do app é código morto.** O campo é
 `<input type="number" min={1900} max={ano}>`, e a validação nativa do navegador
@@ -898,6 +898,14 @@ asserção de "console limpo" numa tela deslogada reprova por comportamento
 esperado. **Pronto quando** o filtro existir na ferramenta, ao lado do que já
 ignora o `favicon.ico`.
 
+**Fechou em 2026-09-13**, pelo [PR #67](https://github.com/keizokita/watchlytics/pull/67):
+a regra está em `IGNORADOS`, ao lado do favicon, e só nessa rota e só em 401 —
+um 500 em `/v1/auth/refresh` continua reprovando, e o autoteste cobra isso.
+**Não foi reproduzida numa cena**, e vale dizer por quê: sem
+`VITE_GOOGLE_CLIENT_ID` o `Login.tsx` monta a tela de "sign-in is not configured"
+e nunca chama o `resume()` que emite o 401. A prova é o autoteste contra a string
+que o Chrome produz de verdade, não a cena.
+
 **β9.6 — a cascata não alcança a cópia que mora no payload.** `friends.ts` grava
 `payload: { friendId, friendHandle, … }` nas duas notificações que existem —
 `match` (linhas 142 e 152) e `friend_matches` (391 e 396) —, de propósito, para
@@ -943,6 +951,31 @@ fora do driver: recusa de handle ocupado vista pela tela, o que o cabeçalho
 mostra enquanto a porta está fechada, e a porta a 360px. **Pronto quando** a
 mesma varredura da β9 passar pela porta do handle.
 
+**Fechou em 2026-09-13** (PR #67), e o resultado inverteu a expectativa: **a tela
+passou limpa e quem estava errado era o instrumento.**
+
+Medido por CDP, fora das asserções do driver: nada estoura em 320px nem em 360px
+(`scrollWidth` bate a janela, zero elementos passando da borda), o campo mede
+46px e o botão 44px nas duas larguras, colar de uma vez gera UMA consulta como
+digitar, `  KeiZo Kita  ` vira `keizo kita` e é recusado com a frase do app, e o
+veredito de erro mede 5.9:1 contra o fundo (AA pede 4.5:1). Os dois silêncios que
+pareciam achado não são: o handle de 2 caracteres não é acusado enquanto se
+digita porque a regra "3 to 20 characters" já está na tela e no
+`aria-describedby`, e o corte em 20 é o `maxLength` espelhando o contrato.
+
+O achado foi do `driver.mjs`: o `pressKey` mandava `keyDown`/`keyUp` sem `text`,
+e sem `text` o Chrome não emite o evento de caractere — **não existe submissão
+implícita de formulário**. O `onSubmit` do `HandleGate` (que existe exatamente
+para o Enter) nunca rodava sob o driver, e o caminho de quem chega por teclado ou
+leitor de tela era intestável. A primeira leitura da varredura foi "a tela não
+envia pelo teclado", que teria virado tarefa para consertar código certo — o
+mesmo erro de forma da β9.2, medição vizinha ao defeito voltando confiante.
+
+Agora `pressKey` passa `text` para tecla que produz caractere, e três asserções
+novas cobrem o caminho: o foco já está no campo sem um Tab, o Enter envia sem
+passar pelo botão, e o Postgres tem o handle que o teclado escolheu. Medido nos
+dois sentidos: com `text`, 3 de 3 rodadas enviam; sem, 3 de 3 não enviam.
+
 **β9.8 — o `all` termina vermelho, e não é o app.** A última asserção do
 `cmdHandle`, `console sem erro além do 409 da corrida`, reprova com
 `TypeError: Failed to fetch` em `Onboarding.tsx`. **Reproduz 2 em 2**, não é
@@ -963,6 +996,28 @@ primeiro paint seguinte) resolve a classe. Crédito da observação a outra sess
 **Pronto quando** o `driver.mjs all` terminar verde num banco de desenvolvimento
 com dado real, sem que a asserção tenha ficado cega: ela precisa continuar
 reprovando um erro que o app produza sozinho, e isso se prova plantando um.
+
+**Fechou em 2026-09-13** (PR #67), pelo caminho que este parágrafo pedia — e a
+diferença entre janela e allowlist acabou sendo o que também fechou o #40.
+
+Um filtro só, `errosReais`, no lugar das cinco cópias divergentes de
+`!/favicon/i` que existiam. Três regras, de origens diferentes: `IGNORADOS` é o
+que é ruído em qualquer cena (favicon e o 401 da β9.5); o aborto de fetch sai por
+**janela**, entre o `Page.navigate`/`Page.reload` e o `load` do documento novo, e
+a mesma mensagem fora da janela reprova; e o que é esperado só numa cena — o 409
+da corrida do β8, o 403 da porta do β2 — segue sendo argumento de quem chama,
+porque ali o erro É o que está sob teste. A janela abre no `page.cmd`, único
+ponto por onde os dez navigate e reload das cenas passam. O erro descartado vai
+para `page.descartados`, não para o vazio.
+
+A condição de não ficar cega virou `driver.mjs ruido`: 10 casos, sem banco, sem
+Chrome e sem `.env`, sendo o central o mesmo aborto com veredito oposto dentro e
+fora da janela. Na cena real, com um `console.error` plantado no `main.tsx`, o
+`web` termina vermelho citando a frase e o processo sai 1.
+
+Medido: `social` contra 9.830 títulos dá 21/23 com o driver de `main` e 23/23 com
+este (#40); o `handle` reprovava em 1 de 2 rodadas e passa 2 de 2; `all` fecha
+com 82 asserções e nenhuma reprovação.
 
 Duas coisas foram consertadas aqui em 2026-09-13, junto com a β9.0a, porque sem
 elas o `all` nem chegava nessa asserção:
@@ -987,8 +1042,20 @@ Nenhuma foi refutada agora. Continuam valendo como estão escritas.
 | [#42](https://github.com/keizokita/watchlytics/issues/42) ✅ parcial | Nem o Pages nem a API mandam CSP ou HSTS | **bloqueava**; a CSP segue aberta |
 | [#37](https://github.com/keizokita/watchlytics/issues/37) ✅ | O perfil público não tem caminho de volta para o app | não, mas é o link que circula |
 | [#38](https://github.com/keizokita/watchlytics/issues/38) ✅ | O perfil público não declara `og:image` | não, mesmo motivo |
-| [#40](https://github.com/keizokita/watchlytics/issues/40) | `driver.mjs social`: duas asserções de console reprovam com catálogo real | não |
-| [#41](https://github.com/keizokita/watchlytics/issues/41) | `driver.mjs api`: a asserção do topo do feed é intermitente na fixture de 94 | não |
+| [#40](https://github.com/keizokita/watchlytics/issues/40) ✅ | `driver.mjs social`: duas asserções de console reprovam com catálogo real | não |
+| [#41](https://github.com/keizokita/watchlytics/issues/41) ✅ | `driver.mjs api`: a asserção do topo do feed é intermitente na fixture de 94 | não |
+
+**O #41 não era intermitência** (fechado em 2026-09-13, PR #67). A asserção
+pedia que TODO item da página estivesse acima da mediana do catálogo, e o ruído
+do A4 é multiplicativo entre 0.85 e 1.15 — basta um título valer 0.739 do outro
+para passar na frente dele, então um item meio ponto abaixo da mediana entrar na
+página é o requisito sendo cumprido. O que o ruído não consegue é puxar metade da
+página para baixo: a asserção passa a comparar a mediana **da página**. Cinco
+rodadas contra a fixture de 94, cinco verdes, com a mediana da página entre 78.5
+e 82.5 contra 67.5 do catálogo — e o `menor item` saiu 67 em quatro delas, que é
+exatamente o valor que reprovava antes. O comentário no driver dizia que a
+fixture passava por acidente e que os 9,9k reordenavam sempre; é o contrário, e
+ficou escrito.
 
 O #42 entra como bloqueio pela metade que ele mesmo propõe: `Strict-Transport-Security`
 e `X-Content-Type-Options` na API não têm como quebrar nada e a API serve HTML
@@ -1047,7 +1114,7 @@ e não na hora de mesclar.
 | **X — exclusão** · resta um item | β9.6 ✅ (`28e5792`); falta alinhar o `recusar()` | o `recusar()` de `auth.ts` + teste | web, outras rotas |
 | **U — perfil público** ✅ | #37, #38 (PR #64) | `apps/api/src/routes/profile.ts` + teste | `me.ts`, `auth.ts`, web |
 | **H — cabeçalhos** ✅ | #42, a metade que não quebra (PR #63) | `apps/api/src/server.ts`, `apps/web/public/_headers` (novo) | rotas |
-| **F — ferramenta** · aberta | β9.5, β9.7, β9.8, #40, #41 | `.claude/skills/run-watchlytics/driver.mjs` e o `SKILL.md`, `tools/a11y/*` | `apps/**` |
+| **F — ferramenta** ✅ | β9.5, β9.7, β9.8, #40, #41 (PR #67) | `.claude/skills/run-watchlytics/driver.mjs` e o `SKILL.md`, `tools/a11y/*` | `apps/**` |
 
 X, U e H são todas de api e mesmo assim disjuntas: `me.ts`+`auth.ts`,
 `profile.ts` e `server.ts`. P e V são as duas de web, e a fronteira entre elas é
@@ -1058,13 +1125,12 @@ A F só começa depois da β9.0a — as duas mexem no `driver.mjs`.
 ### Ordem, e o que sobrou dela
 
 A ordem planejada era: serial, depois P e H em paralelo, depois U, depois V, X e
-F. **Foi seguida, e em 2026-09-13 sobrou só a F.**
+F. **Foi seguida, e em 2026-09-13 as seis fecharam** — a F por último, no PR #67.
 
 O que continua aberto:
 
 | | o quê | por que não tem pressa |
 |---|---|---|
-| **F** | β9.5, β9.7, β9.8, #40, #41 | É ferramenta. O `driver.mjs all` termina vermelho na última asserção do `handle`, e a causa está diagnosticada (β9.8): o próprio driver aborta o fetch ao recarregar |
 | resto da **X** | alinhar o `recusar()` do `auth.ts` | Conta sem swipe não aparece em aviso nenhum, então a divergência não produz sobra hoje |
 | resto do **#42** | a CSP | Tarefa própria, com `Report-Only` primeiro — e agora com HSTS e `nosniff` já no ar por baixo dela |
 
@@ -1080,7 +1146,8 @@ onde as trilhas se quebram, não o editor.
 Mesclados em 2026-09-13, nesta ordem: #61, #62, #63, #64, #65. **Conferido na
 branch mesclada antes de tudo** — `npm run check` limpo, 150 testes da api e 43
 da web, e o `driver.mjs all` (api, web, handle e a `porta` nova) verde exceto a
-β9.8, que é conhecida. É a regra do β8: o CI não roda o driver.
+β9.8, que era conhecida e fechou no mesmo dia (PR #67). É a regra do β8: o CI
+não roda o driver.
 
 Um detalhe do CI que engana quem for ler depois: os runs de #62 e #63 aparecem
 **cancelados**, porque o grupo de concorrência derruba o run em voo quando o
