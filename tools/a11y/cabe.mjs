@@ -19,7 +19,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import {
-  openChrome, servers, abrirSessao, devolver, evaluate, waitFor, sleep, comBanco, ROOT, WEB,
+  openChrome, servers, abrirSessao, devolver, evaluate, waitFor, until, sleep, comBanco, ROOT, WEB,
 } from "./lib.mjs";
 
 /**
