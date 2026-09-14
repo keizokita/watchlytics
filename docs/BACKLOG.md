@@ -1268,6 +1268,44 @@ que não dói.
 O antídoto é o estado cheio como padrão: conta povoada, catálogo real de 9830.
 Remedido assim em 320x568, 360x640 e 390x844, nas três abas de cada tela.
 
+**Mas povoar a conta não basta, e a régua nova tem duas armadilhas próprias.**
+Vale antes de alguém confiar num vermelho ou num verde dela:
+
+- **Ela mede num relógio, não num fato.** O `cabe.mjs` afirma na documentação
+  das cenas que espera a prova de que a tela chegou, "nunca um `sleep` solto no
+  lugar da prova" — e o laço de medição põe `await sleep(600)` antes da sonda. O
+  `waitFor` prova que a tela **chegou**; os 600ms apostam que o que vem depois
+  de chegar (pôster carregando, fonte trocando, linha entrando) terminou. Medido:
+  `lib-carregando` no mesmo commit de `main` dá **-236 rodando a suíte e -528
+  rodando a cena sozinha**, estável dentro de cada modo. Comparar suíte-do-antes
+  com cena-do-depois acusa 292px de regressão que não existe. Enquanto a sonda
+  não afirmar o DOM (`document.fonts.ready`, imagens da dobra com `complete`,
+  dois `rAF` sem mudança de `scrollHeight`), antes e depois só valem no **mesmo
+  modo de execução**.
+- **`rola > 0` reprova lista povoada por definição.** A linha do veredito é
+  `if (m.rola > 0 || m.nFora || m.nEstouro || m.nPequeno)`. Hoje a régua é
+  coerente porque só tem cenas que *deveriam* caber (vazia, carregando, erro).
+  No minuto em que uma cena com catálogo real entrar, ela rola — e `nFora`
+  dispara junto, porque numa lista longa os controles das linhas de baixo ficam
+  abaixo da dobra, e é isso que uma lista é. O `folga` acompanha: ele é
+  `alturaDisponivel - soma(alturas dos filhos do .shell)`, então um `-2930` numa
+  biblioteca cheia não é falta de 2930px, é a lista tendo 2930px de linha. O
+  número está certo; a pergunta é que não se aplica.
+
+Daí a regra: **régua permanentemente vermelha é pior que régua permanentemente
+verde.** Na verde alguém ainda confia; na vermelha a regressão de verdade se
+esconde num vermelho que já estava lá, e sobra um exit code que todos aprenderam
+a ignorar. Para cena com lista longa o critério que significa algo é outro — a
+primeira linha inteira dentro da dobra, os controles do **shell** (não os das
+linhas) alcançáveis, estouro horizontal zero, alvo de toque. "Não rola" só é
+alvo onde rolar seria o defeito.
+
+E uma regra de higiene que custou quase um falso defeito: **número de régua
+anda com a versão da régua**. Foram citadas quatro cenas (`lib-interested`,
+`friends-people`, `friends-common`, `friends-alerts`) que não existem em
+`201caf7` nem em nenhum `cabe.mjs` em disco. Quem citar medição diz de qual
+versão ela saiu, e o "antes" sai da mesma.
+
 **O painel de estatísticas não era espaço, era ordem de leitura.** Ele ocupava
 152px entre as abas e a lista, e com o piso de 10 assistidos fechado esses 152px
 eram *uma frase dizendo o que você ainda não pode ver* — servida antes do que
