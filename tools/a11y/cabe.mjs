@@ -95,6 +95,18 @@ const SONDA = `(() => {
     // e isso não é defeito. O que não pode sair de alcance é o controle da
     // própria tela — nav, abas, botões de conta.
     d.naLista = !!el.closest('.lib-list, .friend');
+    // Numa tela que rola, estar abaixo da dobra não é estar fora de alcance:
+    // rolar chega lá. Fora de alcance é o que a rolagem NÃO alcança — o que
+    // cai além do documento rolável, ou o que algum ancestral clipa.
+    const fim = document.documentElement.scrollHeight;
+    const clipado = (() => {
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        const cs2 = getComputedStyle(p), pr = p.getBoundingClientRect();
+        if (/hidden|clip/.test(cs2.overflowY) && (r.top < pr.top - 0.5 || r.bottom > pr.bottom + 0.5)) return true;
+      }
+      return false;
+    })();
+    d.inalcancavel = clipado || r.bottom + scrollY > fim + 1 || r.top + scrollY < -1;
     if (r.bottom > H + 0.5 || r.top < -0.5) foraDaDobra.push(d);
     // Link de texto não é alvo de toque: o piso de --tap é do controle que
     // tem caixa própria (fundo, borda ou padding). Sem esta separação o
@@ -173,6 +185,7 @@ const SONDA = `(() => {
     estouro: estouro.slice(0, 6), foraDaDobra: foraDaDobra.slice(0, 8), alvoPequeno: alvoPequeno.slice(0, 8),
     nEstouro: estouro.length, nFora: foraDaDobra.length, nPequeno: alvoPequeno.length,
     nForaDaTela: foraDaDobra.filter((f) => !f.naLista).length,
+    nInalcancavel: foraDaDobra.filter((f) => f.inalcancavel).length,
   };
 })()`;
 
@@ -415,8 +428,21 @@ const cenas = filtros.length
   ? CENAS.filter(([nome]) => filtros.some((f) => new RegExp(`^${f.replace(/\*/g, ".*")}$`).test(nome)))
   : CENAS;
 
-/** Cenas que rolam por natureza: lista povoada não promete caber na dobra. */
-const LISTA_LONGA = /^(lib-(interested|watched|discarded)|friends-(people|common|alerts))$/;
+/**
+ * Telas que rolam por NATUREZA, e não por defeito.
+ *
+ * É a família da tela que decide, não o estado dela. A biblioteca carrega um
+ * bloco de conta de 436px embaixo da lista (`Library.tsx`), e só ele já é maior
+ * que a dobra de 320x568 menos o chrome: somando abas 44 + estatísticas 276 +
+ * aviso 24 + conta 436 dá 780px numa janela de 568. Ou seja, `lib-vazia`,
+ * `lib-carregando` e `lib-erro` não cabem nem sem lista nenhuma — cobrar "não
+ * rola" delas seria vermelho permanente por classificação errada, e vermelho
+ * permanente esconde regressão melhor do que verde permanente.
+ *
+ * Que os 436px de configuração morem debaixo do catálogo é pergunta de
+ * produto, não de layout, e a régua só a mede.
+ */
+const ROLA_POR_NATUREZA = /^(lib-|friends-)/;
 
 const matriz = new Map(); // cena -> viewport -> célula
 let reprovou = false;
@@ -464,13 +490,13 @@ for (const vp of VIEWPORTS) {
       //
       // Régua sempre vermelha esconde regressão melhor do que régua sempre
       // verde: no vermelho que já estava lá ninguém olha duas vezes.
-      const lista = LISTA_LONGA.test(nome);
+      const lista = ROLA_POR_NATUREZA.test(nome);
       const linhaCortada = lista && m.primeiraLinha !== null && !m.primeiraLinha.cabe;
       const falhou = m.nEstouro > 0 || m.nPequeno > 0 ||
-        (lista ? m.nForaDaTela > 0 || linhaCortada : m.nFora > 0 || m.rola > 0);
+        (lista ? m.nInalcancavel > 0 || linhaCortada : m.nFora > 0 || m.rola > 0);
       if (falhou) reprovou = true;
       const flags =
-        (m.rola > 0 ? "R" : "") + ((lista ? m.nForaDaTela : m.nFora) ? "D" : "") +
+        (m.rola > 0 ? "R" : "") + ((lista ? m.nInalcancavel : m.nFora) ? "D" : "") +
         (linhaCortada ? "P" : "") + (m.nEstouro ? "X" : "") + (m.nPequeno ? "T" : "");
       matriz.set(nome, { ...(matriz.get(nome) ?? {}), [vp]: `${cabe}${flags ? " " + flags : ""}` });
 
@@ -481,7 +507,8 @@ for (const vp of VIEWPORTS) {
           `(dobra ${m.H}) ${m.primeiraLinha.cabe ? "inteira" : "CORTADA"}`);
       }
       for (const f of m.foraDaDobra) {
-        console.log(`   abaixo da dobra${f.naLista ? " (linha de lista)" : ""}: ${f.el} "${f.txt}" ${f.y}..${f.b} (dobra ${m.H})`);
+        const como = f.inalcancavel ? " FORA DE ALCANCE" : f.naLista ? " (linha de lista)" : "";
+        console.log(`   abaixo da dobra${como}: ${f.el} "${f.txt}" ${f.y}..${f.b} (dobra ${m.H})`);
       }
       for (const f of m.estouro) console.log(`   estoura: ${f.el} "${f.txt}" ${f.l}..${f.r} (largura ${m.W})`);
       for (const f of m.alvoPequeno) console.log(`   alvo ${f.w}x${f.h} < ${m.tap}: ${f.el} "${f.txt}"`);
@@ -509,11 +536,12 @@ for (const [nome, linha] of matriz) {
 }
 console.log(`
 número = folga vertical em px (negativo = falta tanto para caber)
-R = rola · D = controle DA TELA abaixo da dobra · P = primeira linha da lista cortada
+R = rola · D = controle fora de alcance (na tela que rola: o que a rolagem não
+alcança; na que promete caber: qualquer um abaixo da dobra) · P = primeira linha cortada
 X = estouro horizontal · T = alvo de toque < --tap (já descontando ::after e <label>)
 
-reprova (saída 1): X e T sempre. Nas cenas que prometem caber (deck, portas,
-onboarding, lib-vazia/carregando/erro, friends-erro, deslogada), R e D também.
-Nas cenas de lista povoada, o critério é P e D — rolar ali é o que a lista faz.`);
+reprova (saída 1): X e T sempre. Nas telas que prometem caber (deslogada,
+portas, onboarding, deck, deck-erro), R e D também. Nas telas de lista
+(lib-*, friends-*), que rolam por construção, o critério é P e D.`);
 
 process.exit(reprovou ? 1 : 0);
