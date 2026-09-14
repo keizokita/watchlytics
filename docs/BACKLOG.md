@@ -1458,3 +1458,21 @@ dia numa escala acima: o registro estava no lugar certo para quem escreveu e no
 lugar errado para quem precisava. Conhecimento de armadilha de ambiente mora em
 documento versionado, ou ele não existe para a próxima faixa.
 
+**E fechar faixa também tem passo: recolher o que ficou em `/tmp`.** Cada Chrome
+descartável da régua criava um perfil em tmpfs e não o levava embora; somadas as
+corridas de um dia, 6,5GB, até o filesystem encher. O `80d1170` estanca na
+origem, mas o padrão vale para qualquer ferramenta que crie descartável — e o
+jeito de recolher é o mesmo do `pkill`: varrer `/tmp/wl-a11y-chrome-*`, comparar
+com o `--user-data-dir` da cmdline de cada `chrome` vivo, e remover **só** o que
+não está nessa lista. Com medição de outra sessão rodando, a varredura pula a
+dela. No `/tmp` a regra vale ainda mais que na porta, porque porta pelo menos
+tem dono declarado.
+
+O que faz disso item de protocolo e não de limpeza: **o vazamento não se anuncia
+em quem vaza.** Quem vaza continua funcionando até o fim; quem paga é o próximo
+processo que precisar de espaço, e ele costuma não ter relação nenhuma com a
+causa — aqui apareceu como `ENOSPC` numa ferramenta vizinha. É a versão de
+recurso do que a `--deck-reserve` fazia com a altura: o custo aparece longe de
+onde nasce. Por isso recolher é antes de abrir leva nova, não depois de alguém
+tropeçar.
+
