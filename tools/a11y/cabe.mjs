@@ -321,10 +321,15 @@ const clicarAba = (page, rotulo) =>
 /**
  * Clicar na aba não é estar NA aba. A lista da aba anterior continua no DOM
  * enquanto a nova carrega, então esperar `.lib-list` volta na hora e a medição
- * descreve o conteúdo velho — era por isso que "interested" e "watched" davam
- * folga idêntica (-3529 nas duas), o que nenhuma tela com conteúdo diferente
- * deveria dar. A prova é o par: a aba pedida com `aria-pressed=true` E o aviso
- * de carregando fora da tela.
+ * pode descrever o conteúdo velho: prova de presença não é prova de identidade.
+ * A prova é o par — a aba pedida com `aria-pressed=true` E o aviso de
+ * carregando fora da tela.
+ *
+ * O que NÃO era isto: "interested" e "watched" darem folga idêntica (-3529) no
+ * `main`. Suspeitei da aba velha e estava errado — no `main` o botão "Clear
+ * rating" é renderizado sempre, só desabilitado, então a altura da linha não
+ * depende de haver nota e as duas abas somam igual. Duas telas de conteúdo
+ * diferente PODEM dar o mesmo número quando o que decide a altura é o mesmo.
  */
 async function trocarAba(page, rotulo) {
   await clicarAba(page, rotulo);

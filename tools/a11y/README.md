@@ -109,9 +109,15 @@ montagem antes de suspeitar do layout.
 
 **Clicar na aba não é estar na aba.** A lista da aba anterior continua no DOM
 enquanto a nova carrega, então `waitFor('.lib-list')` volta na hora e a medição
-descreve o conteúdo velho. O sintoma era discreto: "interested" e "watched"
-davam folga idêntica, o que duas telas com conteúdo diferente não dão. A prova
-é o par — aba com `aria-pressed=true` e o aviso de carregando fora da tela.
+pode descrever o conteúdo velho: prova de presença não é prova de identidade. A
+prova é o par — aba com `aria-pressed=true` e o aviso de carregando fora da
+tela.
+
+**Número igual em duas telas nem sempre é defeito do instrumento.** "interested"
+e "watched" davam -3529 nas duas no `main`, e a suspeita de aba velha estava
+errada: lá o "Clear rating" é renderizado sempre, só desabilitado, então a
+altura da linha não depende da nota. A coincidência que não cabe vale como
+sinal, mas a explicação dela se confere no código da tela, não no da régua.
 
 **`document.scrollWidth` não denuncia estouro.** `html` e `body` têm
 `overflow-x: clip`, que mata a barra e some com a prova junto. Quem denuncia é o
