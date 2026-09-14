@@ -5,7 +5,7 @@
  * acessibilidade, foco de verdade e leitura de pixel.
  */
 import { spawn } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -168,6 +168,12 @@ export async function openChrome({ viewport = "430x932", scale = 1, reduce = tru
     close: () => {
       ws.close();
       chrome.kill();
+      // O perfil é descartável e mora no tmpfs: sem isto cada Chrome deixa
+      // ~90MB para trás, e uma matriz de 15 cenas × 5 viewports enche /tmp —
+      // aconteceu, e o sintoma foi ENOSPC em outra ferramenta, não aqui.
+      try {
+        rmSync(profile, { recursive: true, force: true });
+      } catch {}
     },
   };
 
