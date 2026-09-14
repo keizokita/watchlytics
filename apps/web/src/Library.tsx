@@ -56,13 +56,20 @@ function Item({ item }: { item: Title }) {
   );
 }
 
-/** Nota como cinco botões: paridade com o requisito de acessibilidade do deck. */
+/**
+ * Nota como cinco botões: paridade com o requisito de acessibilidade do deck.
+ *
+ * Só as estrelas. O "clear" saiu daqui porque cinco alvos de 44px somam 230px
+ * e a linha útil em 320px tem 246px — qualquer sexto controle ao lado empurrava
+ * a fileira para duas linhas, e a linha inteira do catálogo media 246px de
+ * altura. Ele agora divide a fileira de ações com o botão de mover.
+ */
 function Rating({
   value,
   onChange,
 }: {
   value: number | null;
-  onChange: (rating: number | null) => void;
+  onChange: (rating: number) => void;
 }) {
   return (
     <div className="lib-rating">
@@ -77,14 +84,6 @@ function Rating({
           {value !== null && n <= value ? "★" : "☆"}
         </button>
       ))}
-      <button
-        type="button"
-        className="lib-clear"
-        disabled={value === null}
-        onClick={() => onChange(null)}
-      >
-        {t.clearRating}
-      </button>
     </div>
   );
 }
@@ -358,8 +357,6 @@ export function Library() {
         {movido}
       </p>
 
-      {stats && <Stats stats={stats} />}
-
       {error && (
         // Sem `foco`: aqui o painel se SOMA à tela, e quem estava numa nota ou
         // num botão da lista continua onde estava.
@@ -397,19 +394,35 @@ export function Library() {
                             void save(entry.title.id, entry.status, rating)
                           }
                         />
-                        <button
-                          type="button"
-                          className="lib-move"
-                          onClick={() =>
-                            void save(
-                              entry.title.id,
-                              entry.status === "watched" ? "interested" : "watched",
-                              entry.rating,
-                            )
-                          }
-                        >
-                          {entry.status === "watched" ? t.markInterested : t.markWatched}
-                        </button>
+                        <div className="lib-actions-row">
+                          {/* Só existe quando há nota para apagar. Botão
+                              permanentemente desabilitado é ruído numa linha
+                              que já disputa 246px de largura. */}
+                          {entry.rating !== null && (
+                            <button
+                              type="button"
+                              className="lib-clear"
+                              onClick={() =>
+                                void save(entry.title.id, entry.status, null)
+                              }
+                            >
+                              {t.clearRating}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="lib-move"
+                            onClick={() =>
+                              void save(
+                                entry.title.id,
+                                entry.status === "watched" ? "interested" : "watched",
+                                entry.rating,
+                              )
+                            }
+                          >
+                            {entry.status === "watched" ? t.markInterested : t.markWatched}
+                          </button>
+                        </div>
                       </div>
                     </li>
                   ))}
@@ -417,6 +430,14 @@ export function Library() {
           )}
         </>
       )}
+
+      {/* Depois da lista, e não antes dela. Medido em 320x568: o painel ocupava
+          152px entre as abas e o catálogo, e a primeira linha da lista começava
+          em y=364 numa dobra de 568 — a tela de catálogo abria com um número
+          sobre o catálogo em vez do catálogo. Com o piso de 10 assistidos ainda
+          fechado é pior: os 152px são uma frase dizendo o que ainda não dá para
+          ver. */}
+      {stats && <Stats stats={stats} />}
 
       <Account />
     </div>
@@ -435,10 +456,14 @@ const CSS = SCREEN_CSS + `
   grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); }
 .lib-stats dt { font-size: 0.75rem; color: var(--muted); }
 .lib-stats dd { margin: 0.15rem 0 0; font-size: 1.1rem; font-weight: 600; }
-.lib-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
+/* Duas fileiras declaradas, e não uma fileira que se vira: as estrelas nunca
+   couberam ao lado do botão de mover (230px + 139px numa linha de 246px), e o
+   flex-wrap fazia a mesma coisa sem dizer o que ia acontecer. */
+.lib-actions { display: grid; gap: 0.5rem; }
+.lib-actions-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;
   justify-content: space-between; }
-/* Envolve porque cinco alvos de 44px mais o "clear" não cabem em 360px. */
-.lib-rating { display: flex; flex-wrap: wrap; gap: 0.15rem; align-items: center; }
+/* nowrap: cinco alvos de 44px somam 230px e cabem nos 246px de 320x568. */
+.lib-rating { display: flex; flex-wrap: nowrap; gap: 0.15rem; align-items: center; }
 /* A estrela continua do mesmo tamanho; o que cresce é a caixa em volta, que
    era ~24px — o alvo mais fino do app inteiro, e num controle que existe para
    ser tocado cinco vezes seguidas. Sem fundo nem borda, o ganho aparece como
@@ -447,14 +472,21 @@ const CSS = SCREEN_CSS + `
   min-width: var(--tap); min-height: var(--tap);
   border: none; background: none; color: var(--fg);
   font: inherit; font-size: 1.1rem; line-height: 1; padding: 0.2rem; cursor: pointer; }
-.lib-rating .lib-clear { min-width: 0; font-size: 0.75rem; color: var(--muted); padding: 0 0.5rem; }
-.lib-rating .lib-clear:disabled { opacity: 0.35; cursor: default; }
+/* Fora da fileira de estrelas agora, e com --tap próprio: era a altura do
+   .lib-rating button que lhe dava os 44px. */
+.lib-clear { display: inline-flex; align-items: center; min-height: var(--tap);
+  border: none; background: none; font: inherit; font-size: 0.75rem;
+  color: var(--muted); padding: 0 0.5rem; cursor: pointer; }
 
 .lib-account { border: 1px solid var(--line); border-radius: var(--r-panel);
   padding: 1rem; display: grid; gap: 0.75rem; }
 .lib-account h2 { margin: 0; font-size: 0.8rem; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted); }
 .lib-account-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+/* A caixa nasce com 13x13. O rótulo inteiro já é o alvo de 44px, mas o
+   quadrado que se mira continuava sendo o menor controle do app. */
+.lib-public { display: flex; align-items: center; gap: 0.6rem; min-height: var(--tap); }
+.lib-public input { width: 1.25rem; height: 1.25rem; flex: none; accent-color: var(--like, #35c98b); }
 .lib-account button:disabled { opacity: 0.4; cursor: default; }
 /* A cor do botão destrutivo é a do pass, e só ele é vermelho na tela. */
 .lib-danger { display: inline-flex; align-items: center; justify-content: center;
