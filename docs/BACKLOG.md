@@ -1316,6 +1316,23 @@ sessões bateram um a um. A lição que sobra é a de sempre, com endereço novo
 **busca por literal não interroga código que monta nomes**; para saber se uma
 cena existe, pergunte ao programa (`cabe.mjs --lista`, ou rode-a), não ao texto.
 
+E o oitavo, que é o mais reutilizável dos oito porque não é sobre medir, é sobre
+**versão**: a régua é dois arquivos, e só um voltou. O `cabe.mjs` reformado
+conviveu por uma corrida inteira com o `lib.mjs` antigo — o `reset --keep` que
+tirou um commit do `main` local devolveu o `lib.mjs` ao estado do `main`, e o
+`cabe.mjs` reapareceu sozinho pelo checkout da branch. Sem `handleChosen` na
+sessão plantada, **toda cena parava na porta do handle**, e o sintoma (nenhuma
+tela renderiza) lê como defeito de produto, não como instrumento remendado pela
+metade. A corrida inteira foi descartada.
+
+A regra que fica: **a versão de um instrumento não é a versão do arquivo dele, é
+a versão do conjunto de arquivos dele.** Quem levar a régua para outro worktree
+leva por commit — `cherry-pick`, nunca `cp` — porque copiar um arquivo é
+exatamente o gesto que produz esse par desencontrado. E vale para o `driver.mjs`
+pela mesma razão: harness que planta sessão em SQL tem uma metade que conhece as
+portas do app e outra que conhece as telas, e as duas envelhecem em ritmos
+diferentes (§7: porta nova invalida conta de fixture).
+
 **O painel de estatísticas não era espaço, era ordem de leitura.** Ele ocupava
 152px entre as abas e a lista, e com o piso de 10 assistidos fechado esses 152px
 eram *uma frase dizendo o que você ainda não pode ver* — servida antes do que
