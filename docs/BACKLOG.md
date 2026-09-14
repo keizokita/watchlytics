@@ -1247,3 +1247,83 @@ Não são trilhas de agente, e nenhuma delas é código:
   criou. Sem ele o sufixo não organiza nada.
 - O veredito do gesto no celular (HANDOFF, §Bloqueado 1).
 - `gh pr merge` e qualquer operação contra produção.
+
+### β10 — o encaixe no telefone, e a régua que não via
+
+Três trilhas em 2026-09-14: as telas de lista (28, PR #73), o deck e o shell
+(e1, PR #74) e a régua de encaixe (ed, `tools/a11y/cabe.mjs`). As duas PRs
+saíram do mesmo `33ea8be`, não conflitam (`merge-tree --write-tree`, exit 0) e
+foram validadas **integradas**, não isoladas — `npm run check` limpo, 156 da api
+e 58 da web.
+
+**O achado que abre a seção não é nenhum dos consertos: é que a régua que
+existia não via o defeito.** O `estouro.mjs` mede numa conta descartável, sem
+catálogo e sem amigos, e **lista vazia cabe em qualquer viewport**. A ferramenta
+não errava no que media; media o estado que nunca quebra. É a sexta vez que o
+padrão do §8 aparece, com uma forma nova: não é medir o lugar vizinho nem o
+instrumento cego para o sinal, é **medir a condição fácil**. Fixture vazia é o
+equivalente de layout do "tem swipe?" do #68 — a pergunta responde sobre o caso
+que não dói.
+
+O antídoto é o estado cheio como padrão: conta povoada, catálogo real de 9830.
+Remedido assim em 320x568, 360x640 e 390x844, nas três abas de cada tela.
+
+**O painel de estatísticas não era espaço, era ordem de leitura.** Ele ocupava
+152px entre as abas e a lista, e com o piso de 10 assistidos fechado esses 152px
+eram *uma frase dizendo o que você ainda não pode ver* — servida antes do que
+você tem. Desceu para depois da lista: a primeira linha do catálogo saiu de
+y=364 (cortada numa dobra de 568) para y=196, inteira.
+
+**A `--deck-reserve` não estava desatualizada: não tinha como estar certa.** Era
+a soma à mão de coisas que mudam de tamanho sozinhas (nav, filtros, rodapé,
+botões), mantida por quem precisasse lembrar de atualizar — 17rem, 19.5rem,
+20.125rem. Morreu. O `.deck-wrap` virou o item que estica
+(`grid-template-rows: minmax(0, 1fr) auto`), a altura vem primeiro e a largura
+sai do `aspect-ratio: 2/3`, o inverso de antes. O tamanho do buraco que a
+constante escondia: o `main` estourava a altura da janela em **todos** os seis
+viewports medidos, não só nos estreitos. Constante que erra em toda parte nunca
+foi medida.
+
+Junto morreu um `margin-top: auto` inerte nos filtros — margem automática só
+recebe folga positiva, e depois do `flex-grow` não sobra nenhuma. A linha dizia
+comandar o alinhamento vertical e não comandava nada. Regra sem efeito mente
+igual a comentário.
+
+Aberto, com o número na mão em vez de "não deu":
+
+- **`740x360` (paisagem de telefone) não cabe.** Sobram 59px para o card contra
+  o piso de legibilidade de 9rem; o chrome come 301 dos 360. Caber ali exige
+  layout próprio de paisagem (botões em coluna ao lado do card), que é mudança
+  de forma, não de medida.
+- **Dois alvos de toque no rodapé do shell**: `.feedback` 280x17 e a atribuição
+  do TMDB 236x34. A conta era que 44px em cada um devolveria ~60px de chrome e
+  apagaria a folga que fez 320x568 caber — mas isso só vale se o alvo tiver que
+  *ocupar* 44px de layout. Um `::after` absoluto com `inset` negativo expande a
+  área de toque sem mudar a caixa do fluxo. A verificação honesta é
+  `elementFromPoint` nos quatro cantos, não o retângulo declarado: o retângulo
+  do pseudo-elemento não prova que o dedo acerta.
+- **`Library.tsx` não tem `h1`; `Friends.tsx` tem.** Tela sem cabeçalho não tem
+  ponto de entrada para leitor de tela, e a nav marcar o link ativo não
+  substitui isso — a assimetria é o defeito. Custo medido: 50px da dobra, com a
+  primeira linha indo de y=196 para y=246 e ainda terminando em 446 de 568.
+
+### Clonar, não semear, ao abrir faixa
+
+Entra no protocolo de abrir trilha, antes do `migrate`:
+
+```
+podman exec watchlytics-db createdb -U dev -T watchlytics wl_sN
+```
+
+O `npm run seed` deixa 94 títulos com `poster_url` nulo e elenco vazio, e o
+`driver all` reprova três passos por isso — elenco no card (I1.2), pôster atrás
+do gradiente e pré-carga (B4) — **sem defeito nenhum na branch**. O `-T` exige
+zero conexões no banco molde: se alguém estiver com api de pé contra
+`watchlytics`, ou espera ou faz dump/restore. É pré-requisito que só aparece
+quando falha, e aí parece erro do comando em vez de estado da máquina.
+
+E um número para ler com cuidado: `npm test` na raiz roda dois workspaces, 156
+na api e 58 na web. Quem vê 58 não viu metade — viu um total parcial que não
+avisa de quantas partes ele era. Rodando com outra sessão em cima do mesmo banco
+de teste, 5 do auth e do β2 reprovam por concorrência, não por defeito.
+
