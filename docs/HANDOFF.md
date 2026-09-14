@@ -103,13 +103,21 @@ npm run check      # typecheck dos 3 pacotes
   migrations atrás (`handle_chosen` não existia) e toda conta de fixture do
   driver morria no insert. `npm run migrate` depois de trocar de branch é mais
   barato que diagnosticar isso.
-- **Precisa do catálogo real num banco novo? Clone, não ingira.** O banco de
-  desenvolvimento já tem os 9830 títulos: `podman exec watchlytics-db createdb
+- **Precisa do catálogo real num banco de DESENVOLVIMENTO? Clone, não ingira.**
+  O banco de dev já tem os 9830 títulos: `podman exec watchlytics-db createdb
   -U dev -T watchlytics wl_sN` leva segundos, contra as horas de um
   `npm run ingest` — e dispensa o `TMDB_READ_TOKEN` e o risco de gravar o cursor
   de ingestão no banco errado. Depois, `npm run migrate` com o seu
   `DATABASE_URL` (num clone já migrado, "relation already exists" seguido de
   "migrations aplicadas" é o esperado) e um `analyze`.
+  **Nunca clone para o banco de teste.** Ele espera a fixture de 94 do
+  `npm run seed`, e com catálogo real o `A5 degrau 1` reprova sem defeito
+  nenhum: o teste monta um recorte impossível de propósito (série coreana de
+  faroeste depois de 2024) e espera a escada descer `year → genre → type`; com
+  9830 títulos o recorte deixa de ser impossível no gênero e a escada para em
+  `['year','genre']`. Medido duas vezes, em sessões diferentes, em 2026-09-13 —
+  e a suíte leva 85s em vez de ~3s. Não é contagem de linha: as asserções de 20
+  são tamanho de página e continuam valendo. É conteúdo.
 - **Medindo latência contra `localhost:5433`? Desconte ~40ms.** O encaminhador
   de porta do podman rootless trava ~40ms por consulta quando a resposta cruza
   certas fronteiras de pacote — ACK atrasado do Linux encontrando Nagle. Medido
@@ -270,6 +278,13 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 - **Flake não explicado:** `A5 degrau 1` falhou uma vez e não reproduziu em 6
   tentativas, incluindo com banco sujo e simulando primeira execução. Se
   aparecer de novo, há uma pista a mais.
+  **Pista nova, de 2026-09-13:** há exatamente um jeito conhecido de reprovar
+  essa asserção sem defeito — rodar contra um banco com o catálogo real em vez
+  da fixture de 94 (ver a bullet do clone em §Ambiente). Ali ela reprova
+  *sempre*, não uma vez, então isso não explica um flake de uma ocorrência por
+  si só; mas se a execução que falhou pegou o `DATABASE_URL` do `.env` em vez do
+  de teste, explica. Da próxima vez que aparecer, a primeira pergunta é **contra
+  qual banco a suíte rodou**, antes de procurar corrida ou estado sujo.
 - **C1 é dívida com prazo, e o cliente já saiu dela.** O shim `DEV_USER_ID` em
   `auth.ts` injeta usuário fixo; produção não define a variável e responde 401.
   O lado web não depende mais dele: o token vive em `apps/web/src/session.ts` e
