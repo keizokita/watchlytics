@@ -329,6 +329,11 @@ export function Library() {
   return (
     <div className="lib">
       <style>{CSS}</style>
+      {/* A tela de amigos sempre teve h1 e esta não tinha: leitor de tela
+          entrava na biblioteca sem nenhum cabeçalho, e a nav marcar o link
+          ativo não é ponto de entrada. O rótulo é o mesmo da nav, de propósito
+          — quem clicou em "Library" chega numa tela que se chama Library. */}
+      <h1>{t.navLibrary}</h1>
 
       {/* Grupo de botões, e não `role="tablist"`. Com o papel de aba o leitor de
           tela promete seta para andar entre elas e um painel do outro lado do
