@@ -1,4 +1,5 @@
-import type { SessionUser } from "@watchlytics/contract";
+import { sessionUser, type SessionUser } from "@watchlytics/contract";
+import { t } from "./strings.ts";
 
 /**
  * Token de acesso da sessão, em memória.
@@ -30,19 +31,42 @@ export const auth = (): HeadersInit =>
  * requisições que levem 401 ao mesmo tempo — o feed e o flush da fila, que é o
  * caso normal — derrubariam a sessão que estavam tentando salvar.
  */
-let refreshing: Promise<boolean> | null = null;
+let refreshing: Promise<Refresh> | null = null;
 
-export function refreshAccess(): Promise<boolean> {
+/**
+ * Três respostas, e não duas.
+ *
+ * `false` juntava "você não tem sessão" com "não consigo saber", e só a
+ * primeira justifica mandar a pessoa para a tela de entrada. Quem tinha sessão
+ * válida no cookie e pedia refresh no segundo errado via a tela de entrada como
+ * se nunca tivesse entrado — sem erro, sem aviso, e indistinguível de um
+ * visitante, porque visitante sem sessão produz o MESMO 401 nesta rota.
+ */
+export type Refresh = "ok" | "sem-sessao" | "indisponivel";
+
+export function refreshAccess(): Promise<Refresh> {
   refreshing ??= (async () => {
     try {
       const res = await fetch("/v1/auth/refresh", { method: "POST" });
-      if (!res.ok) return false;
+      // SÓ 401 quer dizer "sem sessão": é a única forma que o servidor tem de
+      // dizer isso (`unauthorized()` em auth.ts:33, e as quatro saídas do
+      // `rotate`). O resto é o servidor não conseguindo responder —
+      // 429 do teto por IP (routes/auth.ts:462) incluído, que de outro jeito
+      // desloga quem só fez requisição demais.
+      if (res.status === 401) return "sem-sessao";
+      if (!res.ok) return "indisponivel";
+
       const body = (await res.json()) as { access?: unknown };
-      if (typeof body.access !== "string") return false;
+      // 200 sem `access` é defeito do servidor, não ausência de sessão. Cair
+      // para "indisponivel" preserva a sessão que pode estar boa; o contrário
+      // descarta uma sessão válida por causa de um corpo malformado.
+      if (typeof body.access !== "string") return "indisponivel";
       setAccessToken(body.access);
-      return true;
+      return "ok";
     } catch {
-      return false;
+      // `fetch` só rejeita por rede/CORS. Nunca é resposta do servidor, então
+      // nunca é "sem sessão".
+      return "indisponivel";
     } finally {
       refreshing = null;
     }
@@ -58,8 +82,11 @@ export function refreshAccess(): Promise<boolean> {
  * chegam lá — levava 401 na requisição seguinte e o app pintava erro fatal com
  * a sessão ainda válida no cookie.
  *
- * Uma tentativa só de renovar: se o refresh falhou, o 401 é verdadeiro (sessão
- * revogada ou expirada) e vai para quem chamou, que já sabe pintar a entrada.
+ * Uma tentativa só de renovar. Se o refresh não devolveu `"ok"`, o 401 original
+ * vai para quem chamou — e nenhum chamador descarta a sessão por causa dele:
+ * todos pintam erro na tela em que estão (main.tsx:283). É por isso que a
+ * distinção das três respostas não precisa subir até aqui: quem destruía sessão
+ * por não saber era o `resume()`, no boot, e é lá que ela é lida.
  */
 export async function authedFetch(
   url: string,
@@ -70,7 +97,7 @@ export async function authedFetch(
 
   const res = await send();
   if (res.status !== 401) return res;
-  return (await refreshAccess()) ? send() : res;
+  return (await refreshAccess()) === "ok" ? send() : res;
 }
 
 /**
@@ -100,3 +127,52 @@ export const subscribeUser = (l: () => void) => {
   listeners.add(l);
   return () => void listeners.delete(l);
 };
+
+/**
+ * O servidor não conseguiu responder, e por isso NÃO se sabe se há sessão.
+ *
+ * Lança em vez de devolver `null` porque `null` é uma afirmação — "esta pessoa
+ * não tem sessão" — e ela vira a tela de entrada. Quem lança faz o `boot()`
+ * rejeitar, e aí o shell fica no terceiro estado (`undefined`, "ainda não sei")
+ * com o erro e o `retry` à vista.
+ *
+ * Segue a convenção do `Login.tsx`, que é quem pega: o detalhe técnico vai para
+ * o console e o que sobe é texto de usuário, porque o `catch` de lá lê
+ * `e.message` direto.
+ */
+function indisponivel(detalhe: string): Error {
+  console.error(detalhe);
+  return new Error(navigator.onLine ? t.errorGeneric : t.errorOffline);
+}
+
+/**
+ * Sessão anterior: o refresh está no cookie, que o servidor lê e rotaciona.
+ *
+ * Mora aqui, e não no `Login.tsx`: é lógica de sessão, não de componente, e o
+ * `node --test` da web não carrega `.tsx` — no arquivo antigo o caminho que
+ * este conserto endireita ficaria sem teste nenhum.
+ *
+ * As três saídas são diferentes de propósito. Antes eram duas, e a pessoa com
+ * sessão válida no cookie caía na tela de entrada sempre que a api não
+ * respondia — sem erro e sem aviso, indistinguível de quem nunca entrou.
+ *
+ * **Nenhuma retentativa automática aqui**, ao contrário do `exchange()` do
+ * `Login.tsx`, que repete uma vez em 5xx. O refresh é rotacionado, e o servidor trata reuso como replay
+ * revogando a sessão INTEIRA (C3). Um 5xx depois de o servidor já ter
+ * rotacionado é indistinguível de um 5xx antes: repetir sozinho arriscaria
+ * derrubar de vez a sessão que a retentativa existe para salvar. E num 429 a
+ * retentativa imediata é o que causou o 429. Quem repete é a pessoa, pelo
+ * botão — que é o mesmo custo de recarregar a página, com alguém decidindo.
+ */
+export async function resume(): Promise<SessionUser | null> {
+  const refresh = await refreshAccess();
+  if (refresh === "sem-sessao") return null;
+  if (refresh === "indisponivel") throw indisponivel("/v1/auth/refresh não respondeu");
+
+  const me = await authedFetch("/v1/auth/me");
+  if (me.ok) return sessionUser.parse(await me.json());
+  // Mesma regra da rota de refresh: só 401 é o servidor dizendo que não há
+  // sessão. Um 500 aqui derrubava a sessão mesmo com o refresh tendo dado certo.
+  if (me.status === 401) return null;
+  throw indisponivel(`/v1/auth/me respondeu ${me.status}`);
+}
