@@ -104,6 +104,38 @@ npm run check      # typecheck dos 3 pacotes
   migrations atrás (`handle_chosen` não existia) e toda conta de fixture do
   driver morria no insert. `npm run migrate` depois de trocar de branch é mais
   barato que diagnosticar isso.
+- **Precisa do catálogo real num banco de DESENVOLVIMENTO? Clone, não ingira.**
+  O banco de dev já tem os 9830 títulos: `podman exec watchlytics-db createdb
+  -U dev -T watchlytics wl_sN` leva segundos, contra as horas de um
+  `npm run ingest` — e dispensa o `TMDB_READ_TOKEN` e o risco de gravar o cursor
+  de ingestão no banco errado. Depois, `npm run migrate` com o seu
+  `DATABASE_URL` (num clone já migrado, "relation already exists" seguido de
+  "migrations aplicadas" é o esperado) e um `analyze`.
+  **Nunca clone para o banco de teste.** Ele espera a fixture de 94 do
+  `npm run seed`, e com catálogo real o `A5 degrau 1` reprova sem defeito
+  nenhum: o teste monta um recorte impossível de propósito (série coreana de
+  faroeste depois de 2024) e espera a escada descer `year → genre → type`; com
+  9830 títulos o recorte deixa de ser impossível no gênero e a escada para em
+  `['year','genre']`. Medido duas vezes, em sessões diferentes, em 2026-09-13 —
+  e a suíte leva 85s em vez de ~3s. Não é contagem de linha: as asserções de 20
+  são tamanho de página e continuam valendo. É conteúdo.
+  E **banco de medição não é banco de teste**: rodar a suíte contra o banco onde
+  você mede deixa usuários e swipes para trás (4 e 44, na vez em que isso foi
+  medido). Os títulos sobrevivem, mas a conta de "quantos swipes esta conta
+  tem?" não — e é dela que sai a latência do feed.
+- **Medindo latência contra `localhost:5433`? Desconte ~40ms.** O encaminhador
+  de porta do podman rootless trava ~40ms por consulta quando a resposta cruza
+  certas fronteiras de pacote — ACK atrasado do Linux encontrando Nagle. Medido
+  em 2026-09-13: o mesmo `select * from titles limit 20` custa 0,8ms dentro do
+  container e 41,7ms pela porta publicada, com 0,76ms de CPU. Não é do app e não
+  existe em produção. Vale para **qualquer** medição que passe por ali,
+  `driver.mjs` incluído — ele afirma comportamento e não tempo, então nada do
+  que existe hoje fica inválido, mas asserção de duração ali estaria medindo o
+  encaminhador. E o absoluto do servidor oscila: o mesmo `EXPLAIN` da query do
+  feed deu 21,4ms e 42ms no mesmo dia, sem mudança no banco nem na query —
+  **compare execuções inteiras entre si, não números avulsos.** Detalhe e as
+  quatro medições que fecham o caso em
+  [../tools/feed-bench.md](../tools/feed-bench.md).
 
 - **Node ≥24.** O projeto executa `.ts` direto, sem `tsx` e sem build step. Só
   `packages/contract` compila — type stripping não vale dentro de `node_modules`.
@@ -230,6 +262,56 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 
 ## Problemas conhecidos
 
+- **O boot desloga por indisponibilidade — conserto em voo na PR #71.** Quem tem
+  sessão válida no cookie e pega a API indisponível vai para a tela de entrada,
+  sem erro e sem aviso. São **três portas**, não uma, e quem consertar só a
+  primeira fecha um terço:
+  - `session.ts:39` — `if (!res.ok) return false`: um 503 é `!ok` como um 401.
+  - `session.ts:44` — o `catch`: API fora do ar, sem resposta nenhuma, também
+    vira `false`.
+  - `Login.tsx:131` — `me.ok ? … : null`: um 503 no `/v1/auth/me` manda para a
+    entrada mesmo com o refresh tendo dado certo.
+
+  **`authedFetch` NÃO está afetado**: ele só chama `refreshAccess` quando a
+  resposta é exatamente 401 (`session.ts:72`), então um 503 sai por ali direto.
+  O estrago é do `resume()`, no boot.
+
+  **Nenhuma verificação atual pega** — a tela deslogada já produz 401 em
+  `/v1/auth/refresh` por definição, então "deslogado por engano" é idêntico a
+  "sem sessão", e o `driver.mjs` não passa por ali porque planta sessão.
+
+  **O gatilho observado não é 5xx — é 429.** O `/v1/auth/refresh` passa pelo
+  `limitByIp` (`routes/auth.ts:516`), teto de 20/min, e 429 é `!res.ok` como
+  qualquer outro. Reproduzido em 2026-09-14 rodando `driver all` duas vezes
+  seguidas. O cold start, que era a suspeita inicial, **não** é gatilho: nas duas
+  janelas frias de 2026-09-14 foram 9 sondas, todas 401, porque o proxy do Fly
+  segura a requisição ([../tools/cold-start.md](../tools/cold-start.md)). 5xx
+  continua alcançando em tese — piscada do Neon, troca de máquina em deploy —,
+  mas isso segue sem observação.
+
+  O conserto não é retentativa, é parar de colapsar "indisponível" e "sem
+  sessão" na mesma resposta — só 401 quer dizer "sem sessão". E **retentativa
+  automática seria pior**: o refresh é rotacionado, e um 5xx depois de o servidor
+  ter rotacionado é indistinguível de um antes; retentar arriscaria replay, que
+  revoga a sessão inteira. Por isso a PR #71 põe botão, com uma pessoa decidindo.
+- **NÃO VERIFICADO, e o convite é a rajada que dispara: o beta pode dividir um
+  balde de rate limit só — issue #72.** `clientIp` (`auth.ts:166`) tenta
+  `cf-connecting-ip`, depois `fly-client-ip`, depois `req.ip`. Se o primeiro não
+  atravessar a Function do Pages, os **três** podem convergir para a borda da
+  Cloudflare em vez da pessoa, e o teto de 20/min do `limitByIp` vira global —
+  trinta convidados de uma vez estouram por construção, com o mesmo sintoma de
+  deslogamento da entrada acima. **Leitura de código, não medição.** O caminho
+  barato de confirmar está na #72: uma requisição só e uma olhada no cabeçalho
+  que a api recebeu — rajada real contra `/v1/auth/refresh` derrubaria o serviço
+  de quem estivesse usando, que é o que a medição existiria para prevenir.
+- **O cold start está medido e NÃO bloqueia o beta.** Retomar de suspensão
+  custa 0,42–0,57s, sem um único 5xx. Mas só o caminho `suspend → resume` foi
+  medido; `stopped → start` (deploy, ou o Fly convertendo suspenso em parado)
+  continua sem número, e é o caminho provável de quem abre o link depois de uma
+  noite sem tráfego. O `~6s` do `fly.toml` e o *"meio minuto de ociosidade"* do
+  `Login.tsx` não descrevem o que foi medido: a ociosidade até suspender é
+  ~7min33s. Detalhe e as duas formas de graça de fechar a lacuna em
+  [../tools/cold-start.md](../tools/cold-start.md).
 - **EM ABERTO, e não confirmado: swipe que some depois do onboarding.** Em
   2026-09-13, com duas contas reais, os swipes de `@keizoteste` geraram match
   normalmente **durante** o onboarding (20 linhas entre 04:17 e 04:23). Depois
@@ -261,6 +343,32 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 - **Flake não explicado:** `A5 degrau 1` falhou uma vez e não reproduziu em 6
   tentativas, incluindo com banco sujo e simulando primeira execução. Se
   aparecer de novo, há uma pista a mais.
+  **Pista de 2026-09-13, e o mecanismo está medido:** contra um banco com o
+  catálogo real em vez da fixture de 94, essa asserção reprova *sempre* (ver a
+  bullet do clone em §Ambiente). Então a pergunta útil não é "flake?", é **qual
+  comando foi usado**:
+
+  | comando | banco | resultado |
+  |---|---|---|
+  | `npm test` | o de teste, sempre | seguro por construção |
+  | `node --test src/routes/feed.test.ts` | nenhum | morre alto: "DATABASE_URL não definida" |
+  | `node --env-file-if-exists=.env --test src/…` | **o de DEV** | `A5 degrau 1` reprova sem defeito |
+
+  O `npm test` é seguro porque o `--env-file` do Node **não** sobrescreve
+  variável já definida, então o `DATABASE_URL=` inline do script sempre ganha
+  (medido nas duas árvores). O caminho humano que produz o falso vermelho é
+  copiar o comando de dentro do `package.json` para rodar um arquivo só e deixar
+  o prefixo para trás. Não é intermitente: é determinístico contra o banco
+  errado, e o que oscila é o comando. Isso **não** prova que foi o que aconteceu
+  na ocorrência registrada acima — mas é a primeira coisa a perguntar.
+
+  Proposta registrada e **não implementada**, para quem for dono de
+  `db/client.ts`: recusar a subida sob `node:test` quando o banco não termina em
+  `_test` fecharia a classe inteira em ~4 linhas, em vez desta ocorrência. Dá
+  para escrever sem heurística — o runner se identifica em
+  `process.env.NODE_TEST_CONTEXT` (`"child-v8"` dentro do teste, indefinido
+  fora; medido no v25.4.0), e a convenção `_test` já vale em todos os bancos.
+  Falha alta dizendo qual banco veio, nunca silenciosa.
 - **C1 é dívida com prazo, e o cliente já saiu dela.** O shim `DEV_USER_ID` em
   `auth.ts` injeta usuário fixo; produção não define a variável e responde 401.
   O lado web não depende mais dele: o token vive em `apps/web/src/session.ts` e
