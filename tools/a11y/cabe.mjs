@@ -55,12 +55,26 @@ const SONDA = `(() => {
 
   // Controles: fora da dobra, e alvo pequeno.
   const SEL = 'a[href], button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])';
+  // O alvo de um checkbox com <label> em volta é o rótulo: clicar nele alterna,
+  // e é ele que o dedo acerta. Medir o <input> reprova toda caixa bem
+  // construída para sempre, e mede o elemento errado ao fazer isso.
+  const alvoDe = (el) => {
+    const rot = el.closest('label') ||
+      (el.id ? document.querySelector('label[for="' + el.id + '"]') : null);
+    return rot && /^(checkbox|radio)$/.test(el.type ?? '') ? { el: rot, r: rot.getBoundingClientRect() }
+                                                           : { el, r: el.getBoundingClientRect() };
+  };
   const foraDaDobra = [], alvoPequeno = [];
   for (const el of document.querySelectorAll(SEL)) {
     const r = el.getBoundingClientRect();
     if (!visivel(el, r)) continue;
     const d = { el: marca(el), txt: nome(el), y: Math.round(r.top), b: Math.round(r.bottom),
                 w: Math.round(r.width), h: Math.round(r.height) };
+    // Controle de LINHA de lista não é controle de tela: numa lista longa os
+    // botões das linhas de baixo estão abaixo da dobra porque a lista é longa,
+    // e isso não é defeito. O que não pode sair de alcance é o controle da
+    // própria tela — nav, abas, botões de conta.
+    d.naLista = !!el.closest('.lib-list, .friend');
     if (r.bottom > H + 0.5 || r.top < -0.5) foraDaDobra.push(d);
     // Link de texto não é alvo de toque: o piso de --tap é do controle que
     // tem caixa própria (fundo, borda ou padding). Sem esta separação o
@@ -72,7 +86,25 @@ const SONDA = `(() => {
     const semFundo = cs.backgroundColor === 'transparent' || cs.backgroundColor.startsWith('rgba(0, 0, 0, 0)');
     const semCaixa = semFundo && parseFloat(cs.borderTopWidth) === 0 && parseFloat(cs.paddingTop) < 4;
     const textual = cs.display === 'inline' || (el.tagName === 'A' && semCaixa);
-    if (!textual && (r.width < tap - 0.5 || r.height < tap - 0.5)) alvoPequeno.push(d);
+    const alvo = alvoDe(el);
+    if (!textual && (alvo.r.width < tap - 0.5 || alvo.r.height < tap - 0.5)) {
+      // O retângulo não é a área de toque. Um ::after com inset negativo
+      // estica a área sem aparecer em rect nenhum, e um <label> em volta
+      // entrega o clique à caixa. Quem responde é elementFromPoint, nos quatro
+      // pontos a meio --tap do centro: se todos caem no próprio alvo (ou num
+      // filho dele), a área efetiva já cobre o piso.
+      const cx = alvo.r.left + alvo.r.width / 2, cy = alvo.r.top + alvo.r.height / 2;
+      const meio = tap / 2 - 1;
+      const pontos = [[cx, cy - meio], [cx, cy + meio], [cx - meio, cy], [cx + meio, cy]];
+      const pega = pontos.every(([x, y]) => {
+        const alvoNoPonto = document.elementFromPoint(x, y);
+        return alvoNoPonto && (alvo.el.contains(alvoNoPonto) || alvoNoPonto === el ||
+               (el.labels && [...el.labels].some((l) => l.contains(alvoNoPonto))));
+      });
+      if (!pega) {
+        alvoPequeno.push({ ...d, el: marca(alvo.el), w: Math.round(alvo.r.width), h: Math.round(alvo.r.height) });
+      }
+    }
   }
 
   // Folga vertical real: a coluna do shell é flex, então o que sobra é a altura
@@ -95,15 +127,32 @@ const SONDA = `(() => {
     folga = Math.round(alturaDisponivel - soma);
   }
 
+  // Pilha vertical da tela: tag@top+altura por filho. É ela que separa uma
+  // lista que rola por natureza de uma tela cujo conteúdo nasce empurrado para
+  // fora — o número da folga sozinho não distingue os dois.
+  const alvoPilha = document.querySelector('.lib') || document.querySelector('.deck-wrap') ||
+    document.querySelector('.onboarding') || document.querySelector('main > *');
+  const pilha = alvoPilha ? [...alvoPilha.children]
+    .filter((el) => el.tagName !== 'STYLE')
+    .map((el) => { const r = el.getBoundingClientRect();
+      return marca(el) + '@' + Math.round(r.top) + '+' + Math.round(r.height); }) : [];
+
+  // A primeira linha da lista: numa tela que rola por natureza, o critério que
+  // significa alguma coisa é esta linha caber INTEIRA antes de rolar.
+  const li = document.querySelector('.lib-list > li');
+  const primeiraLinha = li ? (() => { const r = li.getBoundingClientRect();
+    return { top: Math.round(r.top), bottom: Math.round(r.bottom), cabe: r.bottom <= H + 0.5 }; })() : null;
+
   const acoes = document.querySelector('.actions');
   return {
-    W, H, tap, folga,
+    W, H, tap, folga, pilha, primeiraLinha,
     scrollH: de.scrollHeight, clientH: H,
     rola: Math.max(0, de.scrollHeight - H),
     acoes: acoes ? (() => { const r = acoes.getBoundingClientRect();
       return { y: Math.round(r.top), b: Math.round(r.bottom), dentro: r.bottom <= H + 0.5 }; })() : null,
     estouro: estouro.slice(0, 6), foraDaDobra: foraDaDobra.slice(0, 8), alvoPequeno: alvoPequeno.slice(0, 8),
     nEstouro: estouro.length, nFora: foraDaDobra.length, nPequeno: alvoPequeno.length,
+    nForaDaTela: foraDaDobra.filter((f) => !f.naLista).length,
   };
 })()`;
 
@@ -183,6 +232,35 @@ const comFixture = async (page, opts) => {
   return u;
 };
 
+/**
+ * "A tela parou", provado — e não `sleep(600)`, que aposta que o que acontece
+ * DEPOIS de a tela chegar também terminou. A aposta se perde quando o navegador
+ * roda frio: a mesma cena media -236 em suíte e -528 sozinha, no mesmo commit.
+ *
+ * Três provas: fonte pronta (troca de fonte muda altura de tudo), imagem dentro
+ * da dobra carregada, e dois quadros seguidos com o mesmo `scrollHeight`.
+ */
+async function assentou(page, timeoutMs = 20_000) {
+  const deadline = Date.now() + timeoutMs;
+  const PROVA = `(async () => {
+    await document.fonts.ready;
+    const dentro = [...document.images].filter((i) => {
+      const r = i.getBoundingClientRect();
+      return r.height > 0 && r.top < innerHeight;
+    });
+    if (dentro.some((i) => !i.complete)) return { pronto: false, motivo: 'imagem' };
+    const quadro = () => new Promise((r) => requestAnimationFrame(() => r(document.documentElement.scrollHeight)));
+    const a = await quadro(), b = await quadro();
+    return { pronto: a === b, motivo: 'altura', a, b };
+  })()`;
+  while (Date.now() < deadline) {
+    const r = await evaluate(page, PROVA);
+    if (r?.pronto) return;
+    await sleep(120);
+  }
+  throw new Error("a tela não assentou em " + timeoutMs + "ms");
+}
+
 const limpar = async (page) => {
   // `about:blank` antes de tudo: navegar só o hash NÃO recarrega o app, e a
   // cena herdaria os dados que a anterior já tinha carregado — foi assim que a
@@ -246,7 +324,8 @@ const CENAS = [
       await page.cmd("Page.navigate", { url: `${WEB}/#/library` });
       await waitFor(page, ".lib-tabs", 40_000);
       if (id !== "interested") await clicarAba(page, rotulo);
-      await sleep(1500);
+      await waitFor(page, ".lib-list, .lib .notice", 40_000);
+      await assentou(page);
       return u;
     }],
   ),
@@ -256,13 +335,19 @@ const CENAS = [
     const u = await abrirSessao(page);
     await page.cmd("Page.navigate", { url: `${WEB}/#/library` });
     await waitFor(page, ".lib-tabs", 40_000);
-    await sleep(1500);
+    await waitFor(page, ".lib-list, .lib .notice", 40_000);
+    await assentou(page);
     return u;
   }],
   ["lib-carregando", async (page) => {
     const u = await comFixture(page);
     await page.cmd("Page.navigate", { url: `${WEB}/#/library` });
     await waitFor(page, ".lib-tabs", 40_000);
+    // Pré-condição, não sorte: o painel de estatísticas só monta quando
+    // /v1/me/stats responde, e ligar a latência antes disso media 292px a
+    // menos — o mesmo commit dava -236 na suíte e -528 sozinho, porque quem
+    // decidia era o tempo que as cenas anteriores gastaram.
+    await waitFor(page, ".lib-stats", 30_000);
     // Latência absurda em vez de bloqueio: bloquear dá erro, e o que se quer
     // medir aqui é a tela ENQUANTO espera.
     await page.cmd("Network.emulateNetworkConditions", {
@@ -284,7 +369,8 @@ const CENAS = [
       const u = await comFixture(page);
       await page.cmd("Page.navigate", { url: `${WEB}/#/friends/${id}` });
       await waitFor(page, ".lib-tabs", 40_000);
-      await sleep(1500);
+      await waitFor(page, ".lib-list, .lib-locked, .friend-search", 40_000);
+      await assentou(page);
       return u;
     },
   ]),
@@ -301,6 +387,9 @@ const filtros = process.argv.slice(2);
 const cenas = filtros.length
   ? CENAS.filter(([nome]) => filtros.some((f) => new RegExp(`^${f.replace(/\*/g, ".*")}$`).test(nome)))
   : CENAS;
+
+/** Cenas que rolam por natureza: lista povoada não promete caber na dobra. */
+const LISTA_LONGA = /^(lib-(interested|watched|discarded)|friends-(people|common|alerts))$/;
 
 const matriz = new Map(); // cena -> viewport -> célula
 let reprovou = false;
@@ -325,7 +414,7 @@ for (const vp of VIEWPORTS) {
           user = null;
           await limpar(page);
           user = await montar(page);
-          await sleep(600);
+          await assentou(page);
           m = await evaluate(page, SONDA);
         } catch (e) {
           ultimo = e;
@@ -333,17 +422,41 @@ for (const vp of VIEWPORTS) {
         }
       }
       void ultimo;
-      const flags =
-        (m.rola > 0 ? "R" : "") + (m.nFora ? "D" : "") + (m.nEstouro ? "X" : "") + (m.nPequeno ? "T" : "");
       const cabe = m.folga === null ? "?" : m.folga >= 0 ? `+${m.folga}` : `${m.folga}`;
-      if (m.rola > 0 || m.nFora || m.nEstouro || m.nPequeno) reprovou = true;
+      // O que reprova depende do que a cena promete.
+      //
+      // Estouro horizontal e alvo pequeno reprovam sempre: nenhum deles tem
+      // versão aceitável. Rolar e ter controle abaixo da dobra só reprovam nas
+      // cenas que prometem CABER — deck, portas, onboarding, vazia, carregando,
+      // erro. Numa lista povoada, rolar é o que uma lista faz, e os botões das
+      // linhas de baixo estão fora da dobra porque a lista é longa; ali o
+      // critério é outro: a primeira linha inteira antes de rolar, e nenhum
+      // controle DA TELA fora de alcance.
+      //
+      // Régua sempre vermelha esconde regressão melhor do que régua sempre
+      // verde: no vermelho que já estava lá ninguém olha duas vezes.
+      const lista = LISTA_LONGA.test(nome);
+      const linhaCortada = lista && m.primeiraLinha !== null && !m.primeiraLinha.cabe;
+      const falhou = m.nEstouro > 0 || m.nPequeno > 0 ||
+        (lista ? m.nForaDaTela > 0 || linhaCortada : m.nFora > 0 || m.rola > 0);
+      if (falhou) reprovou = true;
+      const flags =
+        (m.rola > 0 ? "R" : "") + ((lista ? m.nForaDaTela : m.nFora) ? "D" : "") +
+        (linhaCortada ? "P" : "") + (m.nEstouro ? "X" : "") + (m.nPequeno ? "T" : "");
       matriz.set(nome, { ...(matriz.get(nome) ?? {}), [vp]: `${cabe}${flags ? " " + flags : ""}` });
 
       console.log(`${nome}: folga ${cabe}px · ${m.rola ? `rola ${m.rola}px` : "não rola"}` +
         (m.acoes ? ` · botões ${m.acoes.dentro ? "dentro" : `FORA (bottom ${m.acoes.b} > ${m.H})`}` : ""));
-      for (const f of m.foraDaDobra) console.log(`   abaixo da dobra: ${f.el} "${f.txt}" ${f.y}..${f.b} (dobra ${m.H})`);
+      if (m.primeiraLinha) {
+        console.log(`   primeira linha: ${m.primeiraLinha.top}..${m.primeiraLinha.bottom} ` +
+          `(dobra ${m.H}) ${m.primeiraLinha.cabe ? "inteira" : "CORTADA"}`);
+      }
+      for (const f of m.foraDaDobra) {
+        console.log(`   abaixo da dobra${f.naLista ? " (linha de lista)" : ""}: ${f.el} "${f.txt}" ${f.y}..${f.b} (dobra ${m.H})`);
+      }
       for (const f of m.estouro) console.log(`   estoura: ${f.el} "${f.txt}" ${f.l}..${f.r} (largura ${m.W})`);
       for (const f of m.alvoPequeno) console.log(`   alvo ${f.w}x${f.h} < ${m.tap}: ${f.el} "${f.txt}"`);
+      if (m.pilha.length) console.log(`   pilha: ${m.pilha.join(" ")}`);
       if (m.nFora > m.foraDaDobra.length) console.log(`   (+${m.nFora - m.foraDaDobra.length} controles abaixo da dobra)`);
     } catch (e) {
       reprovou = true;
@@ -366,6 +479,11 @@ for (const [nome, linha] of matriz) {
 }
 console.log(`
 número = folga vertical em px (negativo = falta tanto para caber)
-R = rola na vertical · D = controle abaixo da dobra · X = estouro horizontal · T = alvo < --tap`);
+R = rola · D = controle DA TELA abaixo da dobra · P = primeira linha da lista cortada
+X = estouro horizontal · T = alvo de toque < --tap (já descontando ::after e <label>)
+
+reprova (saída 1): X e T sempre. Nas cenas que prometem caber (deck, portas,
+onboarding, lib-vazia/carregando/erro, friends-erro, deslogada), R e D também.
+Nas cenas de lista povoada, o critério é P e D — rolar ali é o que a lista faz.`);
 
 process.exit(reprovou ? 1 : 0);
