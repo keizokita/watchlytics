@@ -354,8 +354,9 @@ function Root() {
            únicos alvos interativos do app abaixo do piso de 44px que o resto
            respeita (medidos em 34px de altura na auditoria). Passam o mínimo
            AA de 24x24 da WCAG 2.5.8, mas são o controle mais usado da tela, e
-           a régua aqui é a do app. Os 10px que isto acrescenta entram na
-           --deck-reserve. */
+           a régua aqui é a do app. Os 10px que isto acrescenta saem da folga
+           do deck sozinhos: desde que a --deck-reserve morreu, chrome que
+           cresce não precisa ser somado em lugar nenhum. */
         .shell nav a {
           display: inline-flex; align-items: center;
           min-height: var(--tap);
@@ -377,11 +378,40 @@ function Root() {
            lia como a primeira frase do texto legal, e ninguém clica em texto
            legal. */
         .shell .attribution .feedback {
-          display: block; margin-bottom: 0.6rem; text-decoration: underline;
+          display: block; margin-bottom: 1.3rem; text-decoration: underline;
+          /* Contexto de posicionamento do ::after abaixo. */
+          position: relative;
+        }
+        /* O alvo de toque cresce, a caixa do layout não. O link tem 17px de
+           altura e o alvo do app é 44 (--tap): dar os 27px que faltam em
+           padding custaria 27px de chrome em toda tela, e em tela baixa esse
+           chrome sai do card. Um ::after absoluto com inset negativo estica
+           só a área que recebe o clique — o fluxo continua enxergando 17px.
+
+           O crescimento é assimétrico, e a assimetria foi medida, não
+           escolhida: para cima só há a folga do shell, que em tela baixa é de
+           12px, e a primeira tentativa (16px para cima) roubou a base do botão
+           Like — o elementFromPoint no rodapé do botão devolvia o link. Então
+           sobe 8px e desce 19.2px, e a margem até a linha do TMDB subiu de
+           0.6rem para 1.3rem para a área ampliada não roubar o topo daquele
+           link. Verificado com elementFromPoint nos quatro cantos da área
+           pretendida, no botão Like e no link do TMDB, e não pelo retângulo
+           declarado: o retângulo de um pseudo-elemento não prova quem recebe
+           o toque. */
+        .shell .attribution .feedback::after {
+          content: "";
+          position: absolute;
+          inset: -0.5rem 0 -1.2rem;
         }
         .shell .attribution a:hover { color: var(--fg); }
         .shell .attribution a:focus-visible {
           outline: 2px solid var(--fg); outline-offset: 3px; border-radius: 4px;
+        }
+        /* Tela baixa: menos ar entre nav, filtros, deck e rodapé — é o que
+           faz o deck caber em 320x568 com os três botões dentro. O par desta
+           regra (padding do body e gap do deck) está no index.html. */
+        @media (max-height: 700px) {
+          .shell { gap: 0.75rem; }
         }
       `}</style>
       {/* Recusado, a nav some inteira — inclusive o botão de entrar. Oferecer
