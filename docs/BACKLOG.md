@@ -1320,10 +1320,18 @@ E o oitavo, que é o mais reutilizável dos oito porque não é sobre medir, é 
 **versão**: a régua é dois arquivos, e só um voltou. O `cabe.mjs` reformado
 conviveu por uma corrida inteira com o `lib.mjs` antigo — o `reset --keep` que
 tirou um commit do `main` local devolveu o `lib.mjs` ao estado do `main`, e o
-`cabe.mjs` reapareceu sozinho pelo checkout da branch. Sem `handleChosen` na
-sessão plantada, **toda cena parava na porta do handle**, e o sintoma (nenhuma
-tela renderiza) lê como defeito de produto, não como instrumento remendado pela
-metade. A corrida inteira foi descartada.
+`cabe.mjs` reapareceu sozinho pelo `checkout <branch> -- <arquivo>`, porque foi
+só ele que se pediu. Sem `handleChosen` na sessão plantada, **toda cena parava na
+porta do handle**, e o sintoma (nenhuma tela renderiza) lê como defeito de
+produto, não como instrumento remendado pela metade. A corrida inteira foi
+descartada.
+
+O que dá o peso à regra é que **nenhuma das duas operações errou**. O
+`reset --keep` devolveu o `lib.mjs` ao `main`, que é o que ele promete; o
+`checkout` trouxe o arquivo pedido, que é o que ele promete. Duas operações
+corretas compõem um instrumento incoerente, e nenhuma delas tem como avisar —
+cada uma só enxerga a sua metade. Não é descuido que se conserta prestando mais
+atenção; é uma propriedade de mover arquivo em vez de mover commit.
 
 A regra que fica: **a versão de um instrumento não é a versão do arquivo dele, é
 a versão do conjunto de arquivos dele.** Quem levar a régua para outro worktree
