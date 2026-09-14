@@ -6,15 +6,76 @@
 # `functions/u/[[path]].js` reexportam o mesmo `_proxy.js`, TODA a superfície da
 # api — `/v1/*` e `/u/*` — fica fora deste arquivo. Quem carimba aquela metade é
 # a própria api, em `apps/api/src/seguranca.ts`, e o proxy repassa a resposta do
-# Fly sem mexer.
+# Fly sem mexer. A CSP do HTML do perfil público (`GET /u/:handle`) mora lá pelo
+# mesmo motivo, e é OUTRA política: aquela página não carrega script nenhum.
 #
-# Só HSTS aqui porque o Pages já manda `x-content-type-options: nosniff` e
-# `referrer-policy: strict-origin-when-cross-origin` por conta própria — medido
-# com `curl -sI` em 2026-09-12, no issue #42. Repetir não somaria nada.
+# `x-content-type-options: nosniff` e `referrer-policy:
+# strict-origin-when-cross-origin` não estão aqui porque o Pages já os manda por
+# conta própria — medido com `curl -sI` em 2026-09-12, no issue #42. Repetir não
+# somaria nada.
 #
-# CSP, X-Frame-Options e Permissions-Policy ficam para a tarefa da CSP, com
-# `Content-Security-Policy-Report-Only` primeiro: o app carrega pôster de
-# terceiro por desenho, e uma CSP errada quebra em produção de um jeito que o
-# teste local não pega.
+# Este arquivo é a ÚNICA cópia da política: o `vite.config.ts` lê estas linhas
+# para o `vite preview`, que é onde o `driver.mjs` mede a CSP. Uma segunda cópia
+# divergiria, e a que diverge é sempre a que ninguém está medindo.
+#
+# ── a CSP, diretiva por diretiva ───────────────────────────────────────────
+#
+# Entra em `Report-Only` e fica assim até alguém decidir apertar. CSP errada
+# quebra o app inteiro em produção, e o sintoma é tela branca sem erro visível —
+# ninguém abre um chamado dizendo "a página não pintou nada".
+#
+# `default-src 'none'` — o padrão é negar, e cada permissão abaixo é uma linha
+#   que alguém teve que escrever. Uma lista de bloqueios esquece o que ainda não
+#   existe; uma lista de permissões acusa.
+# `script-src 'self'` — o `dist/index.html` sai do vite com UM `<script
+#   type="module" src="/assets/…">` e nenhum script inline. Medido no bundle de
+#   2026-09-13, não suposto.
+# `style-src 'self' 'unsafe-inline'` — o `'unsafe-inline'` é obrigatório e não
+#   preguiça. O `index.html` traz a folha inteira num `<style>` inline, e o
+#   `poster.ts` monta o fundo do card num ATRIBUTO `style` (pôster na frente,
+#   gradiente atrás). Hash resolve o `<style>`; atributo `style` não tem hash —
+#   precisaria de `'unsafe-hashes'` mais um hash por valor, e o valor muda a
+#   cada título. Tirar isso é reescrever como o card pinta, não ajustar um
+#   cabeçalho.
+# `img-src 'self' https://image.tmdb.org` — o pôster é de terceiro por desenho
+#   (`apps/api/src/ingest/tmdb.ts`: `https://image.tmdb.org/t/p`). `img-src`
+#   também governa o `url()` de CSS, que é como o card carrega o pôster.
+# `connect-src 'self'` — todo `fetch` do app vai para `/v1/*` na mesma origem,
+#   pelo proxy. O login do Google NÃO é `fetch`: é um `location.assign` para
+#   `accounts.google.com`, que é navegação de topo e nenhuma diretiva de busca
+#   alcança. A troca do código acontece na api.
+# `form-action 'self'` — não há `<form>` que poste para fora; o do handle envia
+#   por `fetch`.
+# `base-uri 'none'` — sem isto, um `<base>` injetado reescreve para onde o
+#   `/assets/…` do `script-src 'self'` aponta.
+# `frame-ancestors 'none'` — ninguém embute esta tela. Enquanto a CSP estiver em
+#   `Report-Only` esta linha NÃO protege nada: quem impede o enquadramento é o
+#   `X-Frame-Options: DENY` acima, que é o legado justamente por isso.
+#
+# ── o que a medição acusou ─────────────────────────────────────────────────
+#
+# `driver.mjs all` + `social` com a política ligada, contra o `vite preview`
+# (2026-09-13): uma violação, e sempre a mesma —
+#
+#   [Report Only] Refused to evaluate a string as JavaScript because
+#   'unsafe-eval' is not an allowed source of script … "script-src 'self'"
+#
+# É do `zod@4`, que testa `new Function("")` dentro de um `try/catch` para
+# decidir se compila o validador com JIT, e cai no caminho sem JIT quando não
+# pode. O app funciona igual com a política bloqueando — o que se vê é a
+# detecção, não uma falha. Por isso `'unsafe-eval'` NÃO entra aqui: abrir a
+# diretiva mais perigosa da CSP para calar um `catch` que já funciona é trocar a
+# proteção pelo silêncio. Quem quiser o console limpo põe `z.config({ jitless:
+# true })` na entrada do app, e aí a detecção nem acontece.
+#
+# As demais páginas do Pages não acusaram nada: `/legal/privacy.html`,
+# `/legal/terms.html` e a tela deslogada.
+#
+# Faltou de propósito: `report-uri`/`report-to`. Precisaria de rota nova na api
+# para receber o relatório, e a violação já aparece no console — que é onde o
+# `driver.mjs` mede. Coletor entra quando houver alguém para ler a coleta.
 /*
   Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy-Report-Only: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://image.tmdb.org; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
