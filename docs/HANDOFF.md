@@ -150,6 +150,16 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 - **Só OAuth, sem senha.** Login nunca é por email — a chave é
   `identities (provider, provider_user_id)`.
 - **Perfil público mostra só estatísticas agregadas**, com piso de 10 assistidos.
+- **A CSP do app fica em `Report-Only`, e a do `/u/:handle` fica bloqueando.** A
+  assimetria é intencional e a pergunta foi levada ao usuário em 2026-09-13, com
+  a medição na mão. São superfícies de tamanho diferente: o perfil público é um
+  `<style>` inline, texto e um link, que cabe numa leitura; o app são 320 kB de
+  React com caminhos que medição local não atravessa — a volta do OAuth e a
+  exportação por `blob:` entre eles. Apertar o segundo sem ter atravessado esses
+  caminhos quebra em produção com tela branca e sem erro visível. **Não é etapa
+  pendente de migração**, e a nota anterior no `_headers` dizia "fica assim até
+  alguém decidir apertar", que lê como tarefa aberta e convida a próxima sessão a
+  apertar por arrumação (corrigido em `95f078d`). Reabrir exige razão nova.
 
 ## Bloqueado na pessoa, não no código
 
