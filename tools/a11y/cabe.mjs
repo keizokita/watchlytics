@@ -36,7 +36,20 @@ function procedencia() {
     const sujo = execFileSync("git", ["status", "--porcelain"], { cwd: ROOT, encoding: "utf8" }).trim();
     if (sujo) commit += "+local";
   } catch {}
-  return `instrumento: cabe.mjs ${sha("./cabe.mjs")} · lib.mjs ${sha("./lib.mjs")} | medindo: ${ROOT} @ ${commit}`;
+  // O commit da árvore nomeia a RÉGUA quando ela está por cima; o que se está
+  // medindo é a base embaixo dela, e a base envelhece sem avisar. Por isso as
+  // trilhas: quais pontas de `origin/fix/*` esta árvore já contém.
+  let trilhas = "";
+  try {
+    trilhas = execFileSync(
+      "git",
+      ["branch", "-r", "--merged", "HEAD", "--format=%(refname:short)@%(objectname:short)",
+       "origin/fix/*", "origin/main"],
+      { cwd: ROOT, encoding: "utf8" },
+    ).trim().split("\n").filter(Boolean).join(" ");
+  } catch {}
+  return `instrumento: cabe.mjs ${sha("./cabe.mjs")} · lib.mjs ${sha("./lib.mjs")} | medindo: ${ROOT} @ ${commit}` +
+    (trilhas ? `\n  contém: ${trilhas}` : "");
 }
 
 const VIEWPORTS = (process.env["CABE_VIEWPORTS"] ?? "320x568,360x640,390x844,430x932,740x360")
