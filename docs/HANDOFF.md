@@ -103,6 +103,20 @@ npm run check      # typecheck dos 3 pacotes
   migrations atrás (`handle_chosen` não existia) e toda conta de fixture do
   driver morria no insert. `npm run migrate` depois de trocar de branch é mais
   barato que diagnosticar isso.
+- **Precisa do catálogo real num banco novo? Clone, não ingira.** O banco de
+  desenvolvimento já tem os 9830 títulos: `podman exec watchlytics-db createdb
+  -U dev -T watchlytics wl_sN` leva segundos, contra as horas de um
+  `npm run ingest` — e dispensa o `TMDB_READ_TOKEN` e o risco de gravar o cursor
+  de ingestão no banco errado. Depois, `npm run migrate` com o seu
+  `DATABASE_URL` (num clone já migrado, "relation already exists" seguido de
+  "migrations aplicadas" é o esperado) e um `analyze`.
+- **Medindo latência contra `localhost:5433`? Desconte ~40ms.** O encaminhador
+  de porta do podman rootless trava ~40ms por consulta quando a resposta cruza
+  certas fronteiras de pacote — ACK atrasado do Linux encontrando Nagle. Medido
+  em 2026-09-13: o mesmo `select * from titles limit 20` custa 0,8ms dentro do
+  container e 41,7ms pela porta publicada, com 0,76ms de CPU. Não é do app e não
+  existe em produção. Detalhe e as quatro medições que fecham o caso em
+  [../tools/feed-bench.md](../tools/feed-bench.md).
 
 - **Node ≥24.** O projeto executa `.ts` direto, sem `tsx` e sem build step. Só
   `packages/contract` compila — type stripping não vale dentro de `node_modules`.

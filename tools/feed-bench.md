@@ -10,6 +10,12 @@ Esta é a medição contra os **9830 títulos** do catálogo ingerido.
 sozinho fica entre 57ms e 81ms — 2,5× abaixo dos 200ms. O gatilho só aparece
 quando a API é saturada de propósito, num regime ~90× mais pesado que o beta.
 
+E esses 81ms são pessimistas: **~40ms de cada requisição medida aqui são o
+encaminhador de porta do podman, não o app** (§"Os ~40ms são a porta publicada
+do container"). Tirando isso, a resposta é da ordem de 33ms. Produção tem outros
+custos — Neon do outro lado da rede, e o cold start do Fly, que este relatório
+**não** mede e é o que o primeiro convidado vai sentir.
+
 **Nada foi otimizado.** A decisão sobre o cache é do usuário e está no PLAN.
 
 ## Números
@@ -85,20 +91,59 @@ A consulta de autenticação e o recálculo do boost somam <2ms: o `ponytail:` d
 que aparecer no perfil de latência") pode continuar dormindo, e o do
 `weightsFor` também. **Quase toda a resposta é a query do deck.**
 
-E dentro dela, o Postgres não é a metade maior. Com `EXPLAIN (ANALYZE,
-SERIALIZE, TIMING OFF)` o servidor fecha em **21,4ms**, serializando 15kB. O
-cliente cronometra 65ms para a mesma query. Os ~40ms restantes estão entre o
-Postgres terminar e as 20 linhas virarem objetos no Node — transferência e
-decodificação pelo `postgres.js`. Não é atribuível a uma coluna: pedir só o `id`
-das mesmas 20 linhas custa 18ms, pedir as 18 colunas custa 65ms, e nenhuma
-coluna isolada explica a diferença (`overview`, `genre_ids`, `cast_names` e
-`final`, cada uma somada ao `id`, dão os mesmos ~18ms). O `raw` jsonb está NULO
-nas 9830 linhas, então não é ele.
+E dentro dela havia uma sobra: `EXPLAIN (ANALYZE, SERIALIZE, TIMING OFF)` diz
+que o servidor fecha em 21,4ms, e o cliente cronometra 65ms para a mesma query.
+**Os ~40ms de diferença não são do Watchlytics. São do podman.**
 
-Não persegui isso além daqui: estamos 2,5× abaixo do gatilho, e o PLAN não pede
-otimização. Fica registrado porque é onde alguém deve olhar **primeiro** se um
-dia o gatilho for atingido de verdade — antes de considerar Redis, que atacaria
-a parte de 21ms e deixaria a de 40ms de pé.
+### Os ~40ms são a porta publicada do container
+
+A primeira redação deste relatório registrou esses ~40ms como "entre o Postgres
+terminar e as linhas virarem objetos no Node" e especulou que fosse
+decodificação do `postgres.js`. **Estava errado.** Quatro medições fecham o
+caso:
+
+1. **Não é CPU.** `process.cpuUsage()` em volta da chamada acusa **0,76ms** de
+   CPU para uma chamada de 40ms. Os outros 39ms são espera.
+2. **Não é o Postgres.** O mesmo `select * from titles limit 20` rodado *dentro*
+   do container responde em **0,8ms**; rodado do host, pela porta publicada,
+   em **41,7ms** — e a partir da segunda chamada na mesma conexão, em 0,3ms.
+   Isso com `psql`, que não tem uma linha de Node nem de `postgres.js`.
+3. **Não é o loopback do host.** Um servidor TCP em Node mandando 60000 bytes
+   para um cliente Node em `127.0.0.1`, sem podman no meio: **0,12ms**.
+4. **O custo depende do recorte em pacotes, não do volume.** Pela porta
+   publicada, `select repeat('x', N)` custa 41ms para N=30000, **0,56ms** para
+   N=35000, 41ms para 40000 e 45000, 0,55ms para 50000. Não monotônico, e
+   sempre ~40ms redondos quando aparece.
+
+Quarenta milissegundos redondos, dependentes de fronteira de pacote e com a CPU
+parada, são a assinatura do **ACK atrasado do Linux (40ms) encontrando o
+algoritmo de Nagle** — aqui, no encaminhador de porta em espaço de usuário que o
+podman rootless põe entre `localhost:5433` e o container. O `psql` paga uma vez
+por conexão; o `postgres.js` paga **toda chamada**, mesmo com `max: 1` e a mesma
+conexão reusada (medido: 20 chamadas seguidas, todas entre 81ms e 87ms, com o
+servidor respondendo em 42ms — sobra constante de 38,3ms).
+
+### O que isso muda
+
+**Todo número medido por HTTP neste relatório carrega ~40ms que produção não
+vai ter.** O p50 de 73,2ms é ~33ms de Watchlytics mais ~40ms de encaminhador. A
+folga contra o gatilho de 200ms é, portanto, **maior** do que a tabela mostra —
+o veredito não muda de sinal, fica mais confortável.
+
+E **a conclusão que eu tinha tirado sobre o Redis estava invertida.** Eu havia
+escrito que o cache de página atacaria "a fatia menor" porque dois terços do
+tempo estariam depois do banco. Não estão: fora deste ambiente, a query do deck
+é praticamente a resposta inteira. **Se um dia o gatilho do PLAN §4 for
+atingido, o cache de página ataca exatamente a fatia certa.** O PLAN está certo
+e eu estava errado.
+
+A consequência menos óbvia: a vazão de ~92 req/s da tabela anterior também é
+pessimista. Cada requisição segura uma conexão ~40ms a mais do que precisaria,
+então o teto real desta máquina é mais alto — o que só aumenta a folga.
+
+A parte que continua verdadeira é a barata: autenticação e recálculo do boost
+somam menos de 2ms. Os dois `ponytail:` que preveem "some no dia em que aparecer
+no perfil de latência" continuam dormindo com razão.
 
 ## Os planos
 
@@ -158,13 +203,23 @@ O que esta medição **não** prova:
 
 - **Não é produção.** Lá a API é uma máquina no Fly (`gru`, com auto-suspend) e
   o banco é Neon, do outro lado da rede. Aqui o banco está a um socket de
-  distância e todos os buffers dão `shared hit`. A parte de 21ms do Postgres vai
-  crescer com a latência de rede do Neon; a de 40ms do cliente, não. **Um
-  auto-suspend acordando é um custo de outra ordem e não aparece aqui.**
-- **Não mede o cold start** nem o primeiro acesso com cache frio.
+  distância, todos os buffers dão `shared hit`, e há os ~40ms do encaminhador do
+  podman que produção não tem. Em compensação, a latência de rede até o Neon vai
+  somar a cada uma das **três** idas ao banco por requisição — e essa conta não
+  dá para fazer daqui.
+- **Não mede o cold start.** É a lacuna que mais importa para o beta: com
+  `min_machines_running = 0`, a primeira requisição depois da suspensão é o
+  número que a pessoa vê ao abrir o link, e ele não é 81ms nem 33ms — é a
+  máquina do Fly acordando. Medir isso exige produção, não bancada. **Enquanto
+  ninguém medir, o "p95 do feed" deste relatório não é o que o primeiro
+  convidado vai sentir.**
 - **A vazão de ~92 req/s é desta máquina**, com o gerador de carga disputando
-  CPU. Serve para dizer "a folga é de duas ordens de grandeza", não para
-  dimensionar produção.
+  CPU e cada requisição segurando a conexão 40ms a mais por causa do
+  encaminhador. É um piso pessimista, não um dimensionamento.
+- **O número de um mesmo cenário varia com o estado da máquina.** O mesmo
+  `EXPLAIN` da query do deck deu 21,4ms durante as execuções do benchmark e
+  42ms mais tarde, sem mudança nenhuma no banco ou na query. Compare execuções
+  entre si, não contra números avulsos deste documento.
 
 ## Reproduzir
 
