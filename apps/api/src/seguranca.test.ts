@@ -22,6 +22,10 @@ const ESPERADOS = {
   "strict-transport-security": "max-age=31536000; includeSubDomains",
   "x-content-type-options": "nosniff",
   "referrer-policy": "strict-origin-when-cross-origin",
+  "content-security-policy":
+    "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; " +
+    "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  "permissions-policy": "camera=(), microphone=(), geolocation=()",
 };
 
 const app = buildServer();
@@ -48,3 +52,26 @@ for (const [nome, resposta] of [
     }
   });
 }
+
+/**
+ * A CSP daqui existe por causa de UMA página, e é essa página que o teste
+ * precisa olhar: o `/u/:handle` é o HTML que circula em link.
+ *
+ * Confere o que a política PERMITE contra o que o template realmente usa, e não
+ * a string contra ela mesma — isso o laço acima já faz. Se alguém puser um
+ * `<script>` ou um `<img>` no perfil público, a página passa a nascer quebrada
+ * em produção e o único aviso seria este teste.
+ *
+ * O 404 e não um perfil de verdade: o corpo dos dois sai do mesmo handler, com
+ * o mesmo `reply.type("text/html")`, e um perfil exigiria criar conta — o que
+ * poria fixture num arquivo que existe para testar um gancho.
+ */
+test("#42 — o HTML do perfil público não usa nada que a CSP dele proíba", async () => {
+  const res = await app.inject({ method: "GET", url: "/u/ninguem" });
+
+  assert.match(res.headers["content-type"] ?? "", /text\/html/);
+  assert.doesNotMatch(res.body, /<script/i, "`script-src` está em 'none'");
+  assert.doesNotMatch(res.body, /<img/i, "o template não devia carregar imagem");
+  assert.doesNotMatch(res.body, /<form/i, "`form-action` está em 'none'");
+  assert.doesNotMatch(res.body, /<base/i, "`base-uri` está em 'none'");
+});
