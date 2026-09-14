@@ -98,7 +98,7 @@ export async function servers(log = []) {
   };
 }
 
-export async function openChrome({ viewport = "430x932", scale = 1, reduce = true } = {}) {
+export async function openChrome({ viewport = "430x932", scale = 1, reduce = true, mobile } = {}) {
   const profile = mkdtempSync(join(tmpdir(), "wl-a11y-chrome-"));
   const chrome = spawn("google-chrome", [
     "--headless=new",
@@ -188,7 +188,9 @@ export async function openChrome({ viewport = "430x932", scale = 1, reduce = tru
     width: w,
     height: h,
     deviceScaleFactor: scale,
-    mobile: w < 700,
+    // Largura não decide: 740x360 é telefone deitado, e o padrão `w < 700` o
+    // mediria como desktop.
+    mobile: mobile ?? w < 700,
   });
   return page;
 }
@@ -263,7 +265,12 @@ export async function comBanco(fn) {
  * Usuário descartável com sessão plantada. `birthYear` null deixa a porta de
  * idade fechada — é assim que se audita a própria porta.
  */
-export async function abrirSessao(page, { birthYear = 1990, onboarded = true } = {}) {
+export async function abrirSessao(
+  page,
+  // β8 pôs a porta do handle depois da idade, e `handle_chosen` nasce false: sem
+  // escolher aqui, TODA sessão plantada cai na porta em vez da tela pedida.
+  { birthYear = 1990, onboarded = true, handleChosen = true } = {},
+) {
   const { newRefreshToken, REFRESH_TTL_S } = await import(join(ROOT, "apps/api/src/auth.ts"));
   const userId = crypto.randomUUID();
   const sessionId = crypto.randomUUID();
@@ -271,8 +278,9 @@ export async function abrirSessao(page, { birthYear = 1990, onboarded = true } =
 
   await comBanco(async (sql) => {
     await sql`
-      insert into users (id, handle, display_name, birth_year)
-      values (${userId}, ${`a11y-${userId.slice(0, 8)}`}, 'Auditoria', ${birthYear})`;
+      insert into users (id, handle, display_name, birth_year, handle_chosen)
+      values (${userId}, ${`a11y-${userId.slice(0, 8)}`}, 'Auditoria', ${birthYear},
+              ${handleChosen})`;
     await sql`
       insert into sessions (id, user_id, refresh_token_hash, expires_at, user_agent)
       values (${sessionId}, ${userId}, ${hash},

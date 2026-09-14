@@ -24,7 +24,14 @@ node --env-file=apps/api/.env tools/a11y/foco.mjs '#/library'
 node --env-file=apps/api/.env tools/a11y/contraste.mjs            # contraste no card
 node --env-file=apps/api/.env tools/a11y/estouro.mjs              # estouro horizontal
 node --env-file=apps/api/.env tools/a11y/acoes.mjs deck           # foco e anúncio por cena
+node --env-file=apps/api/.env tools/a11y/cabe.mjs                # cabe no telefone?
+node --env-file=apps/api/.env tools/a11y/cabe.mjs deck 'lib-*'   # só estas cenas
+CABE_VIEWPORTS=320x568 node --env-file=apps/api/.env tools/a11y/cabe.mjs
 ```
+
+Variável de shell vence `--env-file` no Node: `A11Y_API_PORT`, `A11Y_WEB_PORT` e
+`DATABASE_URL` na frente do comando trocam a faixa sem editar o `.env` do
+worktree.
 
 Sobe em **3100 (api) e 5273 (vite)**, não nas 3000/5173 do `run-watchlytics`:
 as duas ferramentas precisam poder rodar ao mesmo tempo, e numa máquina com mais
@@ -43,6 +50,7 @@ lê sai daí sozinho.
 | `amigos.mjs` | Busca e pedido de amizade: o que é anunciado e onde o foco cai. |
 | `movimento.mjs` | `prefers-reduced-motion` nos dois modos. |
 | `nomes.mjs` | Papel e nome de nós específicos, como o leitor de tela os vê. |
+| `cabe.mjs` | **A régua de encaixe.** Cada tela cabe no telefone, ou quantos px faltam: folga vertical, controle abaixo da dobra, alvo < `--tap` e estouro horizontal, em 14 cenas × 5 viewports. Matriz no fim e saída 1 se reprovar. |
 | `layout.mjs` | Impressão digital da geometria — para comparar antes/depois de mexer no shell. |
 | `posteres.mjs` | Põe pôster sintético (`branco`/`cinza`) ou tira (`limpar`) em todos os títulos. |
 | `lib.mjs` | O encanamento: Chrome por CDP, servidores, sessão descartável, decoder de PNG. |
@@ -76,6 +84,21 @@ iguais. Quem desliga é `Emulation.setEmulatedMedia` com `no-preference`.
 **Texto em `role="status"` não entra no nome do elemento que o contém.** Medido
 no badge de notificações: a mesma frase não serve de nome do link e de região
 viva ao mesmo tempo.
+
+**A rolagem vertical do app é de propósito.** O `index.html` clipa só o eixo X
+e deixa o Y rolável porque, em tela baixa, os botões de Pass/Undo/Like saem do
+alcance — e eles são o caminho não-gestual que a acessibilidade exige. Por isso
+o `cabe.mjs` mede QUANTO falta para caber, e não se rola: tirar a rolagem sem
+fazer caber esconde o controle em vez de resolver.
+
+**`handle_chosen` nasce `false`.** A porta do handle (β8) chegou depois destes
+scripts, e toda sessão plantada pelo `abrirSessao` caía nela em vez da tela
+pedida. Hoje o padrão é `handleChosen: true`, e `{ handleChosen: false }` é como
+se audita a própria porta.
+
+**Largura não diz se é telefone.** O `mobile` do CDP saía `false` em 740x360,
+que é telefone deitado — o caso que mais quebra layout. `openChrome` aceita
+`mobile` explícito.
 
 **`document.scrollWidth` não denuncia estouro.** `html` e `body` têm
 `overflow-x: clip`, que mata a barra e some com a prova junto. Quem denuncia é o
