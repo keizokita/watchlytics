@@ -1247,3 +1247,232 @@ Não são trilhas de agente, e nenhuma delas é código:
   criou. Sem ele o sufixo não organiza nada.
 - O veredito do gesto no celular (HANDOFF, §Bloqueado 1).
 - `gh pr merge` e qualquer operação contra produção.
+
+### β10 — o encaixe no telefone, e a régua que não via
+
+Três trilhas em 2026-09-14: as telas de lista (28, PR #73), o deck e o shell
+(e1, PR #74) e a régua de encaixe (ed, `tools/a11y/cabe.mjs`). As duas PRs
+saíram do mesmo `33ea8be`, não conflitam (`merge-tree --write-tree`, exit 0) e
+foram validadas **integradas**, não isoladas — `npm run check` limpo, 156 da api
+e 58 da web.
+
+**O achado que abre a seção não é nenhum dos consertos: é que a régua que
+existia não via o defeito.** O `estouro.mjs` mede numa conta descartável, sem
+catálogo e sem amigos, e **lista vazia cabe em qualquer viewport**. A ferramenta
+não errava no que media; media o estado que nunca quebra. É a sexta vez que o
+padrão do §8 aparece, com uma forma nova: não é medir o lugar vizinho nem o
+instrumento cego para o sinal, é **medir a condição fácil**. Fixture vazia é o
+equivalente de layout do "tem swipe?" do #68 — a pergunta responde sobre o caso
+que não dói.
+
+O antídoto é o estado cheio como padrão: conta povoada, catálogo real de 9830.
+Remedido assim em 320x568, 360x640 e 390x844, nas três abas de cada tela.
+
+**Mas povoar a conta não basta, e a régua nova tem duas armadilhas próprias.**
+Vale antes de alguém confiar num vermelho ou num verde dela:
+
+- **Ela mede num relógio, não num fato.** O `cabe.mjs` afirma na documentação
+  das cenas que espera a prova de que a tela chegou, "nunca um `sleep` solto no
+  lugar da prova" — e o laço de medição põe `await sleep(600)` antes da sonda. O
+  `waitFor` prova que a tela **chegou**; os 600ms apostam que o que vem depois
+  de chegar (pôster carregando, fonte trocando, linha entrando) terminou. Medido:
+  `lib-carregando` no mesmo commit de `main` dá **-236 rodando a suíte e -528
+  rodando a cena sozinha**, estável dentro de cada modo. Comparar suíte-do-antes
+  com cena-do-depois acusa 292px de regressão que não existe. Enquanto a sonda
+  não afirmar o DOM (`document.fonts.ready`, imagens da dobra com `complete`,
+  dois `rAF` sem mudança de `scrollHeight`), antes e depois só valem no **mesmo
+  modo de execução**.
+- **`rola > 0` reprova lista povoada por definição, e já reprova hoje.** A linha
+  do veredito é `if (m.rola > 0 || m.nFora || m.nEstouro || m.nPequeno)`. As
+  cenas de lista povoada já existem — `lib-interested/watched/discarded` e
+  `friends-people/common/alerts` — e lista longa rola; `nFora` dispara junto,
+  porque numa lista longa os controles das linhas de baixo ficam abaixo da
+  dobra, e é isso que uma lista é. Medido, numa cena só e das que *deveriam*
+  caber: `cabe.mjs 'lib-vazia'` → `-477 RDT`, **`EXIT=1`**. A biblioteca vazia
+  reprova porque a seção de conta rola 477px. O `folga` acompanha o mesmo erro
+  de pergunta: ele é `alturaDisponivel - soma(alturas dos filhos do .shell)`,
+  então um `-2930` numa biblioteca cheia não é falta de 2930px, é a lista tendo
+  2930px de linha. O número está certo; a pergunta é que não se aplica.
+
+Daí a regra: **régua permanentemente vermelha é pior que régua permanentemente
+verde.** Na verde alguém ainda confia; na vermelha a regressão de verdade se
+esconde num vermelho que já estava lá, e sobra um exit code que todos aprenderam
+a ignorar. A régua nasceu vermelha, e o vermelho não distingue "o catálogo é
+longo" de "a tela quebrou". Para cena com lista longa o critério que significa
+algo é outro — a primeira linha inteira dentro da dobra, os controles do
+**shell** (não os das linhas) alcançáveis, estouro horizontal zero, alvo de
+toque. "Não rola" só é alvo onde rolar seria o defeito.
+
+E o sétimo caso do padrão, desta vez cometido ao *conferir* os outros: contestei
+a procedência dos números de lista porque
+`grep -rl "lib-interested" --include=*.mjs` não achava nada em disco. Não achava
+porque **o nome nunca aparece inteiro no arquivo** — as seis cenas de lista são
+geradas por `.map()` sobre `["interested","watched","discarded"]` dentro de um
+template, e entram no array por spread. O `grep` rodou no arquivo certo e
+respondeu outra pergunta: "esta string literal existe?", não "esta cena existe?".
+A conclusão inventou um problema de procedência que não havia, e por pouco não
+custou a credibilidade de números que eram reprodutíveis — os dígitos de duas
+sessões bateram um a um. A lição que sobra é a de sempre, com endereço novo:
+**busca por literal não interroga código que monta nomes**; para saber se uma
+cena existe, pergunte ao programa (`cabe.mjs --lista`, ou rode-a), não ao texto.
+
+E o oitavo, que é o mais reutilizável dos oito porque não é sobre medir, é sobre
+**versão**: a régua é dois arquivos, e só um voltou. O `cabe.mjs` reformado
+conviveu por uma corrida inteira com o `lib.mjs` antigo — o `reset --keep` que
+tirou um commit do `main` local devolveu o `lib.mjs` ao estado do `main`, e o
+`cabe.mjs` reapareceu sozinho pelo `checkout <branch> -- <arquivo>`, porque foi
+só ele que se pediu. Sem `handleChosen` na sessão plantada, **toda cena parava na
+porta do handle**, e o sintoma (nenhuma tela renderiza) lê como defeito de
+produto, não como instrumento remendado pela metade. A corrida inteira foi
+descartada.
+
+O que dá o peso à regra é que **nenhuma das duas operações errou**. O
+`reset --keep` devolveu o `lib.mjs` ao `main`, que é o que ele promete; o
+`checkout` trouxe o arquivo pedido, que é o que ele promete. Duas operações
+corretas compõem um instrumento incoerente, e nenhuma delas tem como avisar —
+cada uma só enxerga a sua metade. Não é descuido que se conserta prestando mais
+atenção; é uma propriedade de mover arquivo em vez de mover commit.
+
+A regra que fica: **a versão de um instrumento não é a versão do arquivo dele, é
+a versão do conjunto de arquivos dele.** Quem levar a régua para outro worktree
+leva por commit — `cherry-pick`, nunca `cp` — porque copiar um arquivo é
+exatamente o gesto que produz esse par desencontrado. E vale para o `driver.mjs`
+pela mesma razão: harness que planta sessão em SQL tem uma metade que conhece as
+portas do app e outra que conhece as telas, e as duas envelhecem em ritmos
+diferentes (§7: porta nova invalida conta de fixture).
+
+E o nono, que fecha a lista porque é o padrão na forma mais limpa que ele
+apareceu: **prova de presença não é prova de identidade.** A cena de aba clicava
+em "Watched", esperava `.lib-list` e media — mas a lista de "interested" continua
+no DOM enquanto a nova carrega, então o `waitFor` voltava na hora e a sonda
+descrevia a **aba anterior**. O sintoma que denunciou foi duas telas de conteúdo
+diferente publicando o mesmo número (-3529 e -2052 em `lib-interested` e
+`lib-watched`), e o que ele denunciava era pior que ruído: as seis linhas
+comparavam uma medição errada com uma certa. Consertado exigindo prova de par —
+a aba pedida com `aria-pressed=true` **e** o aviso de carregando fora da tela.
+
+A hipótese que levantou a pedra estava errada (supôs-se contagem variável na
+fixture; ela insere 12 + 12 + 12, determinístico). O que funcionou foi o sinal,
+não a explicação: **dois casos que deveriam diferir e não diferem denunciam o
+instrumento**, mesmo quando quem aponta não sabe dizer por quê. Vale como método:
+procurar coincidência onde a coincidência não cabe é mais barato que auditar
+método, e acha o que auditoria de método não acha.
+
+Daí a leitura dos nove juntos. Todos são a mesma frase com sujeitos diferentes —
+o instrumento respondeu uma pergunta próxima da que se fez, e a resposta foi lida
+como se fosse da pergunta certa. `sleep(600)` responde "passou tempo?" e se lê
+"a tela assentou". `waitFor('.lib-list')` responde "há uma lista?" e se lê "esta
+aba está pronta". `grep` de literal responde "esta string existe?" e se lê "esta
+cena existe". `getBoundingClientRect` responde "que retângulo o elemento ocupa?"
+e se lê "onde o dedo acerta". Conta vazia responde "cabe sem conteúdo?" e se lê
+"cabe". Nenhum dos cinco falhou; **os cinco acertaram outra pergunta**, e por
+isso nenhum deles dá erro. É por isso que o hábito que este projeto adotou —
+afirmar a FONTE, não a premissa — é o único que pega essa família: a fonte
+denuncia a pergunta que foi realmente feita.
+
+E o que decide se esta seção serviu para alguma coisa não é ela ter sido
+escrita: é **quantas das lições viraram checagem em vez de parágrafo**. Três
+viraram, e são as que ninguém vai precisar lembrar:
+
+- **`C`** — cada controle é sondado no próprio centro, e quem atende ali tem que
+  ser ele. Nasceu do `::after` que ampliava o link do rodapé e roubava a base do
+  botão Like: a régua perguntava se o alvo cobre 44px **dele** e não se ele cobre
+  o centro do vizinho. Área de toque é disputa, não propriedade.
+- **`P`** — primeira linha da lista inteira antes de rolar, que é o critério que
+  faz sentido onde "não rola" não faz.
+- **A linha de procedência** — shas do `cabe.mjs` e do `lib.mjs` **e** o que a
+  árvore medida contém de cada branch. As duas metades, porque a primeira versão
+  provava a identidade do instrumento e não a do objeto medido.
+
+O resto desta seção é prosa, e prosa depende de alguém lembrar de ler. As três
+acima reprovam sozinhas.
+
+**O painel de estatísticas não era espaço, era ordem de leitura.** Ele ocupava
+152px entre as abas e a lista, e com o piso de 10 assistidos fechado esses 152px
+eram *uma frase dizendo o que você ainda não pode ver* — servida antes do que
+você tem. Desceu para depois da lista: a primeira linha do catálogo saiu de
+y=364 (cortada numa dobra de 568) para y=196, inteira.
+
+**A `--deck-reserve` não estava desatualizada: não tinha como estar certa.** Era
+a soma à mão de coisas que mudam de tamanho sozinhas (nav, filtros, rodapé,
+botões), mantida por quem precisasse lembrar de atualizar — 17rem, 19.5rem,
+20.125rem. Morreu. O `.deck-wrap` virou o item que estica
+(`grid-template-rows: minmax(0, 1fr) auto`), a altura vem primeiro e a largura
+sai do `aspect-ratio: 2/3`, o inverso de antes. O tamanho do buraco que a
+constante escondia: o `main` estourava a altura da janela em **todos** os seis
+viewports medidos, não só nos estreitos. Constante que erra em toda parte nunca
+foi medida.
+
+Junto morreu um `margin-top: auto` inerte nos filtros — margem automática só
+recebe folga positiva, e depois do `flex-grow` não sobra nenhuma. A linha dizia
+comandar o alinhamento vertical e não comandava nada. Regra sem efeito mente
+igual a comentário.
+
+Aberto, com o número na mão em vez de "não deu":
+
+- **`740x360` (paisagem de telefone) não cabe.** Sobram 59px para o card contra
+  o piso de legibilidade de 9rem; o chrome come 301 dos 360. Caber ali exige
+  layout próprio de paisagem (botões em coluna ao lado do card), que é mudança
+  de forma, não de medida.
+- **Dois alvos de toque no rodapé do shell**: `.feedback` 280x17 e a atribuição
+  do TMDB 236x34. A conta era que 44px em cada um devolveria ~60px de chrome e
+  apagaria a folga que fez 320x568 caber — mas isso só vale se o alvo tiver que
+  *ocupar* 44px de layout. Um `::after` absoluto com `inset` negativo expande a
+  área de toque sem mudar a caixa do fluxo. A verificação honesta é
+  `elementFromPoint` nos quatro cantos, não o retângulo declarado: o retângulo
+  do pseudo-elemento não prova que o dedo acerta.
+- **`Library.tsx` não tem `h1`; `Friends.tsx` tem.** Tela sem cabeçalho não tem
+  ponto de entrada para leitor de tela, e a nav marcar o link ativo não
+  substitui isso — a assimetria é o defeito. Custo medido: 50px da dobra, com a
+  primeira linha indo de y=196 para y=246 e ainda terminando em 446 de 568.
+
+### Clonar, não semear, ao abrir faixa
+
+Entra no protocolo de abrir trilha, antes do `migrate`:
+
+```
+podman exec watchlytics-db createdb -U dev -T watchlytics wl_sN
+```
+
+O `npm run seed` deixa 94 títulos com `poster_url` nulo e elenco vazio, e o
+`driver all` reprova três passos por isso — elenco no card (I1.2), pôster atrás
+do gradiente e pré-carga (B4) — **sem defeito nenhum na branch**. O `-T` exige
+zero conexões no banco molde: se alguém estiver com api de pé contra
+`watchlytics`, ou espera ou faz dump/restore. É pré-requisito que só aparece
+quando falha, e aí parece erro do comando em vez de estado da máquina.
+
+E um número para ler com cuidado: `npm test` na raiz roda dois workspaces, 156
+na api e 58 na web. Quem vê 58 não viu metade — viu um total parcial que não
+avisa de quantas partes ele era. Rodando com outra sessão em cima do mesmo banco
+de teste, 5 do auth e do β2 reprovam por concorrência, não por defeito.
+
+**Derrubar processo próprio é por PID, conferindo `cwd` antes de cada `kill`.**
+`pkill -f <padrão>` casa com a linha de comando da **própria chamada** e mata o
+shell que o executou; e com três sessões rodando o mesmo script, o nome do
+script não decide de quem ele é. Já custou uma corrida inteira de medição.
+
+O que torna isso item de protocolo, e não anedota: a armadilha **já estava
+registrada** em memória de sessão, e mesmo assim foi redescoberta pagando o
+preço — `grep -rn "pkill" CLAUDE.md docs/*.md` não devolvia nada. É o defeito do
+dia numa escala acima: o registro estava no lugar certo para quem escreveu e no
+lugar errado para quem precisava. Conhecimento de armadilha de ambiente mora em
+documento versionado, ou ele não existe para a próxima faixa.
+
+**E fechar faixa também tem passo: recolher o que ficou em `/tmp`.** Cada Chrome
+descartável da régua criava um perfil em tmpfs e não o levava embora; somadas as
+corridas de um dia, 6,5GB, até o filesystem encher. O `80d1170` estanca na
+origem, mas o padrão vale para qualquer ferramenta que crie descartável — e o
+jeito de recolher é o mesmo do `pkill`: varrer `/tmp/wl-a11y-chrome-*`, comparar
+com o `--user-data-dir` da cmdline de cada `chrome` vivo, e remover **só** o que
+não está nessa lista. Com medição de outra sessão rodando, a varredura pula a
+dela. No `/tmp` a regra vale ainda mais que na porta, porque porta pelo menos
+tem dono declarado.
+
+O que faz disso item de protocolo e não de limpeza: **o vazamento não se anuncia
+em quem vaza.** Quem vaza continua funcionando até o fim; quem paga é o próximo
+processo que precisar de espaço, e ele costuma não ter relação nenhuma com a
+causa — aqui apareceu como `ENOSPC` numa ferramenta vizinha. É a versão de
+recurso do que a `--deck-reserve` fazia com a altura: o custo aparece longe de
+onde nasce. Por isso recolher é antes de abrir leva nova, não depois de alguém
+tropeçar.
+
