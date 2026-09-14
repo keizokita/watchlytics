@@ -503,6 +503,7 @@ const cenas = filtros.length
 const ROLA_POR_NATUREZA = /^(lib-|friends-)/;
 
 const matriz = new Map(); // cena -> viewport -> célula
+const naoMedidos = [];
 let reprovou = false;
 
 console.log(procedencia());
@@ -576,9 +577,13 @@ for (const vp of VIEWPORTS) {
       if (m.pilha.length) console.log(`   pilha: ${m.pilha.join(" ")}`);
       if (m.nFora > m.foraDaDobra.length) console.log(`   (+${m.nFora - m.foraDaDobra.length} controles abaixo da dobra)`);
     } catch (e) {
-      reprovou = true;
-      matriz.set(nome, { ...(matriz.get(nome) ?? {}), [vp]: "ERRO" });
-      console.log(`${nome}: ERRO — ${String(e.message).slice(0, 160)}`);
+      // "Não consegui medir" não é "reprovou", e a matriz não pode deixar os
+      // dois com a mesma cara: a cena que falha ao MONTAR (rede, sessão
+      // plantada) não diz nada sobre o layout. Fica fora do veredito e sai
+      // numa lista própria embaixo da tabela, com o motivo.
+      matriz.set(nome, { ...(matriz.get(nome) ?? {}), [vp]: "não medido" });
+      naoMedidos.push(`${nome} ${vp} — ${String(e.message).replace(/\s+/g, " ").slice(0, 120)}`);
+      console.log(`${nome}: NÃO MEDIDO — ${String(e.message).slice(0, 160)}`);
     } finally {
       await devolver(user);
       for (const extra of lixo.splice(0)) await devolver(extra);
@@ -595,6 +600,12 @@ console.log(`|${"-".repeat(largura + 2)}|${VIEWPORTS.map(() => "-".repeat(15)).j
 for (const [nome, linha] of matriz) {
   console.log(`| ${nome.padEnd(largura)} | ${VIEWPORTS.map((v) => (linha[v] ?? "—").padEnd(13)).join(" | ")} |`);
 }
+if (naoMedidos.length) {
+  console.log(`\nnão medidos (falha ao montar a cena, não veredito de layout):`);
+  for (const f of naoMedidos) console.log(`  ${f}`);
+  console.log(`  remeça estas em cena isolada: elas não entram na saída 1.`);
+}
+
 console.log(`
 número = folga vertical em px (negativo = falta tanto para caber)
 R = rola · D = controle fora de alcance (na tela que rola: o que a rolagem não
