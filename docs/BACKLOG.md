@@ -997,7 +997,16 @@ estava rodando, com a conversa acontecendo ali, barata.
 
 Fica como regra: **premissa que sustenta decisão destrutiva merece teste
 próprio, não comentário.** Comentário é para o porquê; asserção é para o que
-precisa continuar verdade. O #68 já deixa o dele: a premissa de hoje é "estas
+precisa continuar verdade.
+
+Com uma emenda que não é detalhe, porque a regra sem ela recria o problema:
+**afirme a FONTE da premissa, não a premissa.** Um teste que dissesse "conta que
+usou o app tem swipe" morreria junto com a premissa, no dia em que alguém
+mudasse o que significa usar — seria a mesma frase do comentário, só que
+executável. O teste que sobrevive não depende de nenhuma verdade de hoje: ele lê
+`pg_constraint` e pergunta pela tabela nova. E a pergunta vai escrita dentro da
+mensagem do assert, senão o vermelho sem explicação vira teste que alguém ajusta
+para passar. O #68 já deixa o dele: a premissa de hoje é "estas
 são todas as tabelas em que uma pessoa constrói alguma coisa", e ela é um teste
 que classifica cada tabela que aponta para `users` em uma de três gavetas (da
 conta, coisa dentro, consequência). A nona tabela chega vermelha no dia em que
