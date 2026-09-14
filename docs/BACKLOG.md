@@ -1400,3 +1400,15 @@ na api e 58 na web. Quem vê 58 não viu metade — viu um total parcial que nã
 avisa de quantas partes ele era. Rodando com outra sessão em cima do mesmo banco
 de teste, 5 do auth e do β2 reprovam por concorrência, não por defeito.
 
+**Derrubar processo próprio é por PID, conferindo `cwd` antes de cada `kill`.**
+`pkill -f <padrão>` casa com a linha de comando da **própria chamada** e mata o
+shell que o executou; e com três sessões rodando o mesmo script, o nome do
+script não decide de quem ele é. Já custou uma corrida inteira de medição.
+
+O que torna isso item de protocolo, e não anedota: a armadilha **já estava
+registrada** em memória de sessão, e mesmo assim foi redescoberta pagando o
+preço — `grep -rn "pkill" CLAUDE.md docs/*.md` não devolvia nada. É o defeito do
+dia numa escala acima: o registro estava no lugar certo para quem escreveu e no
+lugar errado para quem precisava. Conhecimento de armadilha de ambiente mora em
+documento versionado, ou ele não existe para a próxima faixa.
+
