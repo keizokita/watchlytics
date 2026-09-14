@@ -1370,6 +1370,23 @@ isso nenhum deles dá erro. É por isso que o hábito que este projeto adotou �
 afirmar a FONTE, não a premissa — é o único que pega essa família: a fonte
 denuncia a pergunta que foi realmente feita.
 
+E o que decide se esta seção serviu para alguma coisa não é ela ter sido
+escrita: é **quantas das lições viraram checagem em vez de parágrafo**. Três
+viraram, e são as que ninguém vai precisar lembrar:
+
+- **`C`** — cada controle é sondado no próprio centro, e quem atende ali tem que
+  ser ele. Nasceu do `::after` que ampliava o link do rodapé e roubava a base do
+  botão Like: a régua perguntava se o alvo cobre 44px **dele** e não se ele cobre
+  o centro do vizinho. Área de toque é disputa, não propriedade.
+- **`P`** — primeira linha da lista inteira antes de rolar, que é o critério que
+  faz sentido onde "não rola" não faz.
+- **A linha de procedência** — shas do `cabe.mjs` e do `lib.mjs` **e** o que a
+  árvore medida contém de cada branch. As duas metades, porque a primeira versão
+  provava a identidade do instrumento e não a do objeto medido.
+
+O resto desta seção é prosa, e prosa depende de alguém lembrar de ler. As três
+acima reprovam sozinhas.
+
 **O painel de estatísticas não era espaço, era ordem de leitura.** Ele ocupava
 152px entre as abas e a lista, e com o piso de 10 assistidos fechado esses 152px
 eram *uma frase dizendo o que você ainda não pode ver* — servida antes do que
