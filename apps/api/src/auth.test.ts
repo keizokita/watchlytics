@@ -10,7 +10,17 @@ import {
 } from "@watchlytics/contract";
 import { ACCESS_TTL_S, signAccess, verifyAccess } from "./auth.ts";
 import { db, pg } from "./db/client.ts";
-import { consents, identities, sessions, swipes, titles, users } from "./db/schema.ts";
+import {
+  consents,
+  friendships,
+  identities,
+  libraryEntries,
+  notifications,
+  sessions,
+  swipes,
+  titles,
+  users,
+} from "./db/schema.ts";
 import { providers } from "./routes/auth.ts";
 import { buildServer } from "./server.ts";
 
@@ -572,6 +582,142 @@ test("β2 — conta que já usou o app não é apagada por um ano errado", async
   });
   assert.equal(ainda.statusCode, 403, "sem ano válido, segue sem app");
   assert.equal((await refresh(token)).statusCode, 401, "a sessão foi revogada");
+});
+
+/**
+ * β9.6 fechou a sobra no `DELETE /v1/me`. Esta é a mesma regra na outra porta.
+ *
+ * O aviso de match do amigo é linha DELE, e guarda uma cópia do meu handle no
+ * payload (`friends.ts` grava assim de propósito, para a tela não fazer um
+ * fetch por linha). Nenhuma FK aponta daqui para mim, então a cascata passa
+ * longe: quem varre tem que ser quem apaga — nas DUAS portas, senão a recusa da
+ * idade apaga a conta e deixa o handle dela na tela de outra pessoa.
+ *
+ * Zero swipe não quer dizer zero catálogo: `PUT /v1/library/:titleId` grava
+ * `library_entries` sem gravar swipe, e é de `library_entries` que sai o match
+ * que gera o aviso. A sobra é alcançável, não é só teórica.
+ */
+async function avisosSobre(id: string): Promise<number> {
+  const rows = (await db.execute(
+    sql`select count(*) as n from notifications where payload->>'friendId' = ${id}`,
+  )) as unknown as Record<string, unknown>[];
+  return Number(rows[0]!["n"]);
+}
+
+/** Um amigo com dois avisos: um que cita `userId` no payload e um que não. */
+async function amigoQueGuardaOHandle(userId: string, handle: string) {
+  const { user: amigo } = await loginNative(`sub-amigo-de-${handle}`);
+  await db.insert(notifications).values([
+    {
+      userId: amigo.id,
+      type: "friend_matches",
+      payload: { friendId: userId, friendHandle: handle, count: 3 },
+    },
+    { userId: amigo.id, type: "match", payload: { titleId: null } },
+  ]);
+  return amigo;
+}
+
+test("β2 — a recusa que apaga a conta varre o aviso que guarda o handle dela", async () => {
+  const { user } = await loginNative("sub-menor-com-aviso");
+  const amigo = await amigoQueGuardaOHandle(user.id, "menor-com-aviso");
+  assert.equal(await avisosSobre(user.id), 1, "o aviso do amigo existe antes");
+
+  const res = await responderIdade(user.id, new Date().getFullYear() - (MIN_AGE - 1));
+  assert.deepEqual(res.json(), { ok: false, minAge: MIN_AGE });
+
+  const sobrou = await db.select({ id: users.id }).from(users).where(eq(users.id, user.id));
+  assert.deepEqual(sobrou, [], "conta sem swipe é apagada");
+  assert.equal(await avisosSobre(user.id), 0, "e o handle dela não fica no aviso de ninguém");
+
+  // A varredura é pelo payload, não pelo dono da linha: o amigo continua de pé
+  // e o aviso dele que não cita ninguém continua lá.
+  const dele = await db.select().from(notifications).where(eq(notifications.userId, amigo.id));
+  assert.equal(dele.length, 1, "só o aviso que citava o apagado saiu");
+});
+
+test("β2 — a recusa que NÃO apaga não varre aviso nenhum", async () => {
+  const { user } = await loginNative("sub-menor-que-usou-com-aviso");
+
+  const [titulo] = await db.select({ id: titles.id }).from(titles).limit(1);
+  assert.ok(titulo, "o banco precisa estar semeado (npm run seed)");
+  await db.insert(swipes).values({ userId: user.id, titleId: titulo.id, direction: 1 });
+  await amigoQueGuardaOHandle(user.id, "usou-com-aviso");
+
+  const res = await responderIdade(user.id, new Date().getFullYear() - (MIN_AGE - 1));
+  assert.deepEqual(res.json(), { ok: false, minAge: MIN_AGE });
+
+  const [linha] = await db.select({ id: users.id }).from(users).where(eq(users.id, user.id));
+  assert.ok(linha, "conta com uso dentro NÃO é apagada");
+
+  // O par da asserção de cima, e o lado que é fácil perder: sem apagar não há o
+  // que varrer. Varrer assim mesmo destruiria o aviso de quem continua amigo.
+  assert.equal(await avisosSobre(user.id), 1, "o aviso do amigo continua de pé");
+});
+
+/**
+ * O caso que "zero swipes" não enxergava. A conta fez o que o app pede, depois
+ * desfez o swipe (A7): a linha de `swipes` some, a de `library_entries` fica, e
+ * ela chega na porta de idade parecendo recém-nascida. Um 2015 no lugar de 1995
+ * apagava tudo dela sem confirmação — que é exatamente o que o comentário do
+ * `recusar` promete que não acontece.
+ */
+test("β2 — conta que desfez o swipe não é apagada: o catálogo dela continua lá", async () => {
+  const { user } = await loginNative("sub-desfez-o-swipe");
+  const [titulo] = await db.select({ id: titles.id }).from(titles).limit(1);
+  assert.ok(titulo, "o banco precisa estar semeado (npm run seed)");
+
+  // Passa a porta de idade e a do handle: é conta de gente, não conta nova.
+  await db
+    .update(users)
+    .set({ birthYear: new Date().getFullYear() - 30, handleChosen: true })
+    .where(eq(users.id, user.id));
+
+  const swipou = await app.inject({
+    method: "POST",
+    url: "/v1/swipes",
+    headers: como(user.id),
+    payload: [{ titleId: titulo.id, direction: 1, clientTs: new Date().toISOString() }],
+  });
+  assert.equal(swipou.statusCode, 200, swipou.body);
+
+  const desfez = await app.inject({
+    method: "DELETE",
+    url: `/v1/swipes/${titulo.id}`,
+    headers: como(user.id),
+  });
+  assert.equal(desfez.statusCode, 204, "o undo apagou o swipe");
+  const meus = await db.select().from(swipes).where(eq(swipes.userId, user.id));
+  assert.deepEqual(meus, [], "e agora ela tem zero swipes");
+
+  const noCatalogo = await db
+    .select({ titleId: libraryEntries.titleId })
+    .from(libraryEntries)
+    .where(eq(libraryEntries.userId, user.id));
+  assert.equal(noCatalogo.length, 1, "mas o catálogo que o like criou continua");
+
+  const res = await responderIdade(user.id, new Date().getFullYear() - (MIN_AGE - 1));
+  assert.deepEqual(res.json(), { ok: false, minAge: MIN_AGE });
+
+  const [linha] = await db.select({ id: users.id }).from(users).where(eq(users.id, user.id));
+  assert.ok(linha, "zero swipes NÃO basta para apagar: ela tem coisa dentro");
+});
+
+/** A amizade sozinha também conta: é relação de outra pessoa, não só minha. */
+test("β2 — conta com amizade e mais nada também não é apagada", async () => {
+  const { user } = await loginNative("sub-so-amizade");
+  const { user: amigo } = await loginNative("sub-so-amizade-do-outro");
+  const [a, b] = [user.id, amigo.id].sort() as [string, string];
+
+  await db
+    .insert(friendships)
+    .values({ userA: a, userB: b, requestedBy: a, status: "accepted" });
+
+  const res = await responderIdade(user.id, new Date().getFullYear() - (MIN_AGE - 1));
+  assert.deepEqual(res.json(), { ok: false, minAge: MIN_AGE });
+
+  const [linha] = await db.select({ id: users.id }).from(users).where(eq(users.id, user.id));
+  assert.ok(linha, "amizade é coisa dentro");
 });
 
 test("β2 — a porta se responde uma vez só", async () => {

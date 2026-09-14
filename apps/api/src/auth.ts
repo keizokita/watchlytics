@@ -4,11 +4,11 @@ import {
   randomBytes,
   timingSafeEqual,
 } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { FastifyRequest } from "fastify";
 import { MIN_AGE } from "@watchlytics/contract";
 import { db } from "./db/client.ts";
-import { users } from "./db/schema.ts";
+import { notifications, users } from "./db/schema.ts";
 
 /**
  * Primitivas de identidade: JWT de acesso, refresh opaco e rate limit.
@@ -250,3 +250,36 @@ export async function requireUserId(
 /** Idade em anos cheios não dá para saber só com o ano; este é o ano corrente. */
 export const idadeMinimaOk = (birthYear: number) =>
   new Date().getFullYear() - birthYear >= MIN_AGE;
+
+// ─── exclusão de conta ──────────────────────────────────────────────────────
+
+/**
+ * As DUAS portas de exclusão saem por aqui: o `DELETE /v1/me` (C6) e a recusa
+ * da porta de idade (β2, `routes/auth.ts`). Uma função só porque a regra é uma
+ * só — enquanto eram dois trechos parecidos, o §8.4 foi consertado na rota do
+ * `me.ts` e a recusa ficou para trás sem ninguém ver.
+ *
+ * A cascata alcança as oito tabelas que apontam para `users`, mas nem toda
+ * cópia dos meus dados mora numa linha minha: o aviso de match do outro lado é
+ * linha DELE e guarda uma cópia do meu handle no payload (`friends.ts` grava
+ * assim de propósito, para a tela não fazer um fetch por linha). Nenhuma FK
+ * aponta dali para mim, então quem varre tem que ser quem apaga.
+ *
+ * ponytail: varredura sequencial, `payload->>'friendId'` não tem índice.
+ * Exclusão de conta é rara; se doer, índice de expressão nessa chave.
+ */
+export async function apagarConta(userId: string): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const [linha] = await tx
+      .delete(users)
+      .where(eq(users.id, userId))
+      .returning({ id: users.id });
+    if (!linha) return false;
+
+    await tx
+      .delete(notifications)
+      .where(sql`${notifications.payload}->>'friendId' = ${userId}`);
+
+    return true;
+  });
+}
