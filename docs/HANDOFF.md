@@ -115,7 +115,13 @@ npm run check      # typecheck dos 3 pacotes
   certas fronteiras de pacote — ACK atrasado do Linux encontrando Nagle. Medido
   em 2026-09-13: o mesmo `select * from titles limit 20` custa 0,8ms dentro do
   container e 41,7ms pela porta publicada, com 0,76ms de CPU. Não é do app e não
-  existe em produção. Detalhe e as quatro medições que fecham o caso em
+  existe em produção. Vale para **qualquer** medição que passe por ali,
+  `driver.mjs` incluído — ele afirma comportamento e não tempo, então nada do
+  que existe hoje fica inválido, mas asserção de duração ali estaria medindo o
+  encaminhador. E o absoluto do servidor oscila: o mesmo `EXPLAIN` da query do
+  feed deu 21,4ms e 42ms no mesmo dia, sem mudança no banco nem na query —
+  **compare execuções inteiras entre si, não números avulsos.** Detalhe e as
+  quatro medições que fecham o caso em
   [../tools/feed-bench.md](../tools/feed-bench.md).
 
 - **Node ≥24.** O projeto executa `.ts` direto, sem `tsx` e sem build step. Só
