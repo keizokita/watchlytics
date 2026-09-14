@@ -720,6 +720,68 @@ test("β2 — conta com amizade e mais nada também não é apagada", async () =
   assert.ok(linha, "amizade é coisa dentro");
 });
 
+/**
+ * A premissa do `recusar()`, como asserção em vez de frase.
+ *
+ * O que matou a versão anterior desta decisão não foi falta de documentação. O
+ * comentário do `recusar()` dizia, com todas as letras, que o onboarding do D4
+ * exige ONBOARDING_SWIPES antes de qualquer tela e que por isso conta que usou
+ * o app tem swipe. Estava nomeada, explicada, com o porquê — e morreu assim
+ * mesmo, no dia em que o A7 ganhou undo noutro arquivo, por outro motivo. Quem
+ * escreveu o A7 não tinha como saber que alguém dependia daquilo.
+ *
+ * Comentário não falha; ninguém roda um comentário. A premissa de HOJE é outra
+ * — "estas são todas as tabelas em que uma pessoa constrói alguma coisa" — e
+ * tem exatamente o mesmo jeito de morrer: alguém cria a nona tabela sem passar
+ * por aqui. Então ela fica escrita como teste, e a nona tabela chega vermelha
+ * no dia em que nasce, na suíte de quem a criou.
+ *
+ * As três gavetas são a decisão, não o inventário. Toda tabela que aponta para
+ * `users` está em uma delas:
+ */
+const TABELAS_QUE_APONTAM_PARA_USERS = {
+  /** Nasce do login, não da pessoa. Apagar junto é o fim honesto da conta. */
+  daConta: ["consents", "identities", "sessions"],
+
+  /**
+   * O que a pessoa construiu. É ISTO que o `temAlgoDentro` consulta, e é a
+   * lista que torna a recusa segura: ter qualquer linha aqui já impede o
+   * apagar.
+   */
+  coisaDentro: ["friendships", "library_entries", "swipes"],
+
+  /** Consequência do que está acima — não dá para existir sozinha. */
+  consequencia: ["matches", "notifications"],
+} as const;
+
+test("β2 — a premissa do recusar(): nenhuma tabela nova entra sem decisão", async () => {
+  const linhas = (await db.execute(sql`
+    select distinct c.conrelid::regclass::text as tabela, c.confdeltype as ao_apagar
+    from pg_constraint c
+    where c.contype = 'f' and c.confrelid = 'users'::regclass
+    order by 1
+  `)) as unknown as { tabela: string; ao_apagar: string }[];
+
+  const declaradas = Object.values(TABELAS_QUE_APONTAM_PARA_USERS).flat().sort();
+  const noBanco = linhas.map((l) => l.tabela).sort();
+
+  assert.deepEqual(
+    noBanco,
+    declaradas,
+    "Tabela nova apontando para `users`. Ela é da conta, é coisa que a pessoa " +
+      "construiu, ou é consequência? Se for coisa dentro, `temAlgoDentro` " +
+      "(routes/auth.ts) precisa consultá-la — senão a recusa da porta de idade " +
+      "volta a apagar conta de gente que tinha o que perder.",
+  );
+
+  // A outra metade da mesma promessa: `apagarConta` conta com a cascata para
+  // não deixar linha órfã. Um `set null` aqui manteria a linha de pé sem dono,
+  // e o apagar deixaria de ser o que o §8.4 promete.
+  for (const { tabela, ao_apagar } of linhas) {
+    assert.equal(ao_apagar, "c", `${tabela} precisa ser ON DELETE CASCADE`);
+  }
+});
+
 test("β2 — a porta se responde uma vez só", async () => {
   const { user } = await loginNative("sub-porta-uma-vez");
   const anoOk = new Date().getFullYear() - 30;

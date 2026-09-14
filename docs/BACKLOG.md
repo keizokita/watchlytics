@@ -971,14 +971,37 @@ nos quatro casos havia um teste ou um `grep` passando, confiante:
 | β9.8 | "a tela não envia pelo teclado" | o `pressKey` do driver não mandava `text`; a tela estava certa |
 | #68 | "tem swipe?" | "tem alguma coisa dentro?" — e o undo do A7 separou as duas |
 
+Duas das quatro **absolveram código certo** em vez de deixar defeito passar
+(β9.2 e β9.8). O custo não é o mesmo: deixar defeito passar custa o defeito;
+acusar código certo custa alguém consertar o que não estava quebrado, e planta
+no repositório uma correção que ninguém consegue justificar depois.
+
 Quem ler "confira todas as tabelas" vai conferir todas as tabelas e errar de
 novo. O que pega é outra pergunta: **a coisa medida é a mesma coisa que a
 afirmação promete?** E, quando a resposta depende de um sinal indireto, uma
-segunda: **esse sinal ainda é verdade?** `zero swipes = nunca entrou` **era**
-verdade quando foi escrito, e deixou de ser sem que ninguém tocasse no
-`recusar()` — o undo do A7 foi escrito em outro arquivo, em outro dia, por outro
-motivo. Cobertura que mede a forma errada aprova o defeito com a mesma confiança
-com que aprovaria o conserto.
+segunda: **esse sinal ainda é verdade?**
+
+### E "documente a suposição" não salva — desta vez estava documentada
+
+O detalhe que vale mais que o resto: a premissa do #68 **estava escrita**. O
+comentário do `recusar()` dizia, com todas as letras, que o onboarding do D4
+exige `ONBOARDING_SWIPES` antes de qualquer tela e que por isso conta que usou o
+app tem swipe. Nomeada, explicada, com o porquê. Morreu assim mesmo, no dia em
+que o A7 ganhou undo — outro arquivo, outro dia, outro motivo, e quem escreveu o
+A7 não tinha como saber que alguém dependia daquilo.
+
+**Comentário não falha. Ninguém roda um comentário.** O que teria pegado é a
+premissa existir como asserção: um teste do invariante em si, separado do teste
+do `recusar()`, que ficaria vermelho no dia do A7 — na suíte que o autor do A7
+estava rodando, com a conversa acontecendo ali, barata.
+
+Fica como regra: **premissa que sustenta decisão destrutiva merece teste
+próprio, não comentário.** Comentário é para o porquê; asserção é para o que
+precisa continuar verdade. O #68 já deixa o dele: a premissa de hoje é "estas
+são todas as tabelas em que uma pessoa constrói alguma coisa", e ela é um teste
+que classifica cada tabela que aponta para `users` em uma de três gavetas (da
+conta, coisa dentro, consequência). A nona tabela chega vermelha no dia em que
+nasce, com a pergunta na mensagem do assert.
 
 **β9.7 — a porta do handle não foi varrida.** O `driver.mjs handle` tem 31
 asserções (§7), e elas rodam. O que não aconteceu é a varredura exploratória
