@@ -118,6 +118,10 @@ npm run check      # typecheck dos 3 pacotes
   `['year','genre']`. Medido duas vezes, em sessões diferentes, em 2026-09-13 —
   e a suíte leva 85s em vez de ~3s. Não é contagem de linha: as asserções de 20
   são tamanho de página e continuam valendo. É conteúdo.
+  E **banco de medição não é banco de teste**: rodar a suíte contra o banco onde
+  você mede deixa usuários e swipes para trás (4 e 44, na vez em que isso foi
+  medido). Os títulos sobrevivem, mas a conta de "quantos swipes esta conta
+  tem?" não — e é dela que sai a latência do feed.
 - **Medindo latência contra `localhost:5433`? Desconte ~40ms.** O encaminhador
   de porta do podman rootless trava ~40ms por consulta quando a resposta cruza
   certas fronteiras de pacote — ACK atrasado do Linux encontrando Nagle. Medido
@@ -278,13 +282,28 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 - **Flake não explicado:** `A5 degrau 1` falhou uma vez e não reproduziu em 6
   tentativas, incluindo com banco sujo e simulando primeira execução. Se
   aparecer de novo, há uma pista a mais.
-  **Pista nova, de 2026-09-13:** há exatamente um jeito conhecido de reprovar
-  essa asserção sem defeito — rodar contra um banco com o catálogo real em vez
-  da fixture de 94 (ver a bullet do clone em §Ambiente). Ali ela reprova
-  *sempre*, não uma vez, então isso não explica um flake de uma ocorrência por
-  si só; mas se a execução que falhou pegou o `DATABASE_URL` do `.env` em vez do
-  de teste, explica. Da próxima vez que aparecer, a primeira pergunta é **contra
-  qual banco a suíte rodou**, antes de procurar corrida ou estado sujo.
+  **Pista de 2026-09-13, e o mecanismo está medido:** contra um banco com o
+  catálogo real em vez da fixture de 94, essa asserção reprova *sempre* (ver a
+  bullet do clone em §Ambiente). Então a pergunta útil não é "flake?", é **qual
+  comando foi usado**:
+
+  | comando | banco | resultado |
+  |---|---|---|
+  | `npm test` | o de teste, sempre | seguro por construção |
+  | `node --test src/routes/feed.test.ts` | nenhum | morre alto: "DATABASE_URL não definida" |
+  | `node --env-file-if-exists=.env --test src/…` | **o de DEV** | `A5 degrau 1` reprova sem defeito |
+
+  O `npm test` é seguro porque o `--env-file` do Node **não** sobrescreve
+  variável já definida, então o `DATABASE_URL=` inline do script sempre ganha
+  (medido nas duas árvores). O caminho humano que produz o falso vermelho é
+  copiar o comando de dentro do `package.json` para rodar um arquivo só e deixar
+  o prefixo para trás. Não é intermitente: é determinístico contra o banco
+  errado, e o que oscila é o comando. Isso **não** prova que foi o que aconteceu
+  na ocorrência registrada acima — mas é a primeira coisa a perguntar.
+
+  Proposta registrada e **não implementada**, para quem for dono de
+  `db/client.ts`: recusar a subida sob `node:test` quando o banco não termina em
+  `_test` fecharia a classe inteira em ~4 linhas, em vez desta ocorrência.
 - **C1 é dívida com prazo, e o cliente já saiu dela.** O shim `DEV_USER_ID` em
   `auth.ts` injeta usuário fixo; produção não define a variável e responde 401.
   O lado web não depende mais dele: o token vive em `apps/web/src/session.ts` e
