@@ -171,13 +171,14 @@ const SONDA = `(() => {
 
   // A primeira linha da lista: numa tela que rola por natureza, o critério que
   // significa alguma coisa é esta linha caber INTEIRA antes de rolar.
+  const itens = document.querySelectorAll('.lib-list > li').length;
   const li = document.querySelector('.lib-list > li');
   const primeiraLinha = li ? (() => { const r = li.getBoundingClientRect();
     return { top: Math.round(r.top), bottom: Math.round(r.bottom), cabe: r.bottom <= H + 0.5 }; })() : null;
 
   const acoes = document.querySelector('.actions');
   return {
-    W, H, tap, folga, pilha, primeiraLinha,
+    W, H, tap, folga, pilha, primeiraLinha, itens,
     scrollH: de.scrollHeight, clientH: H,
     rola: Math.max(0, de.scrollHeight - H),
     acoes: acoes ? (() => { const r = acoes.getBoundingClientRect();
@@ -318,6 +319,31 @@ const clicarAba = (page, rotulo) =>
      .find(b => b.innerText.trim() === ${JSON.stringify(rotulo)})?.click() ?? 'nao-achou'`);
 
 /**
+ * Clicar na aba não é estar NA aba. A lista da aba anterior continua no DOM
+ * enquanto a nova carrega, então esperar `.lib-list` volta na hora e a medição
+ * descreve o conteúdo velho — era por isso que "interested" e "watched" davam
+ * folga idêntica (-3529 nas duas), o que nenhuma tela com conteúdo diferente
+ * deveria dar. A prova é o par: a aba pedida com `aria-pressed=true` E o aviso
+ * de carregando fora da tela.
+ */
+async function trocarAba(page, rotulo) {
+  await clicarAba(page, rotulo);
+  await until(
+    () => evaluate(page, `(() => {
+      const b = [...document.querySelectorAll('.lib-tabs button')]
+        .find((b) => b.innerText.trim() === ${JSON.stringify(rotulo)});
+      if (!b) return 'sem-aba';
+      const carregando = [...document.querySelectorAll('.lib .notice')]
+        .some((n) => /^loading/i.test(n.innerText.trim()));
+      return b.getAttribute('aria-pressed') === 'true' && !carregando;
+    })()`),
+    (v) => v === true,
+    `a aba "${rotulo}" ficar pronta`,
+    30_000,
+  );
+}
+
+/**
  * As cenas. Cada uma monta a sessão que precisa, navega e espera o que prova
  * que a tela chegou — nunca um `sleep` solto no lugar da prova.
  */
@@ -363,8 +389,8 @@ const CENAS = [
       const u = await comFixture(page);
       await page.cmd("Page.navigate", { url: `${WEB}/#/library` });
       await waitFor(page, ".lib-tabs", 40_000);
-      if (id !== "interested") await clicarAba(page, rotulo);
       await waitFor(page, ".lib-list, .lib .notice", 40_000);
+      if (id !== "interested") await trocarAba(page, rotulo);
       await assentou(page);
       return u;
     }],
@@ -501,6 +527,7 @@ for (const vp of VIEWPORTS) {
       matriz.set(nome, { ...(matriz.get(nome) ?? {}), [vp]: `${cabe}${flags ? " " + flags : ""}` });
 
       console.log(`${nome}: folga ${cabe}px · ${m.rola ? `rola ${m.rola}px` : "não rola"}` +
+        (m.itens ? ` · ${m.itens} itens` : "") +
         (m.acoes ? ` · botões ${m.acoes.dentro ? "dentro" : `FORA (bottom ${m.acoes.b} > ${m.H})`}` : ""));
       if (m.primeiraLinha) {
         console.log(`   primeira linha: ${m.primeiraLinha.top}..${m.primeiraLinha.bottom} ` +

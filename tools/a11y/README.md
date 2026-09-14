@@ -100,6 +100,19 @@ se audita a própria porta.
 que é telefone deitado — o caso que mais quebra layout. `openChrome` aceita
 `mobile` explícito.
 
+**`assentou` prova que a TELA assentou, não que a SESSÃO montou.** São duas
+provas, e só uma existe. Em 160 medições, três caíram em "Sign-in is not
+configured" ou "Something went wrong" — a sessão plantada não sobreviveu ao
+`refresh`, e nenhuma reproduziu na remedição. O `cabe.mjs` tenta cada cena duas
+vezes por causa disso; se o vermelho de uma cena não reproduzir, suspeite da
+montagem antes de suspeitar do layout.
+
+**Clicar na aba não é estar na aba.** A lista da aba anterior continua no DOM
+enquanto a nova carrega, então `waitFor('.lib-list')` volta na hora e a medição
+descreve o conteúdo velho. O sintoma era discreto: "interested" e "watched"
+davam folga idêntica, o que duas telas com conteúdo diferente não dão. A prova
+é o par — aba com `aria-pressed=true` e o aviso de carregando fora da tela.
+
 **`document.scrollWidth` não denuncia estouro.** `html` e `body` têm
 `overflow-x: clip`, que mata a barra e some com a prova junto. Quem denuncia é o
 retângulo de cada elemento contra a largura da janela.
