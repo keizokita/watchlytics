@@ -303,7 +303,11 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 
   Proposta registrada e **não implementada**, para quem for dono de
   `db/client.ts`: recusar a subida sob `node:test` quando o banco não termina em
-  `_test` fecharia a classe inteira em ~4 linhas, em vez desta ocorrência.
+  `_test` fecharia a classe inteira em ~4 linhas, em vez desta ocorrência. Dá
+  para escrever sem heurística — o runner se identifica em
+  `process.env.NODE_TEST_CONTEXT` (`"child-v8"` dentro do teste, indefinido
+  fora; medido no v25.4.0), e a convenção `_test` já vale em todos os bancos.
+  Falha alta dizendo qual banco veio, nunca silenciosa.
 - **C1 é dívida com prazo, e o cliente já saiu dela.** O shim `DEV_USER_ID` em
   `auth.ts` injeta usuário fixo; produção não define a variável e responde 401.
   O lado web não depende mais dele: o token vive em `apps/web/src/session.ts` e
