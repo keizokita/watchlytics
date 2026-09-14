@@ -68,10 +68,11 @@ de pé: apagar a conta deixava o handle dela no aviso de quem foi amigo.
 A β9.2 **não procedia** — foi medida numa branch velha e já estava consertada em
 `main` pela auditoria de acessibilidade.
 
-**O que continua aberto:** a trilha F (β9.5, β9.7, β9.8, #40, #41), que é
-ferramenta; alinhar o `recusar()` do `auth.ts`, que hoje não produz sobra; e a
-CSP do #42, que é tarefa própria com `Report-Only` primeiro. Nenhum deles
-bloqueia convidar gente.
+A trilha F (β9.5, β9.7, β9.8, #40, #41) fechou no PR #67, e o `recusar()` do
+`auth.ts` no PR #68 — este último invertendo a expectativa: a nota daqui dizia
+"não produz sobra" e, medido, produzia, além de um defeito maior por baixo (ver
+BACKLOG, β9.6). **O que continua aberto** é a CSP do #42, que é tarefa própria
+com `Report-Only` primeiro. Ela não bloqueia convidar gente.
 
 Fora do código, para convidar gente: publicar a tela de consentimento do Google
 ou cadastrar os testadores (modo Testing, teto de 100), o filtro do Gmail para

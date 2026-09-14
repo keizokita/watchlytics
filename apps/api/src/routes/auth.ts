@@ -420,9 +420,12 @@ async function recusar(userId: string): Promise<void> {
 
 /**
  * Uma consulta só, e `exists` para parar na primeira linha: o que importa é se
- * existe alguma, nunca quantas. `matches` e `notifications` ficam de fora por
- * serem consequência — não dá para ter match sem catálogo, nem aviso de amigo
- * sem amizade.
+ * existe alguma, nunca quantas.
+ *
+ * `matches` e `notifications` ficam de fora de propósito, e não é furo: match
+ * só existe entre amigos aceitos (`friends.ts`, o join em `friendships`), e
+ * `friendships` está na lista; aviso de amigo é consequência de match. A
+ * cobertura dessas duas é transitiva pelas três que estão aqui.
  */
 async function temAlgoDentro(userId: string): Promise<boolean> {
   const linhas = (await db.execute(sql`
