@@ -284,14 +284,15 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
   ter rotacionado é indistinguível de um antes; retentar arriscaria replay, que
   revoga a sessão inteira. Por isso a PR #71 põe botão, com uma pessoa decidindo.
 - **NÃO VERIFICADO, e o convite é a rajada que dispara: o beta pode dividir um
-  balde de rate limit só.** `clientIp` (`auth.ts:166`) lê `cf-connecting-ip` e
-  cai para `req.ip`. Se esse header não atravessar a Function do Pages, todo
-  mundo vira o mesmo IP para o `limitByIp`, e o teto de 20/min passa a ser
-  global — com trinta pessoas convidadas de uma vez, estourar é o caso normal, e
-  o sintoma é o deslogamento da entrada acima. Isto é **leitura de código, não
-  medição**: confirmar exige ver o que a api recebe (um log do header, ou duas
-  máquinas em redes diferentes). Levantado pela trilha da CSP; `auth.ts` é da
-  trilha de api.
+  balde de rate limit só — issue #72.** `clientIp` (`auth.ts:166`) tenta
+  `cf-connecting-ip`, depois `fly-client-ip`, depois `req.ip`. Se o primeiro não
+  atravessar a Function do Pages, os **três** podem convergir para a borda da
+  Cloudflare em vez da pessoa, e o teto de 20/min do `limitByIp` vira global —
+  trinta convidados de uma vez estouram por construção, com o mesmo sintoma de
+  deslogamento da entrada acima. **Leitura de código, não medição.** O caminho
+  barato de confirmar está na #72: uma requisição só e uma olhada no cabeçalho
+  que a api recebeu — rajada real contra `/v1/auth/refresh` derrubaria o serviço
+  de quem estivesse usando, que é o que a medição existiria para prevenir.
 - **O cold start está medido e NÃO bloqueia o beta.** Retomar de suspensão
   custa 0,42–0,57s, sem um único 5xx. Mas só o caminho `suspend → resume` foi
   medido; `stopped → start` (deploy, ou o Fly convertendo suspenso em parado)
