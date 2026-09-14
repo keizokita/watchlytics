@@ -1341,6 +1341,35 @@ pela mesma razão: harness que planta sessão em SQL tem uma metade que conhece 
 portas do app e outra que conhece as telas, e as duas envelhecem em ritmos
 diferentes (§7: porta nova invalida conta de fixture).
 
+E o nono, que fecha a lista porque é o padrão na forma mais limpa que ele
+apareceu: **prova de presença não é prova de identidade.** A cena de aba clicava
+em "Watched", esperava `.lib-list` e media — mas a lista de "interested" continua
+no DOM enquanto a nova carrega, então o `waitFor` voltava na hora e a sonda
+descrevia a **aba anterior**. O sintoma que denunciou foi duas telas de conteúdo
+diferente publicando o mesmo número (-3529 e -2052 em `lib-interested` e
+`lib-watched`), e o que ele denunciava era pior que ruído: as seis linhas
+comparavam uma medição errada com uma certa. Consertado exigindo prova de par —
+a aba pedida com `aria-pressed=true` **e** o aviso de carregando fora da tela.
+
+A hipótese que levantou a pedra estava errada (supôs-se contagem variável na
+fixture; ela insere 12 + 12 + 12, determinístico). O que funcionou foi o sinal,
+não a explicação: **dois casos que deveriam diferir e não diferem denunciam o
+instrumento**, mesmo quando quem aponta não sabe dizer por quê. Vale como método:
+procurar coincidência onde a coincidência não cabe é mais barato que auditar
+método, e acha o que auditoria de método não acha.
+
+Daí a leitura dos nove juntos. Todos são a mesma frase com sujeitos diferentes —
+o instrumento respondeu uma pergunta próxima da que se fez, e a resposta foi lida
+como se fosse da pergunta certa. `sleep(600)` responde "passou tempo?" e se lê
+"a tela assentou". `waitFor('.lib-list')` responde "há uma lista?" e se lê "esta
+aba está pronta". `grep` de literal responde "esta string existe?" e se lê "esta
+cena existe". `getBoundingClientRect` responde "que retângulo o elemento ocupa?"
+e se lê "onde o dedo acerta". Conta vazia responde "cabe sem conteúdo?" e se lê
+"cabe". Nenhum dos cinco falhou; **os cinco acertaram outra pergunta**, e por
+isso nenhum deles dá erro. É por isso que o hábito que este projeto adotou —
+afirmar a FONTE, não a premissa — é o único que pega essa família: a fonte
+denuncia a pergunta que foi realmente feita.
+
 **O painel de estatísticas não era espaço, era ordem de leitura.** Ele ocupava
 152px entre as abas e a lista, e com o piso de 10 assistidos fechado esses 152px
 eram *uma frase dizendo o que você ainda não pode ver* — servida antes do que
