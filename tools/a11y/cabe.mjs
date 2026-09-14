@@ -84,7 +84,7 @@ const SONDA = `(() => {
     return rot && /^(checkbox|radio)$/.test(el.type ?? '') ? { el: rot, r: rot.getBoundingClientRect() }
                                                            : { el, r: el.getBoundingClientRect() };
   };
-  const foraDaDobra = [], alvoPequeno = [];
+  const foraDaDobra = [], alvoPequeno = [], roubados = [];
   for (const el of document.querySelectorAll(SEL)) {
     const r = el.getBoundingClientRect();
     if (!visivel(el, r)) continue;
@@ -118,6 +118,19 @@ const SONDA = `(() => {
     const semFundo = cs.backgroundColor === 'transparent' || cs.backgroundColor.startsWith('rgba(0, 0, 0, 0)');
     const semCaixa = semFundo && parseFloat(cs.borderTopWidth) === 0 && parseFloat(cs.paddingTop) < 4;
     const textual = cs.display === 'inline' || (el.tagName === 'A' && semCaixa);
+    // Área de toque é disputa, não propriedade: um alvo ampliado por ::after
+    // pode atravessar a folga e cobrir o centro do vizinho. Aconteceu de
+    // verdade — a primeira versão do alvo de 44px do rodapé roubava a base do
+    // botão Like. Quem responde de novo é elementFromPoint, agora no centro do
+    // PRÓPRIO controle: se quem atende ali é outro elemento, o toque não chega.
+    const cx0 = r.left + r.width / 2, cy0 = r.top + r.height / 2;
+    if (cx0 >= 0 && cy0 >= 0 && cx0 <= W && cy0 <= H) {
+      const noCentro = document.elementFromPoint(cx0, cy0);
+      const meu = noCentro && (el === noCentro || el.contains(noCentro) || noCentro.contains(el) ||
+        (el.labels && [...el.labels].some((l) => l.contains(noCentro))));
+      if (noCentro && !meu) roubados.push({ ...d, ladrao: marca(noCentro) });
+    }
+
     const alvo = alvoDe(el);
     if (!textual && (alvo.r.width < tap - 0.5 || alvo.r.height < tap - 0.5)) {
       // O retângulo não é a área de toque. Um ::after com inset negativo
@@ -184,6 +197,7 @@ const SONDA = `(() => {
     acoes: acoes ? (() => { const r = acoes.getBoundingClientRect();
       return { y: Math.round(r.top), b: Math.round(r.bottom), dentro: r.bottom <= H + 0.5 }; })() : null,
     estouro: estouro.slice(0, 6), foraDaDobra: foraDaDobra.slice(0, 8), alvoPequeno: alvoPequeno.slice(0, 8),
+    roubados: roubados.slice(0, 6), nRoubado: roubados.length,
     nEstouro: estouro.length, nFora: foraDaDobra.length, nPequeno: alvoPequeno.length,
     nForaDaTela: foraDaDobra.filter((f) => !f.naLista).length,
     nInalcancavel: foraDaDobra.filter((f) => f.inalcancavel).length,
@@ -523,12 +537,13 @@ for (const vp of VIEWPORTS) {
       // verde: no vermelho que já estava lá ninguém olha duas vezes.
       const lista = ROLA_POR_NATUREZA.test(nome);
       const linhaCortada = lista && m.primeiraLinha !== null && !m.primeiraLinha.cabe;
-      const falhou = m.nEstouro > 0 || m.nPequeno > 0 ||
+      const falhou = m.nEstouro > 0 || m.nPequeno > 0 || m.nRoubado > 0 ||
         (lista ? m.nInalcancavel > 0 || linhaCortada : m.nFora > 0 || m.rola > 0);
       if (falhou) reprovou = true;
       const flags =
         (m.rola > 0 ? "R" : "") + ((lista ? m.nInalcancavel : m.nFora) ? "D" : "") +
-        (linhaCortada ? "P" : "") + (m.nEstouro ? "X" : "") + (m.nPequeno ? "T" : "");
+        (linhaCortada ? "P" : "") + (m.nEstouro ? "X" : "") + (m.nPequeno ? "T" : "") +
+        (m.nRoubado ? "C" : "");
       matriz.set(nome, { ...(matriz.get(nome) ?? {}), [vp]: `${cabe}${flags ? " " + flags : ""}` });
 
       console.log(`${nome}: folga ${cabe}px · ${m.rola ? `rola ${m.rola}px` : "não rola"}` +
@@ -544,6 +559,7 @@ for (const vp of VIEWPORTS) {
       }
       for (const f of m.estouro) console.log(`   estoura: ${f.el} "${f.txt}" ${f.l}..${f.r} (largura ${m.W})`);
       for (const f of m.alvoPequeno) console.log(`   alvo ${f.w}x${f.h} < ${m.tap}: ${f.el} "${f.txt}"`);
+      for (const f of m.roubados) console.log(`   centro coberto: ${f.el} "${f.txt}" — quem atende é ${f.ladrao}`);
       if (m.pilha.length) console.log(`   pilha: ${m.pilha.join(" ")}`);
       if (m.nFora > m.foraDaDobra.length) console.log(`   (+${m.nFora - m.foraDaDobra.length} controles abaixo da dobra)`);
     } catch (e) {
@@ -571,8 +587,9 @@ número = folga vertical em px (negativo = falta tanto para caber)
 R = rola · D = controle fora de alcance (na tela que rola: o que a rolagem não
 alcança; na que promete caber: qualquer um abaixo da dobra) · P = primeira linha cortada
 X = estouro horizontal · T = alvo de toque < --tap (já descontando ::after e <label>)
+C = centro do controle coberto por outro elemento (alvo ampliado roubando vizinho)
 
-reprova (saída 1): X e T sempre. Nas telas que prometem caber (deslogada,
+reprova (saída 1): X, T e C sempre. Nas telas que prometem caber (deslogada,
 portas, onboarding, deck, deck-erro), R e D também. Nas telas de lista
 (lib-*, friends-*), que rolam por construção, o critério é P e D.`);
 
