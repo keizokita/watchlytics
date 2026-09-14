@@ -124,11 +124,21 @@ sessão. Então "fui deslogado por engano" é byte a byte igual a "não tenho
 sessão": mesma tela, mesmo console, mesma asserção verde. O `driver.mjs` não
 passa por ali porque planta sessão.
 
-**O gatilho nunca foi observado rodando.** Nas duas janelas frias desta
-medição, 9 sondas, **todas 401** — nenhum 5xx, nenhum timeout, nenhum erro de
-rede. O mecanismo está confirmado no código; o disparo é inferido, não visto. A
-única observação histórica do gatilho é o PM11 que gerou o `0f37532`, e ela veio
-do caminho `stopped → start`, que esta medição não cobre.
+**Nesta medição o gatilho nunca apareceu:** nas duas janelas frias, 9 sondas,
+**todas 401** — nenhum 5xx, nenhum timeout, nenhum erro de rede. Procurei o
+disparo por 5xx e não achei, e continua sem observação até hoje.
+
+**O gatilho existe, e está em outro lugar.** A revisão desta trilha reproduziu o
+mesmo sintoma com **429**, não 5xx: `/v1/auth/refresh` passa pelo `limitByIp`
+(`routes/auth.ts:516`), teto de 20/min, e 429 é `!res.ok` como qualquer outro —
+`driver all` duas vezes seguidas desloga. Vale registrar por que isso importa
+para quem lê uma medição: eu tinha descartado o cold start como gatilho, o que
+poderia ter arquivado o caso; o que a medição descartou foi **um** gatilho, não
+o defeito. Sem ela, a correção teria sido publicada como "cold start desloga",
+que é falso.
+
+A única observação histórica do caminho que eu procurava é o PM11 que gerou o
+`0f37532`, e ela veio do `stopped → start`, que esta medição não cobre.
 
 Com o proxy segurando a requisição, **cold start não é mais o gatilho
 frequente** desse defeito. Mas ele continua alcançável por 5xx de qualquer

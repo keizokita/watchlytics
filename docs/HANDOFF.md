@@ -251,10 +251,10 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 
 ## Problemas conhecidos
 
-- **EM ABERTO, mecanismo confirmado no código e NUNCA observado rodando: o boot
-  desloga por indisponibilidade.** Quem tem sessão válida no cookie e pega a API
-  indisponível vai para a tela de entrada, sem erro e sem aviso. São **três
-  portas**, não uma, e quem consertar só a primeira fecha um terço:
+- **O boot desloga por indisponibilidade — conserto em voo na PR #71.** Quem tem
+  sessão válida no cookie e pega a API indisponível vai para a tela de entrada,
+  sem erro e sem aviso. São **três portas**, não uma, e quem consertar só a
+  primeira fecha um terço:
   - `session.ts:39` — `if (!res.ok) return false`: um 503 é `!ok` como um 401.
   - `session.ts:44` — o `catch`: API fora do ar, sem resposta nenhuma, também
     vira `false`.
@@ -269,17 +269,29 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
   `/v1/auth/refresh` por definição, então "deslogado por engano" é idêntico a
   "sem sessão", e o `driver.mjs` não passa por ali porque planta sessão.
 
-  O cold start **não** é o gatilho: nas duas janelas frias de 2026-09-14, 9
-  sondas, todas 401 — o proxy do Fly segura a requisição
-  ([../tools/cold-start.md](../tools/cold-start.md)). Sobra 5xx de outra origem:
-  piscada do Neon, troca de máquina em deploy. Frequência eventual, não
-  previsível.
+  **O gatilho observado não é 5xx — é 429.** O `/v1/auth/refresh` passa pelo
+  `limitByIp` (`routes/auth.ts:516`), teto de 20/min, e 429 é `!res.ok` como
+  qualquer outro. Reproduzido em 2026-09-14 rodando `driver all` duas vezes
+  seguidas. O cold start, que era a suspeita inicial, **não** é gatilho: nas duas
+  janelas frias de 2026-09-14 foram 9 sondas, todas 401, porque o proxy do Fly
+  segura a requisição ([../tools/cold-start.md](../tools/cold-start.md)). 5xx
+  continua alcançando em tese — piscada do Neon, troca de máquina em deploy —,
+  mas isso segue sem observação.
 
   O conserto não é retentativa, é parar de colapsar "indisponível" e "sem
-  sessão" na mesma resposta. Testável sem produção: `fetch` stubado devolvendo
-  503 e a asserção de que a sessão sobrevive. `errorOffline`, `errorGeneric` e
-  `retry` já existem no `strings.ts` e o `Login` já renderiza `error`, então
-  provavelmente não precisa de string nova nem de arquivo compartilhado.
+  sessão" na mesma resposta — só 401 quer dizer "sem sessão". E **retentativa
+  automática seria pior**: o refresh é rotacionado, e um 5xx depois de o servidor
+  ter rotacionado é indistinguível de um antes; retentar arriscaria replay, que
+  revoga a sessão inteira. Por isso a PR #71 põe botão, com uma pessoa decidindo.
+- **NÃO VERIFICADO, e o convite é a rajada que dispara: o beta pode dividir um
+  balde de rate limit só.** `clientIp` (`auth.ts:166`) lê `cf-connecting-ip` e
+  cai para `req.ip`. Se esse header não atravessar a Function do Pages, todo
+  mundo vira o mesmo IP para o `limitByIp`, e o teto de 20/min passa a ser
+  global — com trinta pessoas convidadas de uma vez, estourar é o caso normal, e
+  o sintoma é o deslogamento da entrada acima. Isto é **leitura de código, não
+  medição**: confirmar exige ver o que a api recebe (um log do header, ou duas
+  máquinas em redes diferentes). Levantado pela trilha da CSP; `auth.ts` é da
+  trilha de api.
 - **O cold start está medido e NÃO bloqueia o beta.** Retomar de suspensão
   custa 0,42–0,57s, sem um único 5xx. Mas só o caminho `suspend → resume` foi
   medido; `stopped → start` (deploy, ou o Fly convertendo suspenso em parado)
