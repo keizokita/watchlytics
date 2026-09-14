@@ -100,17 +100,35 @@ chamou. O proxy do Pages (`functions/_proxy.js`) é repasse puro.
 
 Disso sai um caminho que o comentário do `fly.toml` não cobre:
 
-> **`refreshAccess()` trata "servidor indisponível" e "você não tem sessão" como
-> a mesma coisa.** Em `session.ts:39`, `if (!res.ok) return false` — e um 503 é
-> `!ok` tanto quanto um 401. O `resume()` devolve null, o shell pinta a tela de
-> entrada, e a pessoa que TEM sessão válida no cookie vê que foi deslogada.
-> Sem erro, sem aviso.
+> **O boot trata "servidor indisponível" e "você não tem sessão" como a mesma
+> coisa.** A pessoa que TEM sessão válida no cookie vê que foi deslogada, sem
+> erro e sem aviso.
+
+São **três portas**, não uma — quem consertar só a primeira fecha um terço:
+
+- `session.ts:39` — `if (!res.ok) return false`: 503 é `!ok` como 401.
+- `session.ts:44` — o `catch`: API fora do ar, sem resposta nenhuma, vira
+  `false` igual.
+- `Login.tsx:131` — `me.ok ? … : null`: 503 no `/v1/auth/me` manda para a
+  entrada mesmo com o refresh tendo dado certo.
+
+**`authedFetch` não está afetado**, e a primeira versão deste relatório
+sugeria que estivesse: ele só chama `refreshAccess` quando a resposta é
+exatamente 401 (`session.ts:72`), então um 503 sai por ali direto, sem passar
+pelo refresh. O estrago é do `resume()`, no boot — que é o caso descrito, mas o
+alcance é menor do que "todo o app". Correção da sessão que revisou.
 
 **Nenhuma verificação que existe hoje pega isso.** A tela deslogada já produz
 401 em `/v1/auth/refresh` por definição — é o estado normal de quem não tem
 sessão. Então "fui deslogado por engano" é byte a byte igual a "não tenho
 sessão": mesma tela, mesmo console, mesma asserção verde. O `driver.mjs` não
 passa por ali porque planta sessão.
+
+**O gatilho nunca foi observado rodando.** Nas duas janelas frias desta
+medição, 9 sondas, **todas 401** — nenhum 5xx, nenhum timeout, nenhum erro de
+rede. O mecanismo está confirmado no código; o disparo é inferido, não visto. A
+única observação histórica do gatilho é o PM11 que gerou o `0f37532`, e ela veio
+do caminho `stopped → start`, que esta medição não cobre.
 
 Com o proxy segurando a requisição, **cold start não é mais o gatilho
 frequente** desse defeito. Mas ele continua alcançável por 5xx de qualquer

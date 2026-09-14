@@ -251,19 +251,35 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 
 ## Problemas conhecidos
 
-- **EM ABERTO: `refreshAccess()` desloga por indisponibilidade.** Em
-  `session.ts:39`, `if (!res.ok) return false` trata um 503 igual a um 401:
-  quem tem sessão válida no cookie e pega a API indisponível é mandado para a
-  tela de entrada, sem erro e sem aviso. **Nenhuma verificação atual pega
-  isso** — a tela deslogada já produz 401 em `/v1/auth/refresh` por definição,
-  então o estado "deslogado por engano" é idêntico ao "sem sessão", e o
-  `driver.mjs` não passa por ali porque planta sessão. O cold start **não** é
-  mais o gatilho frequente (o proxy do Fly segura a requisição — ver
-  [../tools/cold-start.md](../tools/cold-start.md)), mas 5xx de outra origem
-  continua alcançando: piscada do Neon, troca de máquina em deploy. O conserto
-  não é retentativa, é parar de colapsar "indisponível" e "sem sessão" na mesma
-  resposta. Testável sem produção: stub devolvendo 503 e a asserção de que a
-  sessão sobrevive.
+- **EM ABERTO, mecanismo confirmado no código e NUNCA observado rodando: o boot
+  desloga por indisponibilidade.** Quem tem sessão válida no cookie e pega a API
+  indisponível vai para a tela de entrada, sem erro e sem aviso. São **três
+  portas**, não uma, e quem consertar só a primeira fecha um terço:
+  - `session.ts:39` — `if (!res.ok) return false`: um 503 é `!ok` como um 401.
+  - `session.ts:44` — o `catch`: API fora do ar, sem resposta nenhuma, também
+    vira `false`.
+  - `Login.tsx:131` — `me.ok ? … : null`: um 503 no `/v1/auth/me` manda para a
+    entrada mesmo com o refresh tendo dado certo.
+
+  **`authedFetch` NÃO está afetado**: ele só chama `refreshAccess` quando a
+  resposta é exatamente 401 (`session.ts:72`), então um 503 sai por ali direto.
+  O estrago é do `resume()`, no boot.
+
+  **Nenhuma verificação atual pega** — a tela deslogada já produz 401 em
+  `/v1/auth/refresh` por definição, então "deslogado por engano" é idêntico a
+  "sem sessão", e o `driver.mjs` não passa por ali porque planta sessão.
+
+  O cold start **não** é o gatilho: nas duas janelas frias de 2026-09-14, 9
+  sondas, todas 401 — o proxy do Fly segura a requisição
+  ([../tools/cold-start.md](../tools/cold-start.md)). Sobra 5xx de outra origem:
+  piscada do Neon, troca de máquina em deploy. Frequência eventual, não
+  previsível.
+
+  O conserto não é retentativa, é parar de colapsar "indisponível" e "sem
+  sessão" na mesma resposta. Testável sem produção: `fetch` stubado devolvendo
+  503 e a asserção de que a sessão sobrevive. `errorOffline`, `errorGeneric` e
+  `retry` já existem no `strings.ts` e o `Login` já renderiza `error`, então
+  provavelmente não precisa de string nova nem de arquivo compartilhado.
 - **O cold start está medido e NÃO bloqueia o beta.** Retomar de suspensão
   custa 0,42–0,57s, sem um único 5xx. Mas só o caminho `suspend → resume` foi
   medido; `stopped → start` (deploy, ou o Fly convertendo suspenso em parado)
