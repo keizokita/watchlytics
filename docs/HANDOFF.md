@@ -251,6 +251,27 @@ O que está provado hoje, e vale mais escrito do que redescoberto:
 
 ## Problemas conhecidos
 
+- **EM ABERTO: `refreshAccess()` desloga por indisponibilidade.** Em
+  `session.ts:39`, `if (!res.ok) return false` trata um 503 igual a um 401:
+  quem tem sessão válida no cookie e pega a API indisponível é mandado para a
+  tela de entrada, sem erro e sem aviso. **Nenhuma verificação atual pega
+  isso** — a tela deslogada já produz 401 em `/v1/auth/refresh` por definição,
+  então o estado "deslogado por engano" é idêntico ao "sem sessão", e o
+  `driver.mjs` não passa por ali porque planta sessão. O cold start **não** é
+  mais o gatilho frequente (o proxy do Fly segura a requisição — ver
+  [../tools/cold-start.md](../tools/cold-start.md)), mas 5xx de outra origem
+  continua alcançando: piscada do Neon, troca de máquina em deploy. O conserto
+  não é retentativa, é parar de colapsar "indisponível" e "sem sessão" na mesma
+  resposta. Testável sem produção: stub devolvendo 503 e a asserção de que a
+  sessão sobrevive.
+- **O cold start está medido e NÃO bloqueia o beta.** Retomar de suspensão
+  custa 0,42–0,57s, sem um único 5xx. Mas só o caminho `suspend → resume` foi
+  medido; `stopped → start` (deploy, ou o Fly convertendo suspenso em parado)
+  continua sem número, e é o caminho provável de quem abre o link depois de uma
+  noite sem tráfego. O `~6s` do `fly.toml` e o *"meio minuto de ociosidade"* do
+  `Login.tsx` não descrevem o que foi medido: a ociosidade até suspender é
+  ~7min33s. Detalhe e as duas formas de graça de fechar a lacuna em
+  [../tools/cold-start.md](../tools/cold-start.md).
 - **EM ABERTO, e não confirmado: swipe que some depois do onboarding.** Em
   2026-09-13, com duas contas reais, os swipes de `@keizoteste` geraram match
   normalmente **durante** o onboarding (20 linhas entre 04:17 e 04:23). Depois
