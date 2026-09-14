@@ -15,9 +15,29 @@
  * Sai 1 se alguma tela não couber, estourar na horizontal, deixar controle
  * abaixo da dobra ou servir alvo de toque menor que --tap.
  */
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
-  openChrome, servers, abrirSessao, devolver, evaluate, waitFor, sleep, comBanco, WEB,
+  openChrome, servers, abrirSessao, devolver, evaluate, waitFor, sleep, comBanco, ROOT, WEB,
 } from "./lib.mjs";
+
+/**
+ * Procedência do instrumento E do que ele mede. A régua são DOIS arquivos —
+ * `cabe.mjs` e `lib.mjs` — e um par desencontrado não dá erro: dá uma corrida
+ * inteira parando na porta do handle, com sintoma de defeito de produto. Uma
+ * matriz sem esta linha não prova de qual instrumento saiu.
+ */
+function procedencia() {
+  const sha = (f) => createHash("sha1").update(readFileSync(new URL(f, import.meta.url))).digest("hex").slice(0, 12);
+  let commit = "?";
+  try {
+    commit = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+    const sujo = execFileSync("git", ["status", "--porcelain"], { cwd: ROOT, encoding: "utf8" }).trim();
+    if (sujo) commit += "+local";
+  } catch {}
+  return `instrumento: cabe.mjs ${sha("./cabe.mjs")} · lib.mjs ${sha("./lib.mjs")} | medindo: ${ROOT} @ ${commit}`;
+}
 
 const VIEWPORTS = (process.env["CABE_VIEWPORTS"] ?? "320x568,360x640,390x844,430x932,740x360")
   .split(",")
@@ -239,6 +259,13 @@ const comFixture = async (page, opts) => {
  *
  * Três provas: fonte pronta (troca de fonte muda altura de tudo), imagem dentro
  * da dobra carregada, e dois quadros seguidos com o mesmo `scrollHeight`.
+ *
+ * ponytail: dois quadros são ~32ms de quietude, e conteúdo de rede chega em
+ * buracos maiores que isso — em tese dá para declarar assentado dentro de um
+ * vão. Medido antes de reforçar: `lib-carregando` em 320x568 dá -528 sozinha e
+ * -528 na suíte (antes eram -528 e -236), então hoje a prova basta. Se voltar a
+ * divergir entre modos, o reforço é exigir o mesmo `scrollHeight` em dois POLLS
+ * seguidos (240ms) em vez de dois quadros, mantendo os rAF dentro de cada poll.
  */
 async function assentou(page, timeoutMs = 20_000) {
   const deadline = Date.now() + timeoutMs;
@@ -394,6 +421,8 @@ const LISTA_LONGA = /^(lib-(interested|watched|discarded)|friends-(people|common
 const matriz = new Map(); // cena -> viewport -> célula
 let reprovou = false;
 
+console.log(procedencia());
+
 const srv = await servers();
 for (const vp of VIEWPORTS) {
   const [w] = vp.split("x").map(Number);
@@ -471,6 +500,7 @@ for (const vp of VIEWPORTS) {
 }
 srv.stop();
 
+console.log(`\n${procedencia()}`);
 const largura = Math.max(14, ...[...matriz.keys()].map((k) => k.length));
 console.log(`\n| ${"tela".padEnd(largura)} | ${VIEWPORTS.map((v) => v.padEnd(13)).join(" | ")} |`);
 console.log(`|${"-".repeat(largura + 2)}|${VIEWPORTS.map(() => "-".repeat(15)).join("|")}|`);
