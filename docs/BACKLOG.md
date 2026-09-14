@@ -1282,29 +1282,39 @@ Vale antes de alguém confiar num vermelho ou num verde dela:
   não afirmar o DOM (`document.fonts.ready`, imagens da dobra com `complete`,
   dois `rAF` sem mudança de `scrollHeight`), antes e depois só valem no **mesmo
   modo de execução**.
-- **`rola > 0` reprova lista povoada por definição.** A linha do veredito é
-  `if (m.rola > 0 || m.nFora || m.nEstouro || m.nPequeno)`. Hoje a régua é
-  coerente porque só tem cenas que *deveriam* caber (vazia, carregando, erro).
-  No minuto em que uma cena com catálogo real entrar, ela rola — e `nFora`
-  dispara junto, porque numa lista longa os controles das linhas de baixo ficam
-  abaixo da dobra, e é isso que uma lista é. O `folga` acompanha: ele é
-  `alturaDisponivel - soma(alturas dos filhos do .shell)`, então um `-2930` numa
-  biblioteca cheia não é falta de 2930px, é a lista tendo 2930px de linha. O
-  número está certo; a pergunta é que não se aplica.
+- **`rola > 0` reprova lista povoada por definição, e já reprova hoje.** A linha
+  do veredito é `if (m.rola > 0 || m.nFora || m.nEstouro || m.nPequeno)`. As
+  cenas de lista povoada já existem — `lib-interested/watched/discarded` e
+  `friends-people/common/alerts` — e lista longa rola; `nFora` dispara junto,
+  porque numa lista longa os controles das linhas de baixo ficam abaixo da
+  dobra, e é isso que uma lista é. Medido, numa cena só e das que *deveriam*
+  caber: `cabe.mjs 'lib-vazia'` → `-477 RDT`, **`EXIT=1`**. A biblioteca vazia
+  reprova porque a seção de conta rola 477px. O `folga` acompanha o mesmo erro
+  de pergunta: ele é `alturaDisponivel - soma(alturas dos filhos do .shell)`,
+  então um `-2930` numa biblioteca cheia não é falta de 2930px, é a lista tendo
+  2930px de linha. O número está certo; a pergunta é que não se aplica.
 
 Daí a regra: **régua permanentemente vermelha é pior que régua permanentemente
 verde.** Na verde alguém ainda confia; na vermelha a regressão de verdade se
 esconde num vermelho que já estava lá, e sobra um exit code que todos aprenderam
-a ignorar. Para cena com lista longa o critério que significa algo é outro — a
-primeira linha inteira dentro da dobra, os controles do **shell** (não os das
-linhas) alcançáveis, estouro horizontal zero, alvo de toque. "Não rola" só é
-alvo onde rolar seria o defeito.
+a ignorar. A régua nasceu vermelha, e o vermelho não distingue "o catálogo é
+longo" de "a tela quebrou". Para cena com lista longa o critério que significa
+algo é outro — a primeira linha inteira dentro da dobra, os controles do
+**shell** (não os das linhas) alcançáveis, estouro horizontal zero, alvo de
+toque. "Não rola" só é alvo onde rolar seria o defeito.
 
-E uma regra de higiene que custou quase um falso defeito: **número de régua
-anda com a versão da régua**. Foram citadas quatro cenas (`lib-interested`,
-`friends-people`, `friends-common`, `friends-alerts`) que não existem em
-`201caf7` nem em nenhum `cabe.mjs` em disco. Quem citar medição diz de qual
-versão ela saiu, e o "antes" sai da mesma.
+E o sétimo caso do padrão, desta vez cometido ao *conferir* os outros: contestei
+a procedência dos números de lista porque
+`grep -rl "lib-interested" --include=*.mjs` não achava nada em disco. Não achava
+porque **o nome nunca aparece inteiro no arquivo** — as seis cenas de lista são
+geradas por `.map()` sobre `["interested","watched","discarded"]` dentro de um
+template, e entram no array por spread. O `grep` rodou no arquivo certo e
+respondeu outra pergunta: "esta string literal existe?", não "esta cena existe?".
+A conclusão inventou um problema de procedência que não havia, e por pouco não
+custou a credibilidade de números que eram reprodutíveis — os dígitos de duas
+sessões bateram um a um. A lição que sobra é a de sempre, com endereço novo:
+**busca por literal não interroga código que monta nomes**; para saber se uma
+cena existe, pergunte ao programa (`cabe.mjs --lista`, ou rode-a), não ao texto.
 
 **O painel de estatísticas não era espaço, era ordem de leitura.** Ele ocupava
 152px entre as abas e a lista, e com o piso de 10 assistidos fechado esses 152px
