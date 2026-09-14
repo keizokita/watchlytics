@@ -20,9 +20,18 @@
 #
 # ── a CSP, diretiva por diretiva ───────────────────────────────────────────
 #
-# Entra em `Report-Only` e fica assim até alguém decidir apertar. CSP errada
-# quebra o app inteiro em produção, e o sintoma é tela branca sem erro visível —
-# ninguém abre um chamado dizendo "a página não pintou nada".
+# Entra em `Report-Only`, e FICA. Não é etapa de uma migração pendente: a
+# pergunta foi levada ao usuário em 2026-09-13, com a medição na mão, e ele
+# decidiu manter. Quem quiser reabrir precisa de razão nova, não de arrumação.
+#
+# A razão de origem continua valendo: CSP errada quebra o app inteiro em
+# produção, e o sintoma é tela branca sem erro visível — ninguém abre um chamado
+# dizendo "a página não pintou nada". E a medição local não atravessa o app
+# todo: a volta do OAuth e a exportação por `blob:` ficam fora dela.
+#
+# A CSP do `/u/:handle`, em `apps/api/src/seguranca.ts`, é o contrário e de
+# propósito — aquela bloqueia. A diferença é o tamanho da superfície, não
+# inconsistência.
 #
 # `default-src 'none'` — o padrão é negar, e cada permissão abaixo é uma linha
 #   que alguém teve que escrever. Uma lista de bloqueios esquece o que ainda não
