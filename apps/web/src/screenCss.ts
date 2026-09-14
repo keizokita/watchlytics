@@ -23,12 +23,16 @@ export const SCREEN_CSS = `
      da busca, em Friends.tsx), mas sem isto a fileira volta a vazar assim que
      um rótulo crescer. */
   flex: 1; min-width: 0;
-  min-height: var(--tap); padding: 0.6rem 0.5rem; border-radius: var(--r-pill);
+  min-height: var(--tap); padding: 0.6rem 0.4rem; border-radius: var(--r-pill);
   border: 1px solid var(--line); background: var(--surface);
   color: var(--muted); font: inherit; font-weight: 600; cursor: pointer;
   /* depois do shorthand "font", que reseta o tamanho. Era o único controle-
-     pílula do app em 16px; filtro, gênero e nota já são menores que isso. */
-  font-size: 0.9rem;
+     pílula do app em 16px; filtro, gênero e nota já são menores que isso.
+     O piso do clamp é o que segura "In common" numa linha só em 320px: com
+     0.9rem fixo o rótulo quebrava em duas, e a fileira inteira de abas de
+     amigos media 64px de altura contra 44px da biblioteca — medido. */
+  font-size: clamp(0.78rem, 3.4vw, 0.9rem);
+  white-space: nowrap;
 }
 .lib-tabs button[aria-pressed="true"] { color: var(--fg); border-color: var(--fg); }
 .lib-tabs button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
@@ -42,7 +46,10 @@ export const SCREEN_CSS = `
    rgb(154, 160, 173) da nav ao lado. Mesma regra do .consent a: sublinhado
    junto com a cor, para o link ser reconhecível sem depender de distinguir
    --fg de --muted. */
-.lib-account a { color: var(--fg); text-decoration: underline; }
+/* inline-flex com --tap porque medido dava 41px de altura: é link, mas é
+   também o alvo que se toca para abrir o próprio perfil. */
+.lib-account a { display: inline-flex; align-items: center; min-height: var(--tap);
+  color: var(--fg); text-decoration: underline; overflow-wrap: anywhere; }
 .lib-account a:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
 .lib-hint { margin: 0; color: var(--muted); font-size: 0.85rem; }
 .lib-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
