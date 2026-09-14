@@ -68,10 +68,11 @@ de pé: apagar a conta deixava o handle dela no aviso de quem foi amigo.
 A β9.2 **não procedia** — foi medida numa branch velha e já estava consertada em
 `main` pela auditoria de acessibilidade.
 
-**O que continua aberto:** a trilha F (β9.5, β9.7, β9.8, #40, #41), que é
-ferramenta; alinhar o `recusar()` do `auth.ts`, que hoje não produz sobra; e a
-CSP do #42, que é tarefa própria com `Report-Only` primeiro. Nenhum deles
-bloqueia convidar gente.
+A trilha F (β9.5, β9.7, β9.8, #40, #41) fechou no PR #67, e o `recusar()` do
+`auth.ts` no PR #68 — este último invertendo a expectativa: a nota daqui dizia
+"não produz sobra" e, medido, produzia, além de um defeito maior por baixo (ver
+BACKLOG, β9.6). **O que continua aberto** é a CSP do #42, que é tarefa própria
+com `Report-Only` primeiro. Ela não bloqueia convidar gente.
 
 Fora do código, para convidar gente: publicar a tela de consentimento do Google
 ou cadastrar os testadores (modo Testing, teto de 100), o filtro do Gmail para
@@ -149,6 +150,16 @@ Detalhe e justificativa no PLAN §1. Resumo do que costuma ser questionado:
 - **Só OAuth, sem senha.** Login nunca é por email — a chave é
   `identities (provider, provider_user_id)`.
 - **Perfil público mostra só estatísticas agregadas**, com piso de 10 assistidos.
+- **A CSP do app fica em `Report-Only`, e a do `/u/:handle` fica bloqueando.** A
+  assimetria é intencional e a pergunta foi levada ao usuário em 2026-09-13, com
+  a medição na mão. São superfícies de tamanho diferente: o perfil público é um
+  `<style>` inline, texto e um link, que cabe numa leitura; o app são 320 kB de
+  React com caminhos que medição local não atravessa — a volta do OAuth e a
+  exportação por `blob:` entre eles. Apertar o segundo sem ter atravessado esses
+  caminhos quebra em produção com tela branca e sem erro visível. **Não é etapa
+  pendente de migração**, e a nota anterior no `_headers` dizia "fica assim até
+  alguém decidir apertar", que lê como tarefa aberta e convida a próxima sessão a
+  apertar por arrumação (corrigido em `95f078d`). Reabrir exige razão nova.
 
 ## Bloqueado na pessoa, não no código
 
