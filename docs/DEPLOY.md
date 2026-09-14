@@ -135,8 +135,13 @@ verificados no Search Console. O que colar:
 | Campo | Valor |
 |---|---|
 | Application home page | `https://watchlytics.pages.dev/` |
-| Privacy policy link | `https://watchlytics.pages.dev/legal/privacy.html` |
-| Terms of service link | `https://watchlytics.pages.dev/legal/terms.html` |
+| Privacy policy link | `https://watchlytics.pages.dev/legal/privacy` |
+| Terms of service link | `https://watchlytics.pages.dev/legal/terms` |
+
+**Sem o `.html`.** Medido em 2026-09-13: `/legal/privacy.html` responde **308**
+para `/legal/privacy`, que é onde a página está. O formulário do Google valida a
+URL que você colar, e campo obrigatório apontando para redirecionamento é risco
+desnecessário justamente no passo que trava a publicação.
 
 As duas páginas são geradas no build por `apps/web/legal.mjs` a partir de
 `docs/legal/*.md` — é por isso que elas ficam no domínio do app e não no
@@ -158,6 +163,37 @@ GitHub, que não dá para verificar como domínio nosso.
 >
 > O que o formulário de publicação ainda cobra de verdade são os *Authorized
 > domains* verificados no Search Console — ver o parágrafo acima.
+
+### Plano para publicar (sair do Testing)
+
+Publicar não é preferência: em **Testing o refresh token expira em 7 dias**.
+Num beta de duas semanas todo mundo é deslogado no meio, vê tela de login de
+novo e uma parte não volta. Some com isso o teto de 100 e o cadastro manual de
+cada e-mail.
+
+A favor: os escopos são `openid email profile`, **não sensíveis**. Aplicativo
+que só pede escopo básico não passa pela revisão de verificação.
+
+| # | Passo | Onde |
+|---|---|---|
+| 1 | Conferir que as duas páginas legais abrem, **sem `.html`** | `curl -o /dev/null -w '%{http_code}' https://watchlytics.pages.dev/legal/privacy` |
+| 2 | Preencher home page, política e termos com as URLs da tabela acima | [Auth Platform → Branding](https://console.cloud.google.com/auth/branding) |
+| 3 | Verificar `watchlytics.pages.dev` no Search Console e pôr em *Authorized domains* | [Search Console](https://search.google.com/search-console) |
+| 4 | Publicar | Auth Platform → Audience → *Publish app* |
+| 5 | Entrar com uma conta FORA da lista de testers, em anônimo | prova que o teto caiu |
+
+**NÃO envie logo.** Upload de logotipo dispara a revisão de marca, que é
+processo de dias. Sem logo, a tela mostra o nome do app e segue.
+
+**O risco real é o passo 3.** `pages.dev` está na Public Suffix List, então o
+Search Console trata cada subdomínio como site próprio e a verificação por
+arquivo ou meta tag deve funcionar. Se o Google recusar o domínio mesmo assim,
+a saída é domínio próprio apontado para o Pages — e aí muda também
+`GOOGLE_REDIRECT_URIS`, `PUBLIC_ORIGIN` e as origens autorizadas. Descubra isso
+ANTES de avisar as pessoas.
+
+**Se publicar travar**, Testing atende 10 a 30 pessoas. O preço é o relogin
+semanal, e ele precisa estar dito no convite — senão parece defeito.
 
 ## 4. GitHub (CI)
 
